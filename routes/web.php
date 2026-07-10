@@ -1,75 +1,83 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\{CustomerController, VehicleController, BidSheetController, BidController};
 use App\Http\Controllers\{BiddingResultController, CostingController, InvoiceController, PaymentController};
-use App\Http\Controllers\{ShipmentController, VehicleReassignController, DocumentController, VendorPaymentController, 
-ExpenseController, AccountingController, ReportController};
+use App\Http\Controllers\{ShipmentController, VehicleReassignController, DocumentController, VendorPaymentController,
+    ExpenseController, AccountingController, ReportController};
 
-Route::get('/', function () {
-    return view('welcome');
+// ── Guest ────────────────────────────────────────────────────────────
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login']);
 });
+Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
 
+Route::get('/', fn () => auth()->check() ? redirect()->route('customers.index') : redirect()->route('login'));
+
+Route::get('/unauthorized', fn () => view('unauthorized'))->name('unauthorized')->middleware('auth');
+
+// ── Authenticated ────────────────────────────────────────────────────
 Route::middleware(['auth'])->group(function () {
-    Route::middleware('role:super_admin')->group(function () {
-        Route::resource('team', UserController::class)->except('show');
-    });
+
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::resource('team', UserController::class)->except('show')->middleware('permission:team');
 
     // Module 2 — Customers & Vehicles
-    Route::resource('customers', CustomerController::class);
-    Route::post('customers/{customer}/deposit',  [CustomerController::class, 'payDeposit'])->name('customers.deposit');
-    Route::post('customers/{customer}/complete', [CustomerController::class, 'completeProfile'])->name('customers.complete');
-    Route::resource('vehicles', VehicleController::class);
+    Route::resource('customers', CustomerController::class)->middleware('permission:customers');
+    Route::post('customers/{customer}/deposit',  [CustomerController::class, 'payDeposit'])->middleware('permission:customers.edit')->name('customers.deposit');
+    Route::post('customers/{customer}/complete', [CustomerController::class, 'completeProfile'])->middleware('permission:customers.edit')->name('customers.complete');
+
+    Route::resource('vehicles', VehicleController::class)->middleware('permission:vehicles');
 
     // Module 3 — Bidding
-    Route::resource('bid-sheets', BidSheetController::class)->except(['edit', 'update']);
+    Route::resource('bid-sheets', BidSheetController::class)->except(['edit', 'update'])->middleware('permission:bid_sheets');
 
-    Route::middleware('role:super_admin')->group(function () {
-        Route::get('bids',        [BidController::class, 'index'])->name('bids.index');
-        Route::get('bids/export', [BidController::class, 'export'])->name('bids.export');
-    });
+    Route::get('bids',        [BidController::class, 'index'])->middleware('permission:bids.index')->name('bids.index');
+    Route::get('bids/export', [BidController::class, 'export'])->middleware('permission:bids.print')->name('bids.export');
 
     // Module 4 — Results & Costing
-    Route::get('results', [BiddingResultController::class, 'index'])->name('results.index');
-    Route::post('bids/{bid}/won',  [BiddingResultController::class, 'won'])->name('bids.won');
-    Route::post('bids/{bid}/lost', [BiddingResultController::class, 'lost'])->name('bids.lost');
+    Route::get('results', [BiddingResultController::class, 'index'])->middleware('permission:results.index')->name('results.index');
+    Route::post('bids/{bid}/won',  [BiddingResultController::class, 'won'])->middleware('permission:results.edit')->name('bids.won');
+    Route::post('bids/{bid}/lost', [BiddingResultController::class, 'lost'])->middleware('permission:results.edit')->name('bids.lost');
 
-    Route::get('vehicles/{vehicle}/costing', [CostingController::class, 'edit'])->name('costings.edit');
-    Route::put('vehicles/{vehicle}/costing', [CostingController::class, 'updateCosting'])->name('costings.update');
-    Route::put('vehicles/{vehicle}/selling-price', [CostingController::class, 'updateSellingPrice'])->name('costings.selling');
+    Route::get('vehicles/{vehicle}/costing', [CostingController::class, 'edit'])->middleware('permission:costings.edit')->name('costings.edit');
+    Route::put('vehicles/{vehicle}/costing', [CostingController::class, 'updateCosting'])->middleware('permission:costings.edit')->name('costings.update');
+    Route::put('vehicles/{vehicle}/selling-price', [CostingController::class, 'updateSellingPrice'])->middleware('permission:costings.edit')->name('costings.selling');
 
     // Module 5 — Invoicing & Payments
-    Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices.index');
-    Route::post('vehicles/{vehicle}/invoice', [InvoiceController::class, 'store'])->name('invoices.store');
-    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
-    Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
-    Route::put('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->name('invoices.settle');
+    Route::get('invoices', [InvoiceController::class, 'index'])->middleware('permission:invoices.index')->name('invoices.index');
+    Route::post('vehicles/{vehicle}/invoice', [InvoiceController::class, 'store'])->middleware('permission:invoices.create')->name('invoices.store');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->middleware('permission:invoices.show')->name('invoices.show');
+    Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->middleware('permission:invoices.print')->name('invoices.pdf');
+    Route::put('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->middleware('permission:invoices.edit')->name('invoices.settle');
 
-    Route::post('payments', [PaymentController::class, 'store'])->name('payments.store');
-    Route::get('customers/{customer}/ledger', [PaymentController::class, 'customerLedger'])->name('payments.customer_ledger');
-
+    Route::post('payments', [PaymentController::class, 'store'])->middleware('permission:payments.create')->name('payments.store');
+    Route::get('customers/{customer}/ledger', [PaymentController::class, 'customerLedger'])->middleware('permission:payments.index')->name('payments.customer_ledger');
 
     // Module 6 — Shipment & Documents
-    Route::get('customers/{customer}/shipments/create', [ShipmentController::class, 'create'])->name('shipments.create');
-    Route::resource('shipments', ShipmentController::class)->only(['index', 'store', 'show']);
-    Route::put('shipments/{shipment}/schedule', [ShipmentController::class, 'setSchedule'])->name('shipments.schedule');
-    Route::post('shipments/{shipment}/dispatch', [ShipmentController::class, 'dispatch'])->name('shipments.dispatch');
-    Route::post('shipments/{shipment}/arrive',   [ShipmentController::class, 'arrive'])->name('shipments.arrive');
+    Route::get('customers/{customer}/shipments/create', [ShipmentController::class, 'create'])->middleware('permission:shipments.create')->name('shipments.create');
+    Route::resource('shipments', ShipmentController::class)->only(['index', 'store', 'show'])->middleware('permission:shipments');
+    Route::put('shipments/{shipment}/schedule', [ShipmentController::class, 'setSchedule'])->middleware('permission:shipments.edit')->name('shipments.schedule');
+    Route::post('shipments/{shipment}/dispatch', [ShipmentController::class, 'dispatch'])->middleware('permission:shipments.edit')->name('shipments.dispatch');
+    Route::post('shipments/{shipment}/arrive',   [ShipmentController::class, 'arrive'])->middleware('permission:shipments.edit')->name('shipments.arrive');
 
-    Route::post('vehicles/{vehicle}/reassign', [VehicleReassignController::class, 'reassign'])->name('vehicles.reassign');
+    Route::post('vehicles/{vehicle}/reassign', [VehicleReassignController::class, 'reassign'])->middleware('permission:vehicles.edit')->name('vehicles.reassign');
 
-    Route::get('vehicles/{vehicle}/documents',  [DocumentController::class, 'index'])->name('documents.index');
-    Route::post('vehicles/{vehicle}/documents', [DocumentController::class, 'store'])->name('documents.store');
-    Route::post('vehicles/{vehicle}/documents/release', [DocumentController::class, 'release'])->name('documents.release');
-    Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
+    Route::get('vehicles/{vehicle}/documents',  [DocumentController::class, 'index'])->middleware('permission:documents.index')->name('documents.index');
+    Route::post('vehicles/{vehicle}/documents', [DocumentController::class, 'store'])->middleware('permission:documents.create')->name('documents.store');
+    Route::post('vehicles/{vehicle}/documents/release', [DocumentController::class, 'release'])->middleware('permission:documents.edit')->name('documents.release');
+    Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->middleware('permission:documents.delete')->name('documents.destroy');
 
     // Module 6b — Vendor Payments & Expenses
-    Route::resource('vendor-payments', VendorPaymentController::class)->only(['index', 'store']);
-    Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'destroy']);
+    Route::resource('vendor-payments', VendorPaymentController::class)->only(['index', 'store'])->middleware('permission:vendor_payments');
+    Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'destroy'])->middleware('permission:expenses');
 
     // Module 7 — Accounting
-    Route::middleware('role:super_admin|accountant')->prefix('accounting')->name('accounting.')->group(function () {
+    Route::middleware('permission:accounting.index')->prefix('accounting')->name('accounting.')->group(function () {
         Route::get('chart',       [AccountingController::class, 'chartOfAccounts'])->name('chart');
         Route::get('journal',     [AccountingController::class, 'journal'])->name('journal');
         Route::get('ledger/{account}', [AccountingController::class, 'ledger'])->name('ledger');
@@ -81,9 +89,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Module 8 — Reports
     Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('agent-wise',  [ReportController::class, 'agentWise'])->name('agent_wise');
-        Route::get('vendor-wise', [ReportController::class, 'vendorWise'])->name('vendor_wise');
-        Route::get('bid-wise',    [ReportController::class, 'bidWise'])->name('bid_wise');
-        Route::get('bid-won',     [ReportController::class, 'bidWon'])->name('bid_won');
+        Route::get('agent-wise',  [ReportController::class, 'agentWise'])->middleware('permission:reports.agent_wise')->name('agent_wise');
+        Route::get('vendor-wise', [ReportController::class, 'vendorWise'])->middleware('permission:reports.vendor_wise')->name('vendor_wise');
+        Route::get('bid-wise',    [ReportController::class, 'bidWise'])->middleware('permission:reports.bid_wise')->name('bid_wise');
+        Route::get('bid-won',     [ReportController::class, 'bidWon'])->middleware('permission:reports.bid_won')->name('bid_won');
     });
 });

@@ -13,7 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Illuminate\Foundation\Configuration\Middleware $middleware) {
         $middleware->alias([
             'role'               => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'permission'         => \App\Http\Middleware\CheckModulePermission::class, // was Spatie's — now module-aware
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
     })
