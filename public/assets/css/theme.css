@@ -8,6 +8,9 @@ body {
 	background: #ecedf0;
 	width: 100%;
 }
+.form-check-input{
+	height: 1em !important;
+}
 
 html {
 	overflow-x: hidden !important;
