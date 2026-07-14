@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exports\BidTemplateExport;
 use App\Imports\BidsImport;
-use App\Models\BidSheet;
+use App\Models\{Bid, BidSheet, Customer};
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -12,7 +12,6 @@ class BidSheetController extends Controller
 {
     public function index()
     {
-        // ScopedToAgent narrows this to "my sheets" for a sales agent automatically.
         $sheets = BidSheet::with('agent')
             ->withCount([
                 'bids',
@@ -25,7 +24,6 @@ class BidSheetController extends Controller
         return view('bidding.sheets.index', compact('sheets'));
     }
 
-    /** Route stays registered by Route::resource; nothing links here since upload is a modal. */
     public function create()
     {
         return redirect()->route('bid-sheets.index');
@@ -66,12 +64,13 @@ class BidSheetController extends Controller
     public function show(BidSheet $bidSheet)
     {
         $bidSheet->load(['bids' => fn ($q) => $q->latest(), 'agent']);
-        return view('bidding.sheets.show', ['sheet' => $bidSheet]);
+        $customers = Customer::complete()->orderBy('name')->get(); // for the Assign Customer modal
+
+        return view('bidding.sheets.show', ['sheet' => $bidSheet, 'customers' => $customers]);
     }
 
     public function destroy(BidSheet $bidSheet)
     {
-        // Bids survive (bid_sheet_id nulls out via the FK), only the sheet record itself is removed.
         $bidSheet->delete();
         return back()->with('success', 'Bid sheet removed.');
     }
@@ -79,5 +78,22 @@ class BidSheetController extends Controller
     public function template()
     {
         return Excel::download(new BidTemplateExport, 'bid-sheet-template.xlsx');
+    }
+
+    /** Fill in a customer on a bid uploaded without one — only while the bid is still pending. */
+    public function assignCustomer(Request $request, Bid $bid)
+    {
+        abort_unless($bid->result === 'pending', 422, 'Customer can only be assigned while the bid is still pending.');
+
+        $data = $request->validate([
+            'customer_id' => ['required', 'exists:customers,id'],
+        ]);
+
+        $customer = Customer::findOrFail($data['customer_id']);
+        abort_unless($customer->isProfileComplete(), 422, "Customer '{$customer->name}' has an incomplete profile — complete it before assigning bids.");
+
+        $bid->update(['customer_id' => $customer->id]);
+
+        return back()->with('success', "Customer '{$customer->name}' assigned to lot {$bid->lot_no}.");
     }
 }

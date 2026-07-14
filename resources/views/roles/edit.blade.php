@@ -12,4 +12,4 @@
         </div>
     </section>
 </div></div>
-@endsection
+@endsection 

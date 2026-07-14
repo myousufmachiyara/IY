@@ -40,18 +40,35 @@
                             @forelse ($bids as $b)
                             <tr>
                                 <td>{{ $b->lot_no ?? '—' }}</td>
-                                <td>{{ $b->customer->name ?? '—' }}</td>
+                                <td>
+                                    @if($b->customer)
+                                        {{ $b->customer->name }}
+                                    @else
+                                        <span class="badge bg-warning text-dark">Unassigned</span>
+                                    @endif
+                                </td>
                                 <td>{{ trim("{$b->year} {$b->make} {$b->model}") ?: '—' }}</td>
                                 <td>{{ $b->chassis_no ?? '—' }}</td>
                                 @if($isPrivileged)<td>{{ $b->agent->name ?? '—' }}</td>@endif
                                 <td>¥{{ number_format($b->max_bid) }}</td>
                                 <td>{{ optional($b->auction_date)->format('d-m-Y') ?? '—' }}</td>
                                 <td class="text-nowrap">
+                                    @if(!$b->customer_id)
+                                        @can('bid_sheets.edit')
+                                            <a href="#" class="btn btn-sm btn-warning text-dark me-1"
+                                               onclick="openAssignCustomer({{ $b->id }}, '{{ $b->lot_no }}')">
+                                                Assign Customer
+                                            </a>
+                                        @endcan
+                                    @else
+                                        @can('results.edit')
+                                            <a href="#" class="btn btn-sm btn-success me-1"
+                                               onclick="openWon({{ $b->id }}, '{{ $b->customer->name }}', {{ $b->max_bid }})">
+                                                Mark Won
+                                            </a>
+                                        @endcan
+                                    @endif
                                     @can('results.edit')
-                                        <a href="#" class="btn btn-sm btn-success me-1"
-                                           onclick="openWon({{ $b->id }}, '{{ $b->customer->name ?? 'this customer' }}', {{ $b->max_bid }})">
-                                            Mark Won
-                                        </a>
                                         <form action="{{ route('bids.lost', $b) }}" method="POST" style="display:inline;"
                                               onsubmit="return confirm('Mark this bid as lost?');">
                                             @csrf
@@ -107,6 +124,10 @@
                 </form>
             </section>
         </div>
+        @endcan
+
+        @can('bid_sheets.edit')
+            @include('bidding._assign_customer_modal')
         @endcan
     </div>
 </div>

@@ -22,6 +22,7 @@
                 @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
                 @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
                 @if(session('warning'))<div class="alert alert-warning">{{ session('warning') }}</div>@endif
+
                 <div class="row mb-3">
                     <div class="col-md-4"><strong>Agent:</strong> {{ $sheet->agent->name ?? '—' }}</div>
                     <div class="col-md-4"><strong>Auction Date:</strong> {{ optional($sheet->auction_date)->format('d-m-Y') ?? '—' }}</div>
@@ -48,7 +49,18 @@
                                 <td>{{ $b->auction_house ?? '—' }}</td>
                                 <td>{{ trim("{$b->year} {$b->make} {$b->model}") ?: '—' }}</td>
                                 <td>{{ $b->chassis_no ?? '—' }}</td>
-                                <td>{{ $b->customer->name ?? '—' }}</td>
+                                <td>
+                                    @if($b->customer)
+                                        {{ $b->customer->name }}
+                                    @elseif($b->result === 'pending')
+                                        <span class="badge bg-warning text-dark me-1">Unassigned</span>
+                                        @can('bid_sheets.edit')
+                                            <a href="#" class="small" onclick="openAssignCustomer({{ $b->id }}, '{{ $b->lot_no }}')">Assign</a>
+                                        @endcan
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
                                 <td>¥{{ number_format($b->max_bid) }}</td>
                                 <td><span class="badge bg-{{ $resultColors[$b->result] ?? 'secondary' }} text-uppercase">{{ $b->result }}</span></td>
                             </tr>
@@ -67,6 +79,10 @@
                 @endcan
             </div>
         </section>
+
+        @can('bid_sheets.edit')
+            @include('bidding._assign_customer_modal')
+        @endcan
     </div>
 </div>
 @endsection
