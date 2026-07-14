@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Vehicle;
+use App\Models\{Document, Vehicle};
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
@@ -17,26 +18,62 @@ class DocumentController extends Controller
     {
         $data = $request->validate([
             'type'                => ['nullable', 'string', 'max:60'],
-            'title'                => ['required', 'string', 'max:255'],
-            'file'                 => ['required', 'file', 'max:10240'],
-            'is_final_clearance'   => ['boolean'],
+            'title'               => ['required', 'string', 'max:255'],
+            'file'                => ['required', 'file', 'max:10240'],
+            'is_final_clearance'  => ['boolean'],
         ]);
 
-        // The final clearance document can be UPLOADED any time, but stays hidden
-        // from the customer until the invoice is 100% paid — enforced in release().
         $vehicle->documents()->create([
-            'type'                 => $data['type'] ?? null,
-            'title'                => $data['title'],
-            'file_path'            => $request->file('file')->store('documents'),
-            'is_final_clearance'   => $request->boolean('is_final_clearance'),
-            'visible_to_customer'  => ! $request->boolean('is_final_clearance'), // regular docs visible immediately
-            'uploaded_by'          => $request->user()->id,
+            'type'                => $data['type'] ?? null,
+            'title'               => $data['title'],
+            'file_path'           => $request->file('file')->store('documents', 'public'),
+            'is_final_clearance'  => $request->boolean('is_final_clearance'),
+            'visible_to_customer' => ! $request->boolean('is_final_clearance'),
+            'uploaded_by'         => $request->user()->id,
         ]);
 
         return back()->with('success', 'Document uploaded.');
     }
 
-    /** Release the final clearance document — ONLY after 100% of the invoice is cleared. */
+    /** Modal edit form fetches this as JSON. */
+    public function edit(Document $document)
+    {
+        return response()->json($document);
+    }
+
+    public function update(Request $request, Document $document)
+    {
+        $data = $request->validate([
+            'type'               => ['nullable', 'string', 'max:60'],
+            'title'              => ['required', 'string', 'max:255'],
+            'file'               => ['nullable', 'file', 'max:10240'],
+            'is_final_clearance' => ['boolean'],
+        ]);
+
+        $wasFinal = $document->is_final_clearance;
+        $isFinal  = $request->boolean('is_final_clearance');
+
+        $document->title = $data['title'];
+        $document->type  = $data['type'] ?? null;
+        $document->is_final_clearance = $isFinal;
+
+        // Flipping final-clearance status re-locks visibility, so it always has
+        // to go through the explicit Release action again rather than staying
+        // exposed (or hidden) based on the previous state.
+        if ($isFinal !== $wasFinal) {
+            $document->visible_to_customer = ! $isFinal;
+        }
+
+        if ($request->hasFile('file')) {
+            Storage::disk('public')->delete($document->file_path);
+            $document->file_path = $request->file('file')->store('documents', 'public');
+        }
+
+        $document->save();
+
+        return back()->with('success', 'Document updated.');
+    }
+
     public function release(Vehicle $vehicle)
     {
         $invoice = $vehicle->invoice;
@@ -48,9 +85,11 @@ class DocumentController extends Controller
         return back()->with('success', 'Final clearance document released to customer.');
     }
 
-    public function destroy(\App\Models\Document $document)
+    public function destroy(Document $document)
     {
+        Storage::disk('public')->delete($document->file_path);
         $document->delete();
+
         return back()->with('success', 'Document removed.');
     }
-}
+}   

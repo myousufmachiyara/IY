@@ -63,6 +63,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('customers/{customer}/ledger', [PaymentController::class, 'customerLedger'])->middleware('permission:payments.index')->name('payments.customer_ledger');
 
     // Module 6 — Shipment & Documents
+    Route::resource('shipments', ShipmentController::class)->only(['index', 'store', 'show', 'edit', 'update'])->middleware('permission:shipments');
     Route::get('customers/{customer}/shipments/create', [ShipmentController::class, 'create'])->middleware('permission:shipments.create')->name('shipments.create');
     Route::resource('shipments', ShipmentController::class)->only(['index', 'store', 'show'])->middleware('permission:shipments');
     Route::put('shipments/{shipment}/schedule', [ShipmentController::class, 'setSchedule'])->middleware('permission:shipments.edit')->name('shipments.schedule');
@@ -75,7 +76,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('vehicles/{vehicle}/documents', [DocumentController::class, 'store'])->middleware('permission:documents.create')->name('documents.store');
     Route::post('vehicles/{vehicle}/documents/release', [DocumentController::class, 'release'])->middleware('permission:documents.edit')->name('documents.release');
     Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->middleware('permission:documents.delete')->name('documents.destroy');
-
+    Route::get('documents/{document}/edit', [DocumentController::class, 'edit'])->middleware('permission:documents.edit')->name('documents.edit');
+    Route::put('documents/{document}', [DocumentController::class, 'update'])->middleware('permission:documents.edit')->name('documents.update');
+    
     // Module 6b — Vendor Payments & Expenses
     Route::resource('vendor-payments', VendorPaymentController::class)->only(['index', 'store'])->middleware('permission:vendor_payments');
     Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'destroy'])->middleware('permission:expenses');
