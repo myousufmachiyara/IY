@@ -42,7 +42,12 @@ class RoleController extends Controller
         ]);
 
         $role = Role::create(['name' => $data['name'], 'guard_name' => 'web']);
-        $role->syncPermissions($data['permissions'] ?? []);
+
+        // Resolve to actual Permission models before syncing — passing raw string IDs
+        // straight from the form can make some spatie/laravel-permission versions try
+        // to resolve them BY NAME instead of by ID, throwing PermissionDoesNotExist.
+        $permissions = Permission::whereIn('id', $data['permissions'] ?? [])->get();
+        $role->syncPermissions($permissions);
 
         return redirect()->route('roles.index')->with('success', 'Role created.');
     }
@@ -67,7 +72,9 @@ class RoleController extends Controller
         ]);
 
         $role->update(['name' => $data['name']]);
-        $role->syncPermissions($data['permissions'] ?? []);
+
+        $permissions = Permission::whereIn('id', $data['permissions'] ?? [])->get();
+        $role->syncPermissions($permissions);
 
         return redirect()->route('roles.index')->with('success', 'Role updated.');
     }
