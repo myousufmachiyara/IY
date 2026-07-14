@@ -12,11 +12,11 @@ class UserController extends Controller
     public function index()
     {
         $users = User::with('roles')->latest()->get();
-        $roles = Role::orderBy('name')->get();
+        $roles = Role::with('permissions')->orderBy('name')->get();
 
         $rolePermMap = $roles->mapWithKeys(fn ($r) => [$r->name => [
-            'agent'  => $r->hasPermissionTo('scope.by_agent'),
-            'vendor' => $r->hasPermissionTo('scope.by_vendor'),
+            'agent'  => $r->permissions->contains('name', 'scope.by_agent'),
+            'vendor' => $r->permissions->contains('name', 'scope.by_vendor'),
         ]]);
 
         return view('team.index', compact('users', 'roles', 'rolePermMap'));
