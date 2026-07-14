@@ -94,16 +94,12 @@
                                     @if(!$c->profile_completed_at)
                                         @if($c->canCompleteProfile())
                                             <form action="{{ route('customers.complete', $c) }}" method="POST" style="display:inline;"
-                                                  onsubmit="return confirm('Mark this profile complete? This enables bidding.');">
+                                                onsubmit="return confirm('Mark this profile complete? This enables bidding.');">
                                                 @csrf
                                                 <button type="submit" class="btn btn-link p-0 text-info me-1" title="Complete Profile">
                                                     <i class="fa fa-check-circle"></i>
                                                 </button>
                                             </form>
-                                        @elseif($c->is_new_customer && !$c->security_deposit_paid)
-                                            <span class="text-muted me-1" title="Pay the security deposit first"><i class="fa fa-check-circle"></i></span>
-                                        @else
-                                            <span class="text-muted me-1" title="Add a vehicle requirement first"><i class="fa fa-check-circle"></i></span>
                                         @endif
                                     @endif
                                     @can('customers.delete')

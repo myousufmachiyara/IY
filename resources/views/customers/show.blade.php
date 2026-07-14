@@ -64,10 +64,8 @@
                                                 @csrf
                                                 <button class="btn btn-sm btn-outline-success ms-1">Complete Now</button>
                                             </form>
-                                        @elseif($customer->is_new_customer && !$customer->security_deposit_paid)
-                                            <div class="small text-danger mt-1"><i class="fa fa-info-circle"></i> Pay the security deposit before completing this profile.</div>
                                         @else
-                                            <div class="small text-danger mt-1"><i class="fa fa-info-circle"></i> Add at least one vehicle requirement before completing this profile.</div>
+                                            <div class="small text-danger mt-1"><i class="fa fa-info-circle"></i> Pay the security deposit before completing this profile (use "Pay Now" above).</div>
                                         @endif
                                     @endif
                                 </p>
