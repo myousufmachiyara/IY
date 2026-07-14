@@ -11,13 +11,13 @@ class BidController extends Controller
 {
     public function index(Request $request)
     {
-        // Super admin bypasses the agent scope automatically, so this spans all agents.
+        // Super admin's own permission already bypasses the agent scope, so this spans everyone.
         $bids = Bid::with(['agent', 'customer'])
             ->when($request->agent_id, fn ($q, $v) => $q->where('agent_id', $v))
             ->when($request->from, fn ($q, $v) => $q->whereDate('auction_date', '>=', $v))
             ->when($request->to, fn ($q, $v) => $q->whereDate('auction_date', '<=', $v))
             ->orderBy('auction_date')
-            ->paginate(25)->withQueryString();
+            ->get();
 
         $agents = User::role('sales_agent')->orderBy('name')->get();
 

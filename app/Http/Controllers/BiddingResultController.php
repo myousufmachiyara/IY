@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Bid, Vehicle, VehicleCosting};
+use App\Models\{Bid, User, Vehicle, VehicleCosting};
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,11 +12,14 @@ class BiddingResultController extends Controller
     /** Vehicles/bids awaiting a result. */
     public function index()
     {
-        $bids = Bid::with(['customer', 'vehicle'])
+        $bids = Bid::with(['customer', 'vehicle', 'agent'])
             ->where('result', 'pending')
-            ->latest()->paginate(20);
+            ->latest()
+            ->get();
 
-        return view('results.index', compact('bids'));
+        $vendors = User::role('vendor_agent')->orderBy('name')->get();
+
+        return view('results.index', compact('bids', 'vendors'));
     }
 
     /**
@@ -32,7 +35,6 @@ class BiddingResultController extends Controller
         ]);
 
         DB::transaction(function () use ($bid, $data, $request, $ledger) {
-            // Reuse a linked vehicle or create one from the bid.
             $vehicle = $bid->vehicle ?: Vehicle::create([
                 'customer_id' => $bid->customer_id,
                 'agent_id'    => $bid->agent_id,
@@ -51,10 +53,8 @@ class BiddingResultController extends Controller
 
             $bid->update(['result' => 'won', 'won_amount' => $data['buying_price'], 'vehicle_id' => $vehicle->id]);
 
-            // Amount hits the vendor ledger as PAYABLE (company owes vendor).
             $ledger->vendorPayable($vehicle->fresh());
 
-            // Open a costing row pre-filled with vendor's default commission %.
             VehicleCosting::firstOrCreate(
                 ['vehicle_id' => $vehicle->id],
                 [
@@ -64,7 +64,7 @@ class BiddingResultController extends Controller
             );
         });
 
-        return redirect()->route('costings.edit', $bid->vehicle_id ?? $bid->fresh()->vehicle_id)
+        return redirect()->route('costings.edit', $bid->fresh()->vehicle_id)
             ->with('success', 'Bid marked won. Vendor payable posted — complete the costing next.');
     }
 

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Vehicle;
+use App\Models\{Vehicle, VehicleCosting};
 use Illuminate\Http\Request;
 
 class CostingController extends Controller
@@ -10,12 +10,14 @@ class CostingController extends Controller
     public function edit(Vehicle $vehicle)
     {
         abort_unless($vehicle->isWon(), 422, 'Costing is only available for won vehicles.');
-        $vehicle->load('costing', 'customer', 'vendor', 'agent');
+        $vehicle->load('customer', 'vendor', 'agent');
 
-        return view('costings.edit', compact('vehicle'));
+        $costing = $vehicle->costing ?: $this->ensureCosting($vehicle);
+
+        return view('costings.edit', compact('vehicle', 'costing'));
     }
 
-    /** Cost inputs — restricted to Super Admin / Accountant. */
+    /** Cost inputs — restricted to Super Admin / Accountant (also gated at the route). */
     public function updateCosting(Request $request, Vehicle $vehicle)
     {
         abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may edit costing.');
@@ -28,12 +30,11 @@ class CostingController extends Controller
             'misc_expenses'             => ['required', 'integer', 'min:0'],
         ]);
 
-        $costing = $vehicle->costing;
+        $costing = $vehicle->costing ?: $this->ensureCosting($vehicle);
         $costing->fill($data);
         $costing->buying_price = $vehicle->buying_price;
         $costing->prepared_by  = $request->user()->id;
 
-        // Recompute totals/profit using the agent's commission % and fixed bonus.
         $costing->recalculate(
             $vehicle->agent->sales_commission_percent ?? 15,
             (int) ($vehicle->agent->sales_fixed_bonus ?? 0),
@@ -42,15 +43,14 @@ class CostingController extends Controller
         return back()->with('success', 'Costing updated. Profit and agent earning recalculated.');
     }
 
-    /** Selling price — set by the owning sales agent (or admin). */
+    /** Selling price — set by the owning sales agent (or admin/accountant). */
     public function updateSellingPrice(Request $request, Vehicle $vehicle)
     {
         $data = $request->validate(['selling_price' => ['required', 'integer', 'min:1']]);
 
         $vehicle->update(['selling_price' => $data['selling_price']]);
 
-        // Keep the costing's sale_price aligned to the agent-set figure, then re-derive profit.
-        $costing = $vehicle->costing;
+        $costing = $vehicle->costing ?: $this->ensureCosting($vehicle);
         $costing->sale_price = $data['selling_price'];
         $costing->profit     = $costing->sale_price - $costing->total_costing;
         $costing->agent_commission_amount =
@@ -58,5 +58,14 @@ class CostingController extends Controller
         $costing->save();
 
         return back()->with('success', 'Selling price saved.');
+    }
+
+    private function ensureCosting(Vehicle $vehicle): VehicleCosting
+    {
+        return VehicleCosting::create([
+            'vehicle_id'                => $vehicle->id,
+            'buying_price'              => $vehicle->buying_price,
+            'vendor_commission_percent' => $vehicle->vendor->vendor_commission_percent ?? 7,
+        ]);
     }
 }

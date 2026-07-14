@@ -33,6 +33,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Module 3 — Bidding
     Route::resource('bid-sheets', BidSheetController::class)->except(['edit', 'update'])->middleware('permission:bid_sheets');
+    Route::get('bid-sheets/template', [BidSheetController::class, 'template'])->middleware('permission:bid_sheets.index')->name('bid-sheets.template');
 
     Route::get('bids',        [BidController::class, 'index'])->middleware('permission:bids.index')->name('bids.index');
     Route::get('bids/export', [BidController::class, 'export'])->middleware('permission:bids.print')->name('bids.export');
