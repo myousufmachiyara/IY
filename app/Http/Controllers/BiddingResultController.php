@@ -2,31 +2,30 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Bid, User, Vehicle, VehicleCosting};
+use App\Models\{Bid, Customer, User, Vehicle, VehicleCosting};
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class BiddingResultController extends Controller
 {
-    /** Vehicles/bids awaiting a result. */
     public function index()
     {
         $bids = Bid::with(['customer', 'vehicle', 'agent'])
             ->where('result', 'pending')
             ->latest()
             ->get();
-        $vendors = User::permission('scope.by_vendor')->orderBy('name')->get();
 
-        return view('results.index', compact('bids', 'vendors'));
+        $vendors   = User::permission('scope.by_vendor')->orderBy('name')->get();
+        $customers = Customer::complete()->orderBy('name')->get(); // for the Assign Customer modal
+
+        return view('results.index', compact('bids', 'vendors', 'customers'));
     }
 
-    /**
-     * Mark a bid WON: attach/convert to a vehicle, store the winning screenshot,
-     * post the amount to the vendor ledger as payable, and open a costing row.
-     */
     public function won(Request $request, Bid $bid, LedgerService $ledger)
     {
+        abort_if(is_null($bid->customer_id), 422, 'Assign a customer to this bid before marking it won.');
+
         $data = $request->validate([
             'vendor_id'    => ['required', 'exists:users,id'],
             'buying_price' => ['required', 'integer', 'min:1'],
@@ -69,6 +68,7 @@ class BiddingResultController extends Controller
 
     public function lost(Bid $bid)
     {
+        // Marking lost never touches Vehicle/customer_id, so this is safe even without an assigned customer.
         $bid->update(['result' => 'lost']);
         $bid->vehicle?->update(['status' => 'lost']);
 
