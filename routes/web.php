@@ -23,7 +23,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::resource('team', UserController::class)->except('show')->middleware('permission:team');
-
+    Route::resource('team', UserController::class)->except('show')->middleware('permission:team');
+    Route::resource('roles', RoleController::class)->except('show')->middleware('permission:user_roles');
+    
     // Module 2 — Customers & Vehicles
     Route::resource('customers', CustomerController::class)->middleware('permission:customers');
     Route::post('customers/{customer}/deposit',  [CustomerController::class, 'payDeposit'])->middleware('permission:customers.edit')->name('customers.deposit');

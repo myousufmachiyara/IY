@@ -5,14 +5,21 @@ namespace App\Http\Controllers;
 use App\Http\Requests\UserRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
     public function index()
     {
-        // DataTables handles paging/search/sort client-side.
         $users = User::with('roles')->latest()->get();
-        return view('team.index', compact('users'));
+        $roles = Role::orderBy('name')->get();
+
+        $rolePermMap = $roles->mapWithKeys(fn ($r) => [$r->name => [
+            'agent'  => $r->hasPermissionTo('scope.by_agent'),
+            'vendor' => $r->hasPermissionTo('scope.by_vendor'),
+        ]]);
+
+        return view('team.index', compact('users', 'roles', 'rolePermMap'));
     }
 
     public function store(UserRequest $request)
@@ -23,15 +30,11 @@ class UserController extends Controller
         return back()->with('success', 'Team member created.');
     }
 
-    /** Modal edit form fetches this as JSON. */
     public function edit(User $team)
     {
         $team->load('roles');
 
-        return response()->json([
-            ...$team->toArray(),
-            'role' => $team->roles->first()?->name,
-        ]);
+        return response()->json([...$team->toArray(), 'role' => $team->roles->first()?->name]);
     }
 
     public function update(UserRequest $request, User $team)
@@ -44,7 +47,11 @@ class UserController extends Controller
 
     public function destroy(User $team)
     {
-        abort_if($team->isSuperAdmin() && User::role('super_admin')->count() === 1, 403, 'Cannot delete the last super admin.');
+        abort_if(
+            $team->isSuperAdmin() && User::permission('user_roles.edit')->count() === 1,
+            403,
+            'Cannot delete the last user who can manage roles & permissions.'
+        );
         $team->delete();
 
         return back()->with('success', 'Team member removed.');
@@ -58,11 +65,15 @@ class UserController extends Controller
             $data['password'] = $request->password;
         }
 
-        if ($request->role !== 'sales_agent') {
+        // Which commission fields persist is driven by the SELECTED ROLE's actual
+        // permissions, not a hardcoded role name.
+        $role = Role::where('name', $request->role)->first();
+
+        if (! $role?->hasPermissionTo('scope.by_agent')) {
             $data['sales_commission_percent'] = null;
             $data['sales_fixed_bonus'] = null;
         }
-        if ($request->role !== 'vendor_agent') {
+        if (! $role?->hasPermissionTo('scope.by_vendor')) {
             $data['vendor_commission_percent'] = null;
             $data['vendor_location'] = null;
         }

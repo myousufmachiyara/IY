@@ -4,7 +4,7 @@
 
 @section('content')
 
-@php $isPrivileged = auth()->user()->isSuperAdmin() || auth()->user()->isAccountant(); @endphp
+@php $isPrivileged = auth()->user()->can('data.view_all'); @endphp
 
 <div class="row">
     <div class="col">

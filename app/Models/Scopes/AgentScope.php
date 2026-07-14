@@ -13,18 +13,21 @@ class AgentScope implements Scope
     {
         $user = Auth::user();
 
-        // No user (console/seeds/queues) or privileged roles => see everything.
-        if (! $user || $user->isSuperAdmin() || $user->isAccountant()) {
+        if (! $user) {
+            return; // console/seeds/queues run unscoped
+        }
+
+        // Explicit override always wins, regardless of the scope.* permissions below.
+        if ($user->can('data.view_all')) {
             return;
         }
 
-        // Sales agents are restricted to their own rows.
-        if ($user->isSalesAgent()) {
+        if ($user->can('scope.by_agent') && in_array('agent_id', $model->getFillable(), true)) {
             $builder->where($model->getTable() . '.agent_id', $user->id);
+            return;
         }
 
-        // Vendor agents only see rows tied to them (vehicles carry vendor_id).
-        if ($user->isVendorAgent() && in_array('vendor_id', $model->getFillable(), true)) {
+        if ($user->can('scope.by_vendor') && in_array('vendor_id', $model->getFillable(), true)) {
             $builder->where($model->getTable() . '.vendor_id', $user->id);
         }
     }

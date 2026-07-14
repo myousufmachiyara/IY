@@ -16,8 +16,7 @@ class BiddingResultController extends Controller
             ->where('result', 'pending')
             ->latest()
             ->get();
-
-        $vendors = User::role('vendor_agent')->orderBy('name')->get();
+        $vendors = User::permission('scope.by_vendor')->orderBy('name')->get();
 
         return view('results.index', compact('bids', 'vendors'));
     }

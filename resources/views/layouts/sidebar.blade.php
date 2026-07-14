@@ -33,14 +33,26 @@
           </li>
 
           {{-- Team --}}
-          @can('team.index')
-          <li class="{{ request()->routeIs('team.*') ? 'active' : '' }}">
-            <a class="nav-link" href="{{ route('team.index') }}">
+          @if(auth()->user()->can('team.index') || auth()->user()->can('user_roles.index'))
+          <li class="nav-parent {{ request()->routeIs('team.*') || request()->routeIs('roles.*') ? 'nav-expanded nav-active' : '' }}">
+            <a class="nav-link" href="#">
               <i class="fa fa-user-shield"></i>
               <span>Team</span>
             </a>
+            <ul class="nav nav-children">
+              @can('team.index')
+                <li class="{{ request()->routeIs('team.*') ? 'active' : '' }}">
+                  <a class="nav-link" href="{{ route('team.index') }}">All Members</a>
+                </li>
+              @endcan
+              @can('user_roles.index')
+                <li class="{{ request()->routeIs('roles.*') ? 'active' : '' }}">
+                  <a class="nav-link" href="{{ route('roles.index') }}">Roles &amp; Permissions</a>
+                </li>
+              @endcan
+            </ul>
           </li>
-          @endcan
+          @endif
 
           {{-- Customers & Vehicles --}}
           @if(auth()->user()->can('customers.index') || auth()->user()->can('vehicles.index'))

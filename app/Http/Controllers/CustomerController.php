@@ -39,8 +39,8 @@ class CustomerController extends Controller
     {
         $data = $request->validate($this->rules());
 
-        if ($request->user()->isSalesAgent()) {
-            unset($data['agent_id']); // agents cannot reassign ownership
+        if (! $request->user()->can('customers.assign_any_agent')) {
+            unset($data['agent_id']);
         }
 
         $customer->update($data);
@@ -117,15 +117,15 @@ class CustomerController extends Controller
     private function resolveAgent(Request $request): int
     {
         $user = $request->user();
-        return ($user->isSuperAdmin() || $user->isAccountant())
+        return $user->can('customers.assign_any_agent')
             ? ($request->integer('agent_id') ?: $user->id)
             : $user->id;
     }
 
     private function agents(Request $request)
     {
-        return ($request->user()->isSuperAdmin() || $request->user()->isAccountant())
-            ? User::role('sales_agent')->orderBy('name')->get()
+        return $request->user()->can('customers.assign_any_agent')
+            ? User::permission('scope.by_agent')->orderBy('name')->get()
             : collect();
     }
 }

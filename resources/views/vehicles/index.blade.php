@@ -5,8 +5,8 @@
 @section('content')
 
 @php
-    $isPrivileged = auth()->user()->isSuperAdmin() || auth()->user()->isAccountant();
-    $statusColors = [
+        $isPrivileged = auth()->user()->can('data.view_all');    
+        $statusColors = [
         'requirement' => 'secondary', 'bidding' => 'info', 'won' => 'success', 'lost' => 'danger',
         'invoiced' => 'primary', 'dispatched' => 'warning', 'arrived' => 'warning', 'delivered' => 'success',
     ];

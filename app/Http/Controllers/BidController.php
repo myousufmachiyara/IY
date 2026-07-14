@@ -19,7 +19,7 @@ class BidController extends Controller
             ->orderBy('auction_date')
             ->get();
 
-        $agents = User::role('sales_agent')->orderBy('name')->get();
+        $agents = User::permission('scope.by_agent')->orderBy('name')->get();
 
         return view('bidding.merge', compact('bids', 'agents'));
     }
