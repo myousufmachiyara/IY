@@ -43,17 +43,14 @@ class Customer extends Model
         return ! is_null($this->profile_completed_at);
     }
 
-    /** Whether the profile is CURRENTLY eligible to be marked complete. Used to drive UI and the completeProfile() guard. */
+    /** Whether this profile currently satisfies the requirement to be marked complete. */
     public function canCompleteProfile(): bool
     {
-        if ($this->is_new_customer && ! $this->security_deposit_paid) {
-            return false;
+        if ($this->is_new_customer) {
+            return $this->security_deposit_paid;
         }
 
-        // Reuse an eager-loaded withCount('vehicles') when available to avoid an extra query per row on list pages.
-        $vehiclesCount = $this->attributes['vehicles_count'] ?? null;
-
-        return $vehiclesCount !== null ? $vehiclesCount > 0 : $this->vehicles()->exists();
+        return true; // existing customers have no additional gate
     }
 
     // ---- derived balances ----

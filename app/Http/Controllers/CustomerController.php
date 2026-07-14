@@ -23,9 +23,37 @@ class CustomerController extends Controller
         $data['agent_id']   = $this->resolveAgent($request);
         $data['created_by'] = $request->user()->id;
 
-        Customer::create($data);
+        $customer = Customer::create($data);
+
+        // Existing customers have no deposit gate, so their profile is complete
+        // immediately. New customers complete automatically once the deposit is
+        // recorded — see payDeposit() below.
+        if (! $customer->is_new_customer) {
+            $customer->update(['profile_completed_at' => now()]);
+        }
 
         return back()->with('success', 'Customer created.');
+    }
+
+    public function payDeposit(Request $request, Customer $customer, LedgerService $ledger)
+    {
+        abort_unless($customer->is_new_customer, 422, 'Security deposit applies to new customers only.');
+        abort_if($customer->security_deposit_paid, 422, 'Deposit already recorded for this customer.');
+
+        $data = $request->validate([
+            'security_deposit' => ['required', 'integer', 'min:1'],
+            'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
+        ]);
+
+        $customer->update([
+            'security_deposit'      => $data['security_deposit'],
+            'security_deposit_paid' => true,
+            'profile_completed_at'  => now(), // deposit paid completes a new customer's profile immediately
+        ]);
+
+        $ledger->securityDeposit($customer, $data['account']);
+
+        return back()->with('success', 'Security deposit recorded — profile is now complete and bidding is enabled.');
     }
 
     /** Modal edit form fetches this as JSON. */
@@ -59,27 +87,6 @@ class CustomerController extends Controller
     {
         $customer->load('agent');
         return view('customers.show', compact('customer'));
-    }
-
-    /** Record the refundable security deposit (new customers only) and post it to the ledger. */
-    public function payDeposit(Request $request, Customer $customer, LedgerService $ledger)
-    {
-        abort_unless($customer->is_new_customer, 422, 'Security deposit applies to new customers only.');
-        abort_if($customer->security_deposit_paid, 422, 'Deposit already recorded for this customer.');
-
-        $data = $request->validate([
-            'security_deposit' => ['required', 'integer', 'min:1'],
-            'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
-        ]);
-
-        $customer->update([
-            'security_deposit'      => $data['security_deposit'],
-            'security_deposit_paid' => true,
-        ]);
-
-        $ledger->securityDeposit($customer, $data['account']);
-
-        return back()->with('success', 'Security deposit recorded.');
     }
 
     /** The bidding gate: mark a profile complete once its prerequisites are met. */
