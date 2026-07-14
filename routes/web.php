@@ -23,7 +23,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::resource('team', UserController::class)->except('show')->middleware('permission:team');
-    Route::resource('team', UserController::class)->except('show')->middleware('permission:team');
     Route::resource('roles', RoleController::class)->except('show')->middleware('permission:user_roles');
 
     // Module 2 — Customers & Vehicles
@@ -34,8 +33,11 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('vehicles', VehicleController::class)->middleware('permission:vehicles');
 
     // Module 3 — Bidding
-    Route::resource('bid-sheets', BidSheetController::class)->except(['edit', 'update'])->middleware('permission:bid_sheets');
+    // NOTE: this static route MUST be declared before Route::resource('bid-sheets', ...)
+    // below, otherwise "/bid-sheets/template" gets swallowed by the resource's
+    // GET /bid-sheets/{bid_sheet} route and 404s trying to find a BidSheet named "template".
     Route::get('bid-sheets/template', [BidSheetController::class, 'template'])->middleware('permission:bid_sheets.index')->name('bid-sheets.template');
+    Route::resource('bid-sheets', BidSheetController::class)->except(['edit', 'update'])->middleware('permission:bid_sheets');
 
     Route::get('bids',        [BidController::class, 'index'])->middleware('permission:bids.index')->name('bids.index');
     Route::get('bids/export', [BidController::class, 'export'])->middleware('permission:bids.print')->name('bids.export');
