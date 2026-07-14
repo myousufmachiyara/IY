@@ -44,7 +44,7 @@ class BiddingResultController extends Controller
             $vehicle->update([
                 'vendor_id'               => $data['vendor_id'],
                 'buying_price'            => $data['buying_price'],
-                'winning_screenshot_path' => $request->file('screenshot')->store('winning_screenshots'),
+                'winning_screenshot_path' => $request->file('screenshot')->store('winning_screenshots', 'public'),
                 'won_at'                  => now(),
                 'status'                  => 'won',
             ]);

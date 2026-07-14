@@ -2,8 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\{DashboardController, UserController};
 use App\Http\Controllers\{CustomerController, VehicleController, BidSheetController, BidController};
 use App\Http\Controllers\{BiddingResultController, CostingController, InvoiceController, PaymentController};
 use App\Http\Controllers\{ShipmentController, VehicleReassignController, DocumentController, VendorPaymentController,
@@ -16,14 +15,13 @@ Route::middleware('guest')->group(function () {
 });
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
 
-Route::get('/', fn () => auth()->check() ? redirect()->route('customers.index') : redirect()->route('login'));
-
-Route::get('/unauthorized', fn () => view('unauthorized'))->name('unauthorized')->middleware('auth');
+Route::get('/unauthorized', fn () => view('errors.unauthorized'))->name('unauthorized')->middleware('auth');
 
 // ── Authenticated ────────────────────────────────────────────────────
 Route::middleware(['auth'])->group(function () {
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
     Route::resource('team', UserController::class)->except('show')->middleware('permission:team');
 
     // Module 2 — Customers & Vehicles

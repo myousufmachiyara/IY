@@ -9,24 +9,21 @@ class VehicleController extends Controller
 {
     public function index(Request $request)
     {
-        $vehicles = Vehicle::with('customer')
-            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+        $vehicles = Vehicle::with('customer', 'agent', 'vendor')
             ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
-            ->latest()->paginate(15)->withQueryString();
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->latest()
+            ->get();
 
-        return view('vehicles.index', compact('vehicles'));
-    }
+        // Customer model is already agent-scoped, so this naturally narrows for sales agents.
+        $customers = Customer::orderBy('name')->get();
 
-    public function create()
-    {
-        return view('vehicles.create', ['vehicle' => new Vehicle, 'customers' => Customer::active()->get()]);
+        return view('vehicles.index', compact('vehicles', 'customers'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate($this->rules());
-
-        // Scoped find: an agent can only attach vehicles to their own customers.
         $customer = Customer::findOrFail($data['customer_id']);
 
         Vehicle::create($data + [
@@ -35,25 +32,22 @@ class VehicleController extends Controller
             'status'     => 'requirement',
         ]);
 
-        return redirect()->route('vehicles.index')->with('success', 'Vehicle requirement added.');
+        return back()->with('success', 'Vehicle requirement added.');
     }
 
+    /** Modal edit form fetches this as JSON. */
     public function edit(Vehicle $vehicle)
     {
-        return view('vehicles.edit', ['vehicle' => $vehicle, 'customers' => Customer::active()->get()]);
+        return response()->json($vehicle);
     }
 
     public function update(Request $request, Vehicle $vehicle)
     {
-        $vehicle->update($request->validate($this->rules()));
-        return redirect()->route('vehicles.index')->with('success', 'Vehicle updated.');
-    }
+        abort_if($vehicle->isWon(), 422, 'Won vehicles cannot have their requirement edited here — use Costing instead.');
 
-    public function destroy(Vehicle $vehicle)
-    {
-        abort_if($vehicle->isWon(), 422, 'A won vehicle cannot be deleted.');
-        $vehicle->delete();
-        return back()->with('success', 'Vehicle removed.');
+        $vehicle->update($request->validate($this->rules()));
+
+        return back()->with('success', 'Vehicle updated.');
     }
 
     public function show(Vehicle $vehicle)
@@ -61,7 +55,15 @@ class VehicleController extends Controller
         $vehicle->load('customer', 'agent', 'vendor', 'costing', 'invoice.payments', 'documents', 'shipment', 'bid');
         return view('vehicles.show', compact('vehicle'));
     }
-    
+
+    public function destroy(Vehicle $vehicle)
+    {
+        abort_if($vehicle->isWon(), 422, 'A won vehicle cannot be deleted.');
+        $vehicle->delete();
+
+        return back()->with('success', 'Vehicle removed.');
+    }
+
     private function rules(): array
     {
         return [
