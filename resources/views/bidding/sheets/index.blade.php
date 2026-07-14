@@ -21,11 +21,9 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <h2 class="card-title">Bid Sheets</h2>
                     <div>
-                        <small class="text-muted">
-                            Columns required: lot_no, auction_house, auction_date, make, model, year, grade, chassis_no, max_bid, customer_id.
-                            <a href="{{ route('bid-sheets.template') }}">Download the template</a> to get the exact format.
-                            Rows referencing a customer whose profile isn't complete (deposit paid + a vehicle added) will be skipped automatically.
-                        </small>
+                        <a href="{{ route('bid-sheets.template') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-download"></i> Download Template
+                        </a>
                         @can('bid_sheets.create')
                             <button type="button" class="modal-with-form btn btn-primary" href="#addModal">
                                 <i class="fas fa-upload"></i> Upload Bid Sheet
