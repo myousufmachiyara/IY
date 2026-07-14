@@ -37,14 +37,23 @@ class Customer extends Model
     public function shipments(): HasMany { return $this->hasMany(Shipment::class); }
 
     // ---- profile-completion gate (bidding requires this) ----
+    /** Whether the profile has ALREADY been marked complete (the actual bidding gate). */
     public function isProfileComplete(): bool
     {
-        // A new customer must have paid the refundable deposit to be complete.
+        return ! is_null($this->profile_completed_at);
+    }
+
+    /** Whether the profile is CURRENTLY eligible to be marked complete. Used to drive UI and the completeProfile() guard. */
+    public function canCompleteProfile(): bool
+    {
         if ($this->is_new_customer && ! $this->security_deposit_paid) {
             return false;
         }
 
-        return ! is_null($this->profile_completed_at);
+        // Reuse an eager-loaded withCount('vehicles') when available to avoid an extra query per row on list pages.
+        $vehiclesCount = $this->attributes['vehicles_count'] ?? null;
+
+        return $vehiclesCount !== null ? $vehiclesCount > 0 : $this->vehicles()->exists();
     }
 
     // ---- derived balances ----

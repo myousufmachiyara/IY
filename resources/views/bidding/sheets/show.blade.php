@@ -19,6 +19,9 @@
             </header>
 
             <div class="card-body">
+                @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
+                @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
+                @if(session('warning'))<div class="alert alert-warning">{{ session('warning') }}</div>@endif
                 <div class="row mb-3">
                     <div class="col-md-4"><strong>Agent:</strong> {{ $sheet->agent->name ?? '—' }}</div>
                     <div class="col-md-4"><strong>Auction Date:</strong> {{ optional($sheet->auction_date)->format('d-m-Y') ?? '—' }}</div>

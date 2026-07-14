@@ -47,10 +47,20 @@ class BidSheetController extends Controller
             'status'       => 'uploaded',
         ]);
 
-        Excel::import(new BidsImport($sheet), $request->file('file'));
+        $import = new BidsImport($sheet);
+        Excel::import($import, $request->file('file'));
         $sheet->update(['rows_count' => $sheet->bids()->count()]);
 
-        return redirect()->route('bid-sheets.show', $sheet)->with('success', "Uploaded {$sheet->rows_count} bids.");
+        $redirect = redirect()->route('bid-sheets.show', $sheet)
+            ->with('success', "Uploaded {$sheet->rows_count} bids.");
+
+        if (count($import->skipped) > 0) {
+            $preview = array_slice($import->skipped, 0, 5);
+            $more = count($import->skipped) > 5 ? ' (+' . (count($import->skipped) - 5) . ' more)' : '';
+            $redirect->with('warning', count($import->skipped) . ' row(s) skipped — ' . implode(' ', $preview) . $more);
+        }
+
+        return $redirect;
     }
 
     public function show(BidSheet $bidSheet)

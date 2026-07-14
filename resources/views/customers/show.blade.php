@@ -35,6 +35,7 @@
                         <div class="card bg-light border">
                             <div class="card-body">
                                 <h5 class="card-title mb-3">Profile &amp; Deposit</h5>
+
                                 <p class="mb-2">
                                     Security Deposit:
                                     @if(!$customer->is_new_customer)
@@ -46,18 +47,28 @@
                                         @endif
                                     @else
                                         <span class="badge bg-warning text-dark">Pending</span>
+                                        <a href="#" class="btn btn-sm btn-outline-success ms-1" onclick="openDeposit({{ $customer->id }}, '{{ $customer->name }}')">
+                                            <i class="fa fa-hand-holding-usd"></i> Pay Now
+                                        </a>
                                     @endif
                                 </p>
+
                                 <p class="mb-3">
                                     Profile:
                                     @if($customer->profile_completed_at)
                                         <span class="badge bg-success">Complete ({{ $customer->profile_completed_at->format('d-m-Y') }})</span>
                                     @else
                                         <span class="badge bg-warning text-dark">Incomplete</span>
-                                        <form action="{{ route('customers.complete', $customer) }}" method="POST" class="d-inline" onsubmit="return confirm('Mark profile complete?');">
-                                            @csrf
-                                            <button class="btn btn-sm btn-outline-success ms-1">Complete Now</button>
-                                        </form>
+                                        @if($customer->canCompleteProfile())
+                                            <form action="{{ route('customers.complete', $customer) }}" method="POST" class="d-inline" onsubmit="return confirm('Mark profile complete?');">
+                                                @csrf
+                                                <button class="btn btn-sm btn-outline-success ms-1">Complete Now</button>
+                                            </form>
+                                        @elseif($customer->is_new_customer && !$customer->security_deposit_paid)
+                                            <div class="small text-danger mt-1"><i class="fa fa-info-circle"></i> Pay the security deposit before completing this profile.</div>
+                                        @else
+                                            <div class="small text-danger mt-1"><i class="fa fa-info-circle"></i> Add at least one vehicle requirement before completing this profile.</div>
+                                        @endif
                                     @endif
                                 </p>
 
@@ -73,6 +84,8 @@
                 </div>
             </div>
         </section>
+
+        @include('customers._deposit_modal')
     </div>
 </div>
 @endsection

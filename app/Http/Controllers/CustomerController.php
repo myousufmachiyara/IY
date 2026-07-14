@@ -11,8 +11,7 @@ class CustomerController extends Controller
 {
     public function index(Request $request)
     {
-        // DataTables handles paging/search/sort client-side.
-        $customers = Customer::with('agent')->latest()->get();
+        $customers = Customer::with('agent')->withCount('vehicles')->latest()->get();
         $agents    = $this->agents($request);
 
         return view('customers.index', compact('customers', 'agents'));
