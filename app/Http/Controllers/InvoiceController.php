@@ -84,4 +84,23 @@ class InvoiceController extends Controller
         return Pdf::loadView('invoices.pdf', compact('invoice'))
             ->download("{$invoice->invoice_no}.pdf");
     }
+
+    /** Void an invoice that hasn't received any payments — reverses its receivable entry. */
+    public function cancel(Invoice $invoice, LedgerService $ledger)
+    {
+        abort_unless(auth()->user()->canBackdate(), 403);
+        abort_if($invoice->amount_paid > 0, 422, 'Cannot cancel an invoice with payments already recorded — use Reassign Vehicle instead.');
+        abort_if($invoice->status === 'cancelled', 422, 'Invoice is already cancelled.');
+
+        DB::transaction(function () use ($invoice, $ledger) {
+            foreach ($invoice->journalEntries as $entry) {
+                $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — invoice {$invoice->invoice_no} cancelled");
+            }
+
+            $invoice->update(['status' => 'cancelled']);
+            $invoice->vehicle->update(['status' => 'won']);
+        });
+
+        return back()->with('success', 'Invoice cancelled and receivable entry reversed.');
+    }
 }

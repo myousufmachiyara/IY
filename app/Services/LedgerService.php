@@ -108,6 +108,38 @@ class LedgerService
         ], $vp, $vp->is_backdated);
     }
 
+    /**
+ * Reverse a previously posted entry by mirroring its lines with debit/credit swapped.
+ * Never mutates or deletes the original — audit trail stays intact.
+ */
+    public function reverseEntry(JournalEntry $original, string $date, ?string $description = null): JournalEntry
+    {
+        return DB::transaction(function () use ($original, $date, $description) {
+            $entry = JournalEntry::create([
+                'entry_no'       => $this->nextNo(),
+                'date'           => $date,
+                'description'    => $description ?? "Reversal of {$original->entry_no}",
+                'reference_type' => $original->reference_type,
+                'reference_id'   => $original->reference_id,
+                'is_backdated'   => false,
+                'created_by'     => Auth::id(),
+            ]);
+
+            foreach ($original->lines as $line) {
+                $entry->lines()->create([
+                    'account_id' => $line->account_id,
+                    'debit'      => $line->credit,
+                    'credit'     => $line->debit,
+                    'party_type' => $line->party_type,
+                    'party_id'   => $line->party_id,
+                    'memo'       => 'Reversal',
+                ]);
+            }
+
+            return $entry;
+        });
+    }
+
     public function expense(Expense $e, string $cashAccount = self::BANK): JournalEntry
     {
         $account = ['salary' => self::SALARY, 'office' => self::OFFICE][$e->category] ?? self::MISC;

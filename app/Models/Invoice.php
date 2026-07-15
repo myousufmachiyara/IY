@@ -4,8 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\ScopedToAgent;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany, MorphMany};
 
 class Invoice extends Model
 {
@@ -61,5 +60,10 @@ class Invoice extends Model
         };
 
         return $this;
+    }
+
+    public function journalEntries(): MorphMany
+    {
+        return $this->morphMany(JournalEntry::class, 'reference');
     }
 }
