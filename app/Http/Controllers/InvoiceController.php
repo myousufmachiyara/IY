@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Invoice, Vehicle};
+use App\Models\{Invoice, Vehicle, Customer};
 use App\Services\{InvoiceNumber, LedgerService};
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
