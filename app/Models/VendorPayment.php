@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, MorphMany};
 
 class VendorPayment extends Model
 {
@@ -21,10 +21,11 @@ class VendorPayment extends Model
         ];
     }
 
-    public function vendor(): BelongsTo  { return $this->belongsTo(User::class, 'vendor_id'); }
-    public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class); }
-    public function account(): BelongsTo { return $this->belongsTo(ChartOfAccount::class, 'account_id'); }
-    public function recorder(): BelongsTo{ return $this->belongsTo(User::class, 'recorded_by'); }
+    public function vendor(): BelongsTo   { return $this->belongsTo(Vendor::class, 'vendor_id'); }
+    public function vehicle(): BelongsTo  { return $this->belongsTo(Vehicle::class, 'vehicle_id'); }
+    public function account(): BelongsTo  { return $this->belongsTo(ChartOfAccount::class, 'account_id'); }
+    public function recorder(): BelongsTo { return $this->belongsTo(User::class, 'recorded_by'); }
+
     public function journalEntries(): MorphMany
     {
         return $this->morphMany(JournalEntry::class, 'reference');

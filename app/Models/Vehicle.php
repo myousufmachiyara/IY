@@ -38,7 +38,7 @@ class Vehicle extends Model
     // ---- relationships ----
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function agent(): BelongsTo    { return $this->belongsTo(User::class, 'agent_id'); }
-    public function vendor(): BelongsTo   { return $this->belongsTo(User::class, 'vendor_id'); }
+    public function vendor(): BelongsTo   { return $this->belongsTo(Vendor::class, 'vendor_id'); }
     public function shipment(): BelongsTo { return $this->belongsTo(Shipment::class); }
     public function costing(): HasOne     { return $this->hasOne(VehicleCosting::class); }
     public function invoice(): HasOne     { return $this->hasOne(Invoice::class); }

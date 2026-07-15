@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{ChartOfAccount, Customer, JournalEntry, JournalLine, User};
+use App\Models\{ChartOfAccount, Customer, JournalEntry, JournalLine, Vendor};
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 
@@ -49,7 +49,6 @@ class AccountingController extends Controller
         return view('accounting.ledger', compact('account', 'lines'));
     }
 
-    /** Combined Cash + Bank register — "cash and bank book". */
     public function cashBankBook(Request $request)
     {
         $accounts = [LedgerService::CASH, LedgerService::BANK];
@@ -66,10 +65,8 @@ class AccountingController extends Controller
         return view('accounting.cash_bank_book', compact('lines'));
     }
 
-    /** Accounts Receivable broken down by customer (subledger via the polymorphic `party`). */
     public function receivables()
     {
-        // ScopedToAgent already narrows this for a sales agent; data.view_all sees all.
         $customers = Customer::get()->map(fn ($c) => [
             'customer' => $c,
             'invoiced' => $c->totalInvoiced(),
@@ -80,19 +77,18 @@ class AccountingController extends Controller
         return view('accounting.receivables', compact('customers'));
     }
 
-    /** Accounts Payable broken down by vendor. */
     public function payables()
     {
-        $vendors = User::permission('scope.by_vendor')->get()->map(function ($v) {
-            $payable = $v->vendorVehicles()->sum('buying_price');
-            $paid    = $v->vendorPayments()->sum('amount');
-            return ['vendor' => $v, 'payable' => $payable, 'paid' => $paid, 'balance' => $payable - $paid];
-        })->filter(fn ($r) => $r['balance'] > 0)->values();
+        $vendors = Vendor::get()->map(fn ($v) => [
+            'vendor'  => $v,
+            'payable' => $v->totalPayable(),
+            'paid'    => $v->totalPaid(),
+            'balance' => $v->balance(),
+        ])->filter(fn ($r) => $r['balance'] > 0)->values();
 
         return view('accounting.payables', compact('vendors'));
     }
 
-    /** Simple P&L: Income accounts vs Expense accounts over a date range. */
     public function profitLoss(Request $request)
     {
         $from = $request->from ?? now()->startOfYear()->toDateString();

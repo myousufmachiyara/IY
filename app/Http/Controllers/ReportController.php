@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\ArrayExport;
-use App\Models\{Bid, User, Vehicle};
+use App\Models\{Bid, User, Vehicle, Vendor};
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
@@ -29,12 +29,12 @@ class ReportController extends Controller
 
     public function vendorWise(Request $request)
     {
-        $rows = User::permission('scope.by_vendor')->get()->map(fn ($v) => [
+        $rows = Vendor::get()->map(fn ($v) => [
             'vendor'   => $v->name,
-            'location' => $v->vendor_location,
-            'vehicles' => $v->vendorVehicles()->count(),
-            'payable'  => $v->vendorVehicles()->sum('buying_price'),
-            'paid'     => $v->vendorPayments()->sum('amount'),
+            'location' => $v->location,
+            'vehicles' => $v->vehicles()->count(),
+            'payable'  => $v->vehicles()->sum('buying_price'),
+            'paid'     => $v->payments()->sum('amount'),
         ]);
 
         return $this->respond($request, 'reports.vendor_wise', $rows, ['Vendor', 'Location', 'Vehicles', 'Payable (¥)', 'Paid (¥)']);
@@ -62,7 +62,6 @@ class ReportController extends Controller
         return $this->respond($request, 'reports.bid_won', $rows, ['Lot', 'Agent', 'Customer', 'Vehicle', 'Won Amount (¥)']);
     }
 
-    /** Shared responder: renders Blade, or streams PDF/Excel when ?export= is present. */
     private function respond(Request $request, string $view, $rows, array $headings)
     {
         if ($request->export === 'excel') {

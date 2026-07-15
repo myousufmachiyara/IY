@@ -21,10 +21,6 @@ return new class extends Migration
             $table->decimal('sales_commission_percent', 5, 2)->nullable()->default(15.00);
             $table->unsignedBigInteger('sales_fixed_bonus')->nullable()->default(0); // yen per won bid
 
-            // Vendor-agent economics (only used for vendor_agent role)
-            $table->decimal('vendor_commission_percent', 5, 2)->nullable()->default(7.00);
-            $table->string('vendor_location')->nullable();
-
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');

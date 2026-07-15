@@ -12,7 +12,6 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('customer_id')->constrained()->cascadeOnDelete();
             $table->foreignId('agent_id')->constrained('users')->restrictOnDelete(); // denormalised for scoping
-            $table->foreignId('vendor_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('shipment_id')->nullable()->constrained()->nullOnDelete();;
 
             // requirement

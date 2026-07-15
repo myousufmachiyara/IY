@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Bid, Customer, User, Vehicle, VehicleCosting};
+use App\Models\{Bid, Customer, Vehicle, VehicleCosting, Vendor};
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +16,8 @@ class BiddingResultController extends Controller
             ->latest()
             ->get();
 
-        $vendors   = User::permission('scope.by_vendor')->orderBy('name')->get();
-        $customers = Customer::complete()->orderBy('name')->get(); // for the Assign Customer modal
+        $vendors   = Vendor::active()->orderBy('name')->get();
+        $customers = Customer::complete()->orderBy('name')->get();
 
         return view('results.index', compact('bids', 'vendors', 'customers'));
     }
@@ -27,7 +27,7 @@ class BiddingResultController extends Controller
         abort_if(is_null($bid->customer_id), 422, 'Assign a customer to this bid before marking it won.');
 
         $data = $request->validate([
-            'vendor_id'    => ['required', 'exists:users,id'],
+            'vendor_id'    => ['required', 'exists:vendors,id'],
             'buying_price' => ['required', 'integer', 'min:1'],
             'screenshot'   => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
@@ -57,7 +57,7 @@ class BiddingResultController extends Controller
                 ['vehicle_id' => $vehicle->id],
                 [
                     'buying_price'              => $vehicle->buying_price,
-                    'vendor_commission_percent' => $vehicle->vendor->vendor_commission_percent ?? 7,
+                    'vendor_commission_percent' => $vehicle->vendor->commission_percent ?? 7,
                 ]
             );
         });
@@ -68,7 +68,6 @@ class BiddingResultController extends Controller
 
     public function lost(Bid $bid)
     {
-        // Marking lost never touches Vehicle/customer_id, so this is safe even without an assigned customer.
         $bid->update(['result' => 'lost']);
         $bid->vehicle?->update(['status' => 'lost']);
 

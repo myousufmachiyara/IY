@@ -100,7 +100,7 @@
                                 <select data-plugin-selecttwo class="form-control select2-js" name="vendor_id" required>
                                     <option value="" disabled selected>Select Vendor</option>
                                     @foreach($vendors as $v)
-                                        <option value="{{ $v->id }}">{{ $v->name }} @if($v->vendor_location) ({{ $v->vendor_location }}) @endif</option>
+                                        <option value="{{ $v->id }}">{{ $v->name }} @if($v->location) ({{ $v->location }}) @endif</option>
                                     @endforeach
                                 </select>
                             </div>

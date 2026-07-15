@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{User, Vehicle, VendorPayment};
+use App\Models\{Vehicle, Vendor, VendorPayment};
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,9 +17,8 @@ class VendorPaymentController extends Controller
             ->latest('paid_at')
             ->get();
 
-        $vendors = User::permission('scope.by_vendor')->orderBy('name')->get();
+        $vendors = Vendor::orderBy('name')->get();
 
-        // Vehicles still owing their vendor money — feeds the Add Payment dropdown.
         $vehicles = Vehicle::whereNotNull('vendor_id')
             ->whereNotNull('buying_price')
             ->with('vendor', 'customer')
@@ -73,13 +72,11 @@ class VendorPaymentController extends Controller
         return back()->with('success', 'Vendor payment recorded.');
     }
 
-    /** Modal edit form fetches this as JSON. */
     public function edit(VendorPayment $vendorPayment)
     {
         return response()->json($vendorPayment);
     }
 
-    /** Correcting a vendor payment reverses its original ledger entry and posts a fresh one. */
     public function update(Request $request, VendorPayment $vendorPayment, LedgerService $ledger)
     {
         $data = $request->validate([
@@ -95,9 +92,7 @@ class VendorPaymentController extends Controller
             }
 
             $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
-
             $vendorPayment->update($data + ['account_id' => $ledger->account($account)->id]);
-
             $ledger->vendorPayment($vendorPayment->fresh(), $account);
         });
 
@@ -110,7 +105,6 @@ class VendorPaymentController extends Controller
             foreach ($vendorPayment->journalEntries as $entry) {
                 $ledger->reverseEntry($entry, now()->toDateString(), "Reversal of deleted vendor payment #{$vendorPayment->id}");
             }
-
             $vendorPayment->delete();
         });
 

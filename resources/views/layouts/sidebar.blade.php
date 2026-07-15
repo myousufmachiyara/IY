@@ -76,6 +76,16 @@
           </li>
           @endif
 
+          {{-- Vendors --}}
+          @can('vendors.index')
+          <li class="{{ request()->routeIs('vendors.*') ? 'active' : '' }}">
+              <a class="nav-link" href="{{ route('vendors.index') }}">
+                  <i class="fa fa-truck"></i>
+                  <span>Vendors</span>
+              </a>
+          </li>
+          @endcan
+
           {{-- Bidding --}}
           @if(auth()->user()->can('bid_sheets.index') || auth()->user()->can('bids.index'))
           <li class="nav-parent {{ request()->routeIs('bid-sheets.*') || request()->routeIs('bids.*') ? 'nav-expanded nav-active' : '' }}">

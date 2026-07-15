@@ -2,8 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use App\Models\ChartOfAccount;
+use App\Models\{User, Vendor, ChartOfAccount};
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
@@ -13,17 +12,22 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // ── Roles (starting set — fully editable afterward via Roles & Permissions UI) ──
-        $superAdminRole  = Role::firstOrCreate(['name' => 'super_admin']);
-        $accountantRole  = Role::firstOrCreate(['name' => 'accountant']);
-        $salesAgentRole  = Role::firstOrCreate(['name' => 'sales_agent']);
-        $vendorAgentRole = Role::firstOrCreate(['name' => 'vendor_agent']);
+        // ── Roles ────────────────────────────────────────────────────────────
+
+        $superAdminRole = Role::firstOrCreate(['name' => 'super_admin']);
+        $accountantRole = Role::firstOrCreate(['name' => 'accountant']);
+        $salesAgentRole = Role::firstOrCreate(['name' => 'sales_agent']);
+
+        // Vendors no longer log in — remove any leftover vendor role/permission.
+        Role::where('name', 'vendor_agent')->delete();
+        Permission::where('name', 'scope.by_vendor')->delete();
 
         // ── Permissions: module.action ──────────────────────────────────────
+
         $modules = [
             'team', 'user_roles', 'customers', 'vehicles', 'bid_sheets', 'bids', 'results',
             'costings', 'invoices', 'payments', 'vendor_payments', 'expenses',
-            'shipments', 'documents', 'accounting',
+            'shipments', 'documents', 'accounting', 'vendors',
         ];
         $actions = ['index', 'show', 'create', 'edit', 'delete', 'print'];
 
@@ -37,20 +41,11 @@ class DatabaseSeeder extends Seeder
             Permission::firstOrCreate(['name' => "reports.$report"]);
         }
 
-        // Business-logic permissions — drive scoping, commission fields, and backdating
-        // rights instead of hardcoded role-name checks (see AgentScope, User model).
-        $specialPermissions = [
-            'data.view_all',
-            'scope.by_agent',
-            'scope.by_vendor',
-            'finance.backdate',
-            'customers.assign_any_agent',
-        ];
-        foreach ($specialPermissions as $name) {
+        foreach (['data.view_all', 'scope.by_agent', 'finance.backdate', 'customers.assign_any_agent'] as $name) {
             Permission::firstOrCreate(['name' => $name]);
         }
 
-        // ── Sync role → permissions (starting point; fully editable afterward) ──
+        // ── Sync role → permissions ─────────────────────────────────────────
 
         $superAdminRole->syncPermissions(Permission::all());
 
@@ -60,7 +55,7 @@ class DatabaseSeeder extends Seeder
                 $accountantPermissions[] = "$module.$action";
             }
         }
-        foreach (['customers', 'vehicles', 'bid_sheets'] as $module) {
+        foreach (['customers', 'vehicles', 'bid_sheets', 'vendors'] as $module) {
             $accountantPermissions[] = "$module.index";
             $accountantPermissions[] = "$module.show";
             $accountantPermissions[] = "$module.print";
@@ -69,7 +64,7 @@ class DatabaseSeeder extends Seeder
         $accountantPermissions[] = 'results.show';
         $accountantPermissions[] = 'results.edit';
         $accountantPermissions[] = 'results.print';
-        $accountantPermissions[] = 'vehicles.edit'; // for reassigning vehicles between customers
+        $accountantPermissions[] = 'vehicles.edit';
         $accountantPermissions = array_merge($accountantPermissions, [
             'reports.agent_wise', 'reports.vendor_wise', 'reports.bid_wise', 'reports.bid_won',
             'data.view_all', 'finance.backdate', 'customers.assign_any_agent',
@@ -95,16 +90,9 @@ class DatabaseSeeder extends Seeder
         $salesAgentPermissions[] = 'shipments.show';
         $salesAgentPermissions[] = 'shipments.create';
         $salesAgentPermissions[] = 'shipments.print';
+        $salesAgentPermissions[] = 'vendors.index'; // view-only — for context when picking a vendor at bid-won time
         $salesAgentPermissions[] = 'reports.agent_wise';
-        $salesAgentPermissions[] = 'scope.by_agent';
         $salesAgentRole->syncPermissions(Permission::whereIn('name', array_unique($salesAgentPermissions))->get());
-
-        $vendorAgentRole->syncPermissions(
-            Permission::whereIn('name', [
-                'vehicles.index', 'vehicles.show', 'vehicles.print',
-                'reports.vendor_wise', 'scope.by_vendor',
-            ])->get()
-        );
 
         // ── Chart of Accounts (system accounts) ─────────────────────────────
 
@@ -156,13 +144,11 @@ class DatabaseSeeder extends Seeder
         );
         $salesAgent->syncRoles($salesAgentRole);
 
-        $vendorAgent = User::firstOrCreate(
-            ['username' => 'v.tanaka'],
-            [
-                'name' => 'Vendor Agent - Tanaka', 'email' => 'tanaka@bidding.test', 'password' => Hash::make('12345678'), 'status' => 'active',
-                'vendor_commission_percent' => 7.00, 'vendor_location' => 'USS Tokyo, Japan', 'created_by' => $admin->id,
-            ]
+        // ── Vendors (no login — just business records) ──────────────────────
+
+        Vendor::firstOrCreate(
+            ['name' => 'Vendor - Tanaka'],
+            ['location' => 'USS Tokyo, Japan', 'commission_percent' => 7.00, 'status' => 'active', 'created_by' => $admin->id]
         );
-        $vendorAgent->syncRoles($vendorAgentRole);
     }
 }

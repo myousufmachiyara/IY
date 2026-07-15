@@ -25,10 +25,11 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('team', UserController::class)->except('show')->middleware('permission:team');
     Route::resource('roles', RoleController::class)->except('show')->middleware('permission:user_roles');
 
-    // Module 2 — Customers & Vehicles
+    // Module 2 — Customers, Vehicles & Vendors
     Route::resource('customers', CustomerController::class)->middleware('permission:customers');
     Route::post('customers/{customer}/deposit',  [CustomerController::class, 'payDeposit'])->middleware('permission:customers.edit')->name('customers.deposit');
     Route::post('customers/{customer}/complete', [CustomerController::class, 'completeProfile'])->middleware('permission:customers.edit')->name('customers.complete');
+    Route::resource('vendors', VendorController::class)->except('show')->middleware('permission:vendors');
 
     Route::resource('vehicles', VehicleController::class)->middleware('permission:vehicles');
 

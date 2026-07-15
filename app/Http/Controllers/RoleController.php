@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Spatie\Permission\Models\{Role, Permission};
+use Spatie\Permission\PermissionRegistrar;
 
 class RoleController extends Controller
 {
     private array $specialPermissions = [
-        'data.view_all'              => 'See all data across every agent and vendor — bypasses the scoping below entirely.',
+        'data.view_all'              => 'See all data across every agent — bypasses the scoping below entirely.',
         'scope.by_agent'             => 'Scope customers, vehicles, and bids to this user as the owning Sales Agent. Also reveals sales commission fields on the Team form.',
-        'scope.by_vendor'            => 'Scope vehicles to this user as the supplying Vendor Agent. Also reveals vendor commission fields on the Team form.',
         'finance.backdate'           => 'Allow recording back-dated payments, vendor payments, and expenses.',
         'customers.assign_any_agent' => 'Allow assigning a customer or vehicle to any agent, not just themselves.',
     ];
@@ -43,13 +43,12 @@ class RoleController extends Controller
 
         $role = Role::create(['name' => $data['name'], 'guard_name' => 'web']);
 
-        // Resolve to actual Permission models before syncing — passing raw string IDs
-        // straight from the form can make some spatie/laravel-permission versions try
-        // to resolve them BY NAME instead of by ID, throwing PermissionDoesNotExist.
         $permissions = Permission::whereIn('id', $data['permissions'] ?? [])->get();
         $role->syncPermissions($permissions);
 
-        return redirect()->route('roles.index')->with('success', 'Role created.');
+        $this->flushPermissionCache();
+
+        return redirect()->route('roles.index')->with('success', 'Role created — it takes effect immediately for any user assigned to it, no cache clear needed.');
     }
 
     public function edit(Role $role)
@@ -76,7 +75,9 @@ class RoleController extends Controller
         $permissions = Permission::whereIn('id', $data['permissions'] ?? [])->get();
         $role->syncPermissions($permissions);
 
-        return redirect()->route('roles.index')->with('success', 'Role updated.');
+        $this->flushPermissionCache();
+
+        return redirect()->route('roles.index')->with('success', 'Role updated — changes take effect immediately.');
     }
 
     public function destroy(Role $role)
@@ -84,7 +85,20 @@ class RoleController extends Controller
         abort_if($role->users()->exists(), 422, 'Cannot delete a role currently assigned to users. Reassign those users first.');
         $role->delete();
 
+        $this->flushPermissionCache();
+
         return back()->with('success', 'Role deleted.');
+    }
+
+    /**
+     * Explicitly clear Spatie's permission cache rather than relying on its
+     * automatic self-invalidation, so a role's permissions always take effect
+     * immediately for every user holding that role — regardless of hosting
+     * environment or cache driver quirks.
+     */
+    private function flushPermissionCache(): void
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     private function moduleMatrix()
