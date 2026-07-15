@@ -10,10 +10,9 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
-    /** Sales-agent performance: bids, wins, profit generated, earnings. */
     public function agentWise(Request $request)
     {
-        $rows = User::role('sales_agent')->get()->map(function ($agent) {
+        $rows = User::permission('scope.by_agent')->get()->map(function ($agent) {
             $vehicles = Vehicle::allAgents()->where('agent_id', $agent->id);
             return [
                 'agent'        => $agent->name,
@@ -28,10 +27,9 @@ class ReportController extends Controller
         return $this->respond($request, 'reports.agent_wise', $rows, ['Agent', 'Total Bids', 'Bids Won', 'Vehicles Won', 'Profit (¥)', 'Earnings (¥)']);
     }
 
-    /** Vendor performance: vehicles supplied, amount payable/paid. */
     public function vendorWise(Request $request)
     {
-        $rows = User::role('vendor_agent')->get()->map(fn ($v) => [
+        $rows = User::permission('scope.by_vendor')->get()->map(fn ($v) => [
             'vendor'   => $v->name,
             'location' => $v->vendor_location,
             'vehicles' => $v->vendorVehicles()->count(),
@@ -42,7 +40,6 @@ class ReportController extends Controller
         return $this->respond($request, 'reports.vendor_wise', $rows, ['Vendor', 'Location', 'Vehicles', 'Payable (¥)', 'Paid (¥)']);
     }
 
-    /** Total bid activity per auction date. */
     public function bidWise(Request $request)
     {
         $rows = Bid::allAgents()->selectRaw('auction_date, COUNT(*) as total, SUM(result = "won") as won')
@@ -52,7 +49,6 @@ class ReportController extends Controller
         return $this->respond($request, 'reports.bid_wise', $rows, ['Date', 'Total Bids', 'Won']);
     }
 
-    /** Bid-won detail list. */
     public function bidWon(Request $request)
     {
         $rows = Bid::allAgents()->won()->with('agent', 'customer')->get()->map(fn ($b) => [
@@ -74,8 +70,11 @@ class ReportController extends Controller
         }
 
         if ($request->export === 'pdf') {
-            return Pdf::loadView('reports.pdf', ['rows' => $rows, 'headings' => $headings, 'title' => \Illuminate\Support\Str::headline(str($view)->afterLast('.'))])
-                ->download('report.pdf');
+            return Pdf::loadView('reports.pdf', [
+                'rows'     => $rows,
+                'headings' => $headings,
+                'title'    => \Illuminate\Support\Str::headline(str($view)->afterLast('.')) . ' Report',
+            ])->download('report.pdf');
         }
 
         return view($view, compact('rows', 'headings'));
