@@ -62,10 +62,11 @@ class InvoiceController extends Controller
         return redirect()->route('invoices.show', $invoice)->with('success', "Invoice {$invoice->invoice_no} generated.");
     }
 
-    public function show(Invoice $invoice)
+    public function show(Request $request, Invoice $invoice)
     {
-        $invoice->load('vehicle.costing', 'customer', 'payments', 'agent');
-        return view('invoices.show', compact('invoice'));
+        $invoice->load('vehicle.costing', 'vehicle.shipment', 'customer', 'payments.recorder', 'agent');
+        $customers = Customer::where('id', '!=', $invoice->customer_id)->orderBy('name')->get();
+        return view('invoices.show', compact('invoice', 'customers'));
     }
 
     /** Adjust the settled amount (small discount) — admin/accountant only. */
