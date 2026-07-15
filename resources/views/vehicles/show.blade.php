@@ -88,7 +88,9 @@
                                         </form>
                                     @endcan
                                 </div>
-                            @elseif($vehicle->invoice->isFullyPaid() && !$vehicle->shipment)
+                            @elseif($vehicle->invoice->isHalfPaid() && !$vehicle->shipment)
+                            <div class="alert alert-success">
+                                <i class="fa fa-check-circle"></i> 50% or more paid — ready for shipment.
                                 <div class="alert alert-success">
                                     <i class="fa fa-check-circle"></i> Invoice fully paid — ready for shipment.
                                     @can('shipments.create')

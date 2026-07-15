@@ -8,7 +8,7 @@
         </li>
         @if($vehicle->isWon())
             <li class="nav-item">
-                <a class="nav-link {{ $active === 'costing' ? 'active' : '' }}" href="{{ route('costings.show', $vehicle) }}">       
+                <a class="nav-link {{ $active === 'costing' ? 'active' : '' }}" href="{{ route('costings.show', $vehicle) }}">
                     <i class="fa fa-calculator me-1"></i> Costing
                 </a>
             </li>
@@ -30,6 +30,14 @@
                         <i class="fa fa-ship me-1"></i> Shipment
                     </a>
                 </li>
+            @elseif($vehicle->status === 'invoiced' && $vehicle->invoice?->isHalfPaid())
+                @can('shipments.create')
+                <li class="nav-item">
+                    <a class="nav-link {{ $active === 'shipment' ? 'active' : '' }}" href="{{ route('shipments.create', $vehicle->customer) }}">
+                        <i class="fa fa-ship me-1"></i> Prepare Shipment
+                    </a>
+                </li>
+                @endcan
             @endif
         @endif
     </ul>
