@@ -73,10 +73,7 @@ class UserController extends Controller
             $data['sales_commission_percent'] = null;
             $data['sales_fixed_bonus'] = null;
         }
-        if (! $role?->hasPermissionTo('scope.by_vendor')) {
-            $data['vendor_commission_percent'] = null;
-            $data['vendor_location'] = null;
-        }
+        
 
         return $data;
     }
