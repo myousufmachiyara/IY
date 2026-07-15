@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('vendor_payments', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('vendor_id')->constrained('users')->restrictOnDelete();
             $table->foreignId('vehicle_id')->constrained()->cascadeOnDelete(); // vehicle-wise only, per spec
             $table->unsignedBigInteger('amount');
             $table->foreignId('account_id')->nullable()->constrained('chart_of_accounts')->nullOnDelete();
