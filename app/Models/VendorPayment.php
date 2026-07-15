@@ -25,4 +25,8 @@ class VendorPayment extends Model
     public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class); }
     public function account(): BelongsTo { return $this->belongsTo(ChartOfAccount::class, 'account_id'); }
     public function recorder(): BelongsTo{ return $this->belongsTo(User::class, 'recorded_by'); }
+    public function journalEntries(): MorphMany
+    {
+        return $this->morphMany(JournalEntry::class, 'reference');
+    }
 }

@@ -86,8 +86,8 @@ Route::middleware(['auth'])->group(function () {
     Route::put('documents/{document}', [DocumentController::class, 'update'])->middleware('permission:documents.edit')->name('documents.update');
     
     // Module 6b — Vendor Payments & Expenses
-    Route::resource('vendor-payments', VendorPaymentController::class)->only(['index', 'store'])->middleware('permission:vendor_payments');
-    Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'destroy'])->middleware('permission:expenses');
+    Route::resource('vendor-payments', VendorPaymentController::class)->only(['index', 'store', 'edit', 'update', 'destroy'])->middleware('permission:vendor_payments');
+    Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'edit', 'update', 'destroy'])->middleware('permission:expenses');
 
     // Module 7 — Accounting
     Route::middleware('permission:accounting.index')->prefix('accounting')->name('accounting.')->group(function () {
