@@ -8,7 +8,7 @@
         </li>
         @if($vehicle->isWon())
             <li class="nav-item">
-                <a class="nav-link {{ $active === 'costing' ? 'active' : '' }}" href="{{ route('costings.edit', $vehicle) }}">
+                <a class="nav-link {{ $active === 'costing' ? 'active' : '' }}" href="{{ route('costings.show', $vehicle) }}">       
                     <i class="fa fa-calculator me-1"></i> Costing
                 </a>
             </li>

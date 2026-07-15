@@ -110,6 +110,7 @@
                                     <tr class="fw-bold border-top"><td>Suggested Sale Price</td><td class="text-end">¥<span id="calc_suggested_price">{{ number_format($costing->sale_price) }}</span></td></tr>
                                 </table>
 
+                                @can('costings.edit')
                                 <form method="POST" action="{{ route('costings.selling', $vehicle) }}">
                                     @csrf @method('PUT')
                                     <div class="mb-2">
@@ -120,6 +121,12 @@
                                     </div>
                                     <button type="submit" class="btn btn-primary w-100 mb-3">Save Selling Price</button>
                                 </form>
+                                @else
+                                <p class="mb-3">
+                                    <strong>Selling Price:</strong>
+                                    ¥{{ number_format($vehicle->selling_price ?? $costing->sale_price) }}
+                                </p>
+                                @endcan
 
                                 <hr>
                                 <table class="table table-sm table-borderless mb-0">
@@ -155,7 +162,6 @@ const agentCommissionPercent = {{ $vehicle->agent->sales_commission_percent ?? 1
 const agentFixedBonus = {{ (int) ($vehicle->agent->sales_fixed_bonus ?? 0) }};
 let currentTotalCosting = {{ $costing->total_costing }};
 
-// Mirrors VehicleCosting::serviceChargeFor() exactly.
 function serviceChargeFor(price) {
     if (price <= 500000) return 90000;
     if (price <= 1000000) return 110000;
@@ -178,7 +184,9 @@ function recalcCosting() {
     const serviceCharge = serviceChargeFor(buyingPrice);
     const suggestedPrice = buyingPrice + serviceCharge + inland + freight + misc;
 
-    document.getElementById('vendor_commission_amount_display').value = '¥' + formatYen(vendorCommAmount);
+    if (document.getElementById('vendor_commission_amount_display')) {
+        document.getElementById('vendor_commission_amount_display').value = '¥' + formatYen(vendorCommAmount);
+    }
     document.getElementById('calc_vendor_comm').textContent = formatYen(vendorCommAmount);
     document.getElementById('calc_inland').textContent = formatYen(inland);
     document.getElementById('calc_auction').textContent = formatYen(auction);

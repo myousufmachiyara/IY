@@ -76,7 +76,7 @@
                             @if(!$vehicle->costing || $vehicle->costing->total_costing == 0)
                                 <div class="alert alert-warning">
                                     <i class="fa fa-exclamation-triangle"></i> Costing breakdown not yet prepared.
-                                    <a href="{{ route('costings.edit', $vehicle) }}" class="alert-link">Complete it now &rarr;</a>
+                                    <a href="{{ route('costings.show', $vehicle) }}" class="alert-link">Complete it now &rarr;</a>
                                 </div>
                             @elseif(!$vehicle->invoice)
                                 <div class="alert alert-info">

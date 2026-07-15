@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 
 class CostingController extends Controller
 {
-    public function edit(Vehicle $vehicle)
+    public function show(Vehicle $vehicle)
     {
         abort_unless($vehicle->isWon(), 422, 'Costing is only available for won vehicles.');
         $vehicle->load('customer', 'vendor', 'agent');
@@ -65,7 +65,7 @@ class CostingController extends Controller
         return VehicleCosting::create([
             'vehicle_id'                => $vehicle->id,
             'buying_price'              => $vehicle->buying_price,
-            'vendor_commission_percent' => $vehicle->vendor->vendor_commission_percent ?? 7,
+            'vendor_commission_percent' => $vehicle->vendor->commission_percent ?? 7,
         ]);
     }
 }
