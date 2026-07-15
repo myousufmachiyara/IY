@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\{DashboardController, UserController, RoleController};
-use App\Http\Controllers\{CustomerController, VehicleController, BidSheetController, BidController};
+use App\Http\Controllers\{CustomerController, VendorController,VehicleController, BidSheetController, BidController,};
 use App\Http\Controllers\{BiddingResultController, CostingController, InvoiceController, PaymentController};
 use App\Http\Controllers\{ShipmentController, VehicleReassignController, DocumentController, VendorPaymentController,
     ExpenseController, AccountingController, ReportController};
