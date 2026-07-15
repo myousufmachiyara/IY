@@ -10,6 +10,22 @@ use Illuminate\Validation\Rule;
 
 class PaymentController extends Controller
 {
+
+    public function index(Request $request)
+    {
+        $payments = Payment::with(['customer', 'invoice', 'vehicle', 'recorder'])
+            ->when($request->customer_id, fn ($q, $v) => $q->where('customer_id', $v))
+            ->when($request->method, fn ($q, $v) => $q->where('method', $v))
+            ->when($request->from, fn ($q, $v) => $q->whereDate('paid_at', '>=', $v))
+            ->when($request->to, fn ($q, $v) => $q->whereDate('paid_at', '<=', $v))
+            ->latest('paid_at')
+            ->get();
+
+        $customers = Customer::orderBy('name')->get(); // for the filter dropdown; ScopedToAgent narrows this automatically
+
+        return view('payments.index', compact('payments', 'customers'));
+    }
+
     public function store(Request $request, LedgerService $ledger)
     {
         $data = $request->validate([

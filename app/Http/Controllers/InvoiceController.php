@@ -12,9 +12,15 @@ class InvoiceController extends Controller
 {
     public function index(Request $request)
     {
-        $invoices = Invoice::with(['customer', 'vehicle'])
+        $invoices = Invoice::with(['customer', 'vehicle', 'agent'])
             ->when($request->status, fn ($q, $v) => $q->where('status', $v))
-            ->latest()->paginate(15)->withQueryString();
+            ->when($request->search, fn ($q, $v) => $q->where(fn ($w) =>
+                $w->where('invoice_no', 'like', "%{$v}%")
+                ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$v}%"))))
+            ->when($request->from, fn ($q, $v) => $q->whereDate('issued_at', '>=', $v))
+            ->when($request->to, fn ($q, $v) => $q->whereDate('issued_at', '<=', $v))
+            ->latest()
+            ->get();
 
         return view('invoices.index', compact('invoices'));
     }

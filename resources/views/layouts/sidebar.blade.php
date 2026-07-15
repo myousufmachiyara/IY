@@ -129,24 +129,29 @@
           @endcan
 
           {{-- Payments & Expenses --}}
-          @if(auth()->user()->can('vendor_payments.index') || auth()->user()->can('expenses.index'))
-          <li class="nav-parent {{ request()->routeIs('vendor-payments.*') || request()->routeIs('expenses.*') ? 'nav-expanded nav-active' : '' }}">
-            <a class="nav-link" href="#">
-              <i class="fa fa-money-bill-wave"></i>
-              <span>Payments &amp; Expenses</span>
-            </a>
-            <ul class="nav nav-children">
-              @can('vendor_payments.index')
-                <li class="{{ request()->routeIs('vendor-payments.*') ? 'active' : '' }}">
-                  <a class="nav-link" href="{{ route('vendor-payments.index') }}">Vendor Payments</a>
-                </li>
-              @endcan
-              @can('expenses.index')
-                <li class="{{ request()->routeIs('expenses.*') ? 'active' : '' }}">
-                  <a class="nav-link" href="{{ route('expenses.index') }}">Expenses</a>
-                </li>
-              @endcan
-            </ul>
+          @if(auth()->user()->can('payments.index') || auth()->user()->can('vendor_payments.index') || auth()->user()->can('expenses.index'))
+          <li class="nav-parent {{ request()->routeIs('payments.*') || request()->routeIs('vendor-payments.*') || request()->routeIs('expenses.*') ? 'nav-expanded nav-active' : '' }}">
+              <a class="nav-link" href="#">
+                  <i class="fa fa-money-bill-wave"></i>
+                  <span>Payments &amp; Expenses</span>
+              </a>
+              <ul class="nav nav-children">
+                  @can('payments.index')
+                      <li class="{{ request()->routeIs('payments.*') && !request()->routeIs('payments.customer_ledger') ? 'active' : '' }}">
+                          <a class="nav-link" href="{{ route('payments.index') }}">All Payments</a>
+                      </li>
+                  @endcan
+                  @can('vendor_payments.index')
+                      <li class="{{ request()->routeIs('vendor-payments.*') ? 'active' : '' }}">
+                          <a class="nav-link" href="{{ route('vendor-payments.index') }}">Vendor Payments</a>
+                      </li>
+                  @endcan
+                  @can('expenses.index')
+                      <li class="{{ request()->routeIs('expenses.*') ? 'active' : '' }}">
+                          <a class="nav-link" href="{{ route('expenses.index') }}">Expenses</a>
+                      </li>
+                  @endcan
+              </ul>
           </li>
           @endif
 

@@ -61,6 +61,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('payments/{payment}/edit', [PaymentController::class, 'edit'])->middleware('permission:payments.edit')->name('payments.edit');
     Route::put('payments/{payment}', [PaymentController::class, 'update'])->middleware('permission:payments.edit')->name('payments.update');
     Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->middleware('permission:payments.delete')->name('payments.destroy');
+    Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.index')->name('payments.index');
 
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->middleware('permission:invoices.edit')->name('invoices.cancel');
 
