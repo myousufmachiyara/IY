@@ -10,7 +10,9 @@ class AccountingController extends Controller
 {
     public function chartOfAccounts()
     {
-        $accounts = ChartOfAccount::orderBy('code')->get()->map(fn ($a) => tap($a, fn ($a) => $a->current_balance = $a->balance()));
+        $accounts = ChartOfAccount::orderBy('code')->get()
+            ->map(fn ($a) => tap($a, fn ($a) => $a->current_balance = $a->balance()));
+
         return view('accounting.chart', compact('accounts'));
     }
 
@@ -19,15 +21,16 @@ class AccountingController extends Controller
         $entries = JournalEntry::with('lines.account')
             ->when($request->from, fn ($q, $v) => $q->whereDate('date', '>=', $v))
             ->when($request->to, fn ($q, $v) => $q->whereDate('date', '<=', $v))
-            ->latest('date')->paginate(20)->withQueryString();
+            ->latest('date')
+            ->get();
 
         return view('accounting.journal', compact('entries'));
     }
 
-    /** Ledger / register for a single account, with running balance. */
     public function ledger(Request $request, ChartOfAccount $account)
     {
-        $lines = JournalLine::with('entry')->where('account_id', $account->id)
+        $lines = JournalLine::with('entry')
+            ->where('account_id', $account->id)
             ->when($request->from, fn ($q, $v) => $q->whereHas('entry', fn ($e) => $e->whereDate('date', '>=', $v)))
             ->when($request->to, fn ($q, $v) => $q->whereHas('entry', fn ($e) => $e->whereDate('date', '<=', $v)))
             ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
@@ -50,6 +53,7 @@ class AccountingController extends Controller
     public function cashBankBook(Request $request)
     {
         $accounts = [LedgerService::CASH, LedgerService::BANK];
+
         $lines = JournalLine::with('entry', 'account')
             ->whereHas('account', fn ($q) => $q->whereIn('code', $accounts))
             ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
@@ -65,12 +69,13 @@ class AccountingController extends Controller
     /** Accounts Receivable broken down by customer (subledger via the polymorphic `party`). */
     public function receivables()
     {
-        $customers = Customer::allAgents()->get()->map(fn ($c) => [
+        // ScopedToAgent already narrows this for a sales agent; data.view_all sees all.
+        $customers = Customer::get()->map(fn ($c) => [
             'customer' => $c,
             'invoiced' => $c->totalInvoiced(),
             'paid'     => $c->totalPaid(),
             'balance'  => $c->balance(),
-        ])->filter(fn ($r) => $r['balance'] > 0);
+        ])->filter(fn ($r) => $r['balance'] > 0)->values();
 
         return view('accounting.receivables', compact('customers'));
     }
@@ -78,11 +83,11 @@ class AccountingController extends Controller
     /** Accounts Payable broken down by vendor. */
     public function payables()
     {
-        $vendors = User::role('vendor_agent')->get()->map(function ($v) {
+        $vendors = User::permission('scope.by_vendor')->get()->map(function ($v) {
             $payable = $v->vendorVehicles()->sum('buying_price');
             $paid    = $v->vendorPayments()->sum('amount');
             return ['vendor' => $v, 'payable' => $payable, 'paid' => $paid, 'balance' => $payable - $paid];
-        })->filter(fn ($r) => $r['balance'] > 0);
+        })->filter(fn ($r) => $r['balance'] > 0)->values();
 
         return view('accounting.payables', compact('vendors'));
     }
