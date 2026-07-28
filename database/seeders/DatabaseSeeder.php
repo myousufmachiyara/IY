@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\{User, Vendor, ChartOfAccount};
+use App\Models\{User, Vendor, Port, ChartOfAccount};
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
@@ -119,6 +119,19 @@ class DatabaseSeeder extends Seeder
                 ['code' => $item['code']],
                 array_merge($item, ['is_system' => true, 'is_active' => true])
             );
+        }
+
+        // ── Ports (destination ports for vehicle export) ────────────────────
+
+        $ports = [
+            'Mombasa, Kenya', 'Dar es Salaam, Tanzania', 'Durban, South Africa',
+            'Port Qasim, Pakistan', 'Karachi, Pakistan', 'Colombo, Sri Lanka',
+            'Chattogram, Bangladesh', 'Apapa (Lagos), Nigeria', 'Tin Can Island, Nigeria',
+            'Cotonou, Benin', 'Jebel Ali, UAE', 'Suva, Fiji', 'Auckland, New Zealand',
+            'Port Louis, Mauritius', 'Georgetown, Guyana',
+        ];
+        foreach ($ports as $name) {
+            Port::firstOrCreate(['name' => $name]);
         }
 
         // ── Users (login is via username) ───────────────────────────────────
