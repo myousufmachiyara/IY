@@ -16,6 +16,19 @@
             @if(session('error'))
                 <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
+            @if(session('warning'))
+                <div class="alert alert-warning">{{ session('warning') }}</div>
+            @endif
+            @if ($errors->any())
+                <div class="alert alert-danger">
+                    <strong><i class="fa fa-exclamation-triangle"></i> Could not upload the bid sheet:</strong>
+                    <ul class="mb-0 mt-1">
+                        @foreach ($errors->all() as $e)
+                            <li>{{ $e }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             <header class="card-header">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -93,17 +106,33 @@
                         <div class="row form-group">
                             <div class="col-lg-12 mb-2">
                                 <label>Title <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="title" placeholder="e.g. USS Tokyo — 1 Aug Auction" required>
+                                <input type="text" class="form-control @error('title') is-invalid @enderror"
+                                       name="title" value="{{ old('title') }}"
+                                       placeholder="e.g. USS Tokyo — 1 Aug Auction" required>
+                                @error('title')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
                             <div class="col-lg-12 mb-2">
-                                <label>Auction Date</label>
-                                <input type="date" class="form-control" name="auction_date">
+                                <label>
+                                    Auction Date
+                                    @if(!auth()->user()->isSuperAdmin())
+                                        <span class="text-danger">*</span>
+                                        <small class="text-muted">(must be tomorrow or later)</small>
+                                    @else
+                                        <small class="text-muted">(no restriction for Super Admin)</small>
+                                    @endif
+                                </label>
+                                <input type="date" class="form-control @error('auction_date') is-invalid @enderror"
+                                       name="auction_date" value="{{ old('auction_date') }}"
+                                       @if(!auth()->user()->isSuperAdmin()) min="{{ now()->addDay()->toDateString() }}" required @endif>
+                                @error('auction_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
                             <div class="col-lg-12 mb-2">
                                 <label>Excel File (.xlsx, .xls, .csv) <span class="text-danger">*</span></label>
-                                <input type="file" class="form-control" name="file" accept=".xlsx,.xls,.csv" required>
+                                <input type="file" class="form-control @error('file') is-invalid @enderror"
+                                       name="file" accept=".xlsx,.xls,.csv" required>
+                                @error('file')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 <small class="text-muted">
-                                    Columns required: lot_no, auction_house, auction_date, make, model, year, grade, chassis_no, max_bid, customer_id.
+                                    Columns: lot_no, auction_house, auction_date, make, model, year, grade, chassis_no, max_bid, priority.
                                     <a href="{{ route('bid-sheets.template') }}">Download the template</a> to get the exact format.
                                 </small>
                             </div>
@@ -121,5 +150,16 @@
         @endcan
     </div>
 </div>
+
+<script>
+    @if ($errors->any())
+        // Validation failed on this exact form — reopen the modal automatically
+        // so the person sees their errors right where they were typing, instead
+        // of having to notice the banner above and click Upload again.
+        $(document).ready(function () {
+            $.magnificPopup.open({ items: { src: '#addModal' }, type: 'inline' });
+        });
+    @endif
+</script>
 
 @endsection
