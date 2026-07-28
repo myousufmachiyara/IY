@@ -37,7 +37,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($sheets as $s)                            
+                            @foreach ($sheets as $b)                            
                             <tr>
                                 <td>{{ $b->lot_no ?? '—' }}</td>
                                 <td>
