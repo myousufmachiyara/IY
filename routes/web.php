@@ -15,7 +15,7 @@ Route::middleware('guest')->group(function () {
 });
 Route::post('/logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
 
-Route::get('/unauthorized', fn () => view('errors.unauthorized'))->name('unauthorized')->middleware('auth');
+Route::get('/unauthorized', fn () => view('unauthorized'))->name('unauthorized')->middleware('auth');
 
 // ── Authenticated ────────────────────────────────────────────────────
 Route::middleware(['auth'])->group(function () {
