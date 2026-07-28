@@ -31,6 +31,8 @@ return new class extends Migration {
 
             // requirement | bidding | won | lost | invoiced | dispatched | arrived | delivered
             $table->string('status')->default('requirement');
+            $table->timestamp('invoice_requested_at')->nullable();
+            $table->timestamp('invoice_requested_at')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });

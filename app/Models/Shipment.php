@@ -3,16 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 
 class Shipment extends Model
 {
     public const METHODS = ['RORO', 'Container'];
 
     protected $fillable = [
-        'customer_id', 'method', 'shipment_date', 'expected_arrival',
-        'freight_total', 'status', 'created_by',
+        'customer_id', 'method', 'container_no', 'bl_no', 'shipping_company',
+        'shipment_date', 'expected_arrival', 'freight_total', 'status', 'created_by',
     ];
 
     protected function casts(): array

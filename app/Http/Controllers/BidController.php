@@ -26,7 +26,7 @@ class BidController extends Controller
 
     public function export(Request $request)
     {
-        $filters = $request->only('agent_id', 'from', 'to');
-        return Excel::download(new BidsExport($filters), 'final-bidding-sheet.xlsx');
+        $columns = $request->columns ?: [];
+        return Excel::download(new BidsExport($request->only('agent_id', 'from', 'to'), $columns), 'final-bidding-sheet.xlsx');
     }
 }

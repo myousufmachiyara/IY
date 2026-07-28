@@ -30,6 +30,15 @@
                 </div>
 
                 <div class="table-scroll">
+                    <form method="PUT" action="{{ route('bid-sheets.bulk_assign') }}" id="bulkAssignForm">
+                    @csrf @method('PUT')
+                    <div class="d-flex gap-2 mb-2">
+                        <select name="customer_id" class="form-control select2-js" style="max-width:300px;" required>
+                            <option value="" disabled selected>Assign selected to...</option>
+                            @foreach($customers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach
+                        </select>
+                        <button class="btn btn-outline-primary">Bulk Assign</button>
+                    </div>
                     <table class="table table-bordered table-striped mb-0" id="datatable-default">
                         <thead>
                             <tr>

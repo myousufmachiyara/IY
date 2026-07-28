@@ -3,6 +3,18 @@
 @section('title', 'Customer | ' . $customer->name)
 
 @section('content')
+
+@php
+    $depositBadges = [
+        'none'     => ['secondary', 'Not Submitted'],
+        'pending'  => ['warning text-dark', 'Pending Approval'],
+        'approved' => ['success', 'Approved'],
+        'rejected' => ['danger', 'Rejected'],
+    ];
+    [$badgeClass, $badgeLabel] = $depositBadges[$customer->security_deposit_status] ?? $depositBadges['none'];
+    $canApprove = auth()->user()->canBackdate();
+@endphp
+
 <div class="row">
     <div class="col">
         <section class="card">
@@ -27,7 +39,7 @@
                             <tr><th>Country</th><td>{{ $customer->country ?? '—' }}</td></tr>
                             <tr><th>Address</th><td>{{ $customer->address ?? '—' }}</td></tr>
                             <tr><th>Assigned Agent</th><td>{{ $customer->agent->name ?? '—' }}</td></tr>
-                            <tr><th>Type</th><td>{{ $customer->is_new_customer ? 'New Customer' : 'Existing Customer' }}</td></tr>
+                            <tr><th>Created</th><td>{{ $customer->created_at->format('d-m-Y') }}</td></tr>
                             <tr><th>Status</th><td><span class="badge bg-{{ $customer->status==='active'?'success':'danger' }}">{{ $customer->status }}</span></td></tr>
                         </table>
                     </div>
@@ -37,19 +49,32 @@
                                 <h5 class="card-title mb-3">Profile &amp; Deposit</h5>
 
                                 <p class="mb-2">
-                                    Security Deposit:
-                                    @if(!$customer->is_new_customer)
-                                        <span class="text-muted">N/A (existing customer)</span>
-                                    @elseif($customer->security_deposit_paid)
-                                        <span class="badge bg-success">¥{{ number_format($customer->security_deposit) }} Paid</span>
-                                        @if($customer->security_deposit_refunded)
-                                            <span class="badge bg-secondary">Refunded</span>
+                                    Security Deposit: <span class="badge bg-{{ $badgeClass }}">{{ $badgeLabel }}</span>
+                                    @if($customer->security_deposit_status === 'approved')
+                                        <br><small class="text-muted">¥{{ number_format($customer->security_deposit) }} — received by {{ $customer->depositReceivedBy->name ?? '—' }}, approved by {{ $customer->depositApprovedBy->name ?? '—' }} on {{ $customer->security_deposit_approved_at->format('d-m-Y') }}</small>
+                                    @elseif($customer->security_deposit_status === 'pending')
+                                        <br><small class="text-muted">¥{{ number_format($customer->security_deposit) }} — received by {{ $customer->depositReceivedBy->name ?? '—' }} on {{ $customer->security_deposit_received_at->format('d-m-Y') }}, awaiting approval</small>
+                                        @if($canApprove)
+                                            <div class="mt-1">
+                                                <form action="{{ route('customers.deposit.approve', $customer) }}" method="POST" class="d-inline" onsubmit="return confirm('Approve this deposit?');">
+                                                    @csrf
+                                                    <button class="btn btn-sm btn-success">Approve</button>
+                                                </form>
+                                                <a href="#" class="btn btn-sm btn-outline-danger" onclick="openRejectDeposit({{ $customer->id }}, '{{ $customer->name }}')">Reject</a>
+                                            </div>
                                         @endif
-                                    @else
-                                        <span class="badge bg-warning text-dark">Pending</span>
-                                        <a href="#" class="btn btn-sm btn-outline-success ms-1" onclick="openDeposit({{ $customer->id }}, '{{ $customer->name }}')">
-                                            <i class="fa fa-hand-holding-usd"></i> Pay Now
-                                        </a>
+                                    @elseif($customer->security_deposit_status === 'rejected')
+                                        <br><small class="text-danger">Reason: {{ $customer->security_deposit_rejection_reason }}</small>
+                                    @endif
+
+                                    @if(in_array($customer->security_deposit_status, ['none', 'rejected']))
+                                        @can('customers.edit')
+                                            <div class="mt-1">
+                                                <a href="#" class="btn btn-sm btn-outline-success" onclick="openReceiveDeposit({{ $customer->id }}, '{{ $customer->name }}')">
+                                                    <i class="fa fa-hand-holding-usd"></i> Record Deposit Received
+                                                </a>
+                                            </div>
+                                        @endcan
                                     @endif
                                 </p>
 
@@ -59,14 +84,7 @@
                                         <span class="badge bg-success">Complete ({{ $customer->profile_completed_at->format('d-m-Y') }})</span>
                                     @else
                                         <span class="badge bg-warning text-dark">Incomplete</span>
-                                        @if($customer->canCompleteProfile())
-                                            <form action="{{ route('customers.complete', $customer) }}" method="POST" class="d-inline" onsubmit="return confirm('Mark profile complete?');">
-                                                @csrf
-                                                <button class="btn btn-sm btn-outline-success ms-1">Complete Now</button>
-                                            </form>
-                                        @else
-                                            <div class="small text-danger mt-1"><i class="fa fa-info-circle"></i> Pay the security deposit before completing this profile (use "Pay Now" above).</div>
-                                        @endif
+                                        <div class="small text-muted mt-1">Completes automatically once the deposit is approved.</div>
                                     @endif
                                 </p>
 
@@ -83,7 +101,7 @@
             </div>
         </section>
 
-        @include('customers._deposit_modal')
+        @include('customers._deposit_modals')
     </div>
 </div>
 @endsection

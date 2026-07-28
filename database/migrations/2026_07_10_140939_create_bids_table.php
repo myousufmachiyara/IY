@@ -23,7 +23,8 @@ return new class extends Migration {
             $table->string('year')->nullable();
             $table->string('grade')->nullable();
             $table->string('chassis_no')->nullable();
-            $table->unsignedBigInteger('max_bid')->default(0); // yen
+            $table->unsignedBigInteger('max_bid')->default(0);
+            $table->unsignedTinyInteger('priority')->nullable(); // yen
 
             $table->string('result')->default('pending');      // pending | won | lost
             $table->unsignedBigInteger('won_amount')->nullable();

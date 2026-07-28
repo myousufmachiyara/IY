@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
-        //
+    ->withExceptions(function (Illuminate\Foundation\Configuration\Exceptions $exceptions) {
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, $request) {
+            return $request->expectsJson()
+                ? response()->json(['message' => 'Session expired.'], 419)
+                : redirect()->route('login')->with('error', 'Your session expired. Please log in again.');
+        });
     })->create();

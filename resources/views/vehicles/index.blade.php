@@ -5,8 +5,8 @@
 @section('content')
 
 @php
-        $isPrivileged = auth()->user()->can('data.view_all');    
-        $statusColors = [
+    $isPrivileged = auth()->user()->can('data.view_all');
+    $statusColors = [
         'requirement' => 'secondary', 'bidding' => 'info', 'won' => 'success', 'lost' => 'danger',
         'invoiced' => 'primary', 'dispatched' => 'warning', 'arrived' => 'warning', 'delivered' => 'success',
     ];
@@ -35,9 +35,32 @@
             </header>
 
             <div class="card-body">
-                @if(request('customer_id'))
-                    <a href="{{ route('vehicles.index') }}" class="btn btn-sm btn-light mb-3"><i class="fa fa-times"></i> Clear customer filter</a>
-                @endif
+                <form method="GET" action="{{ route('vehicles.index') }}" class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <select name="customer_id" class="form-control select2-js" onchange="this.form.submit()">
+                            <option value="">All Customers</option>
+                            @foreach($customers as $c)
+                                <option value="{{ $c->id }}" {{ request('customer_id') == $c->id ? 'selected' : '' }}>{{ $c->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-2"><input type="text" name="make" class="form-control" placeholder="Make" value="{{ request('make') }}"></div>
+                    <div class="col-md-2"><input type="text" name="model" class="form-control" placeholder="Model" value="{{ request('model') }}"></div>
+                    <div class="col-md-2"><input type="date" name="from" class="form-control" value="{{ request('from') }}" title="Created from"></div>
+                    <div class="col-md-2"><input type="date" name="to" class="form-control" value="{{ request('to') }}" title="Created to"></div>
+                    <div class="col-md-1">
+                        <button class="btn btn-outline-secondary w-100">Filter</button>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="show_won" name="show_won" value="1" {{ request('show_won') ? 'checked' : '' }} onchange="this.form.submit()">
+                            <label class="form-check-label" for="show_won">Include won / invoiced / shipped vehicles</label>
+                        </div>
+                        @if(request()->anyFilled(['customer_id','make','model','from','to','show_won']))
+                            <a href="{{ route('vehicles.index') }}" class="small">Clear all filters</a>
+                        @endif
+                    </div>
+                </form>
 
                 <div class="table-scroll">
                     <table class="table table-bordered table-striped mb-0" id="datatable-default">
@@ -49,7 +72,9 @@
                                 @if($isPrivileged)<th>Agent</th>@endif
                                 <th>Budget</th>
                                 <th>Buying Price</th>
-                                <th>Status</th>
+                                <th>Balance</th>
+                                @if(request('show_won'))<th>Status</th>@endif
+                                <th>Created</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -65,7 +90,11 @@
                                 @if($isPrivileged)<td>{{ $v->agent->name ?? '—' }}</td>@endif
                                 <td>¥{{ number_format($v->budget) }}</td>
                                 <td>{{ $v->buying_price ? '¥'.number_format($v->buying_price) : '—' }}</td>
+                                <td>{{ $v->invoice ? '¥'.number_format($v->invoice->balance()) : '—' }}</td>
+                                @if(request('show_won'))
                                 <td><span class="badge bg-{{ $statusColors[$v->status] ?? 'secondary' }} text-uppercase">{{ $v->status }}</span></td>
+                                @endif
+                                <td>{{ $v->created_at->format('d-m-Y') }}</td>
                                 <td class="text-nowrap">
                                     <a href="{{ route('vehicles.show', $v) }}" class="text-secondary me-1" title="View">
                                         <i class="fa fa-eye"></i>
@@ -116,28 +145,24 @@
                                 </select>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Make</label>
-                                <input type="text" class="form-control" name="make">
+                                <label>Make <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="make" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Model</label>
-                                <input type="text" class="form-control" name="model">
+                                <label>Model <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="model" required>
                             </div>
-                            <div class="col-lg-4 mb-2">
-                                <label>Year</label>
-                                <input type="text" class="form-control" name="year">
+                            <div class="col-lg-6 mb-2">
+                                <label>Year <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="year" required>
                             </div>
-                            <div class="col-lg-4 mb-2">
-                                <label>Grade</label>
-                                <input type="text" class="form-control" name="grade">
-                            </div>
-                            <div class="col-lg-4 mb-2">
-                                <label>Chassis No.</label>
-                                <input type="text" class="form-control" name="chassis_no">
+                            <div class="col-lg-6 mb-2">
+                                <label>Grade <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="grade" required>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Budget (¥) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" name="budget" min="0" required>
+                                <input type="number" class="form-control" name="budget" min="1" required>
                             </div>
                         </div>
                     </div>
@@ -170,28 +195,24 @@
                                 </select>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Make</label>
-                                <input type="text" id="edit_make" class="form-control" name="make">
+                                <label>Make <span class="text-danger">*</span></label>
+                                <input type="text" id="edit_make" class="form-control" name="make" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Model</label>
-                                <input type="text" id="edit_model" class="form-control" name="model">
+                                <label>Model <span class="text-danger">*</span></label>
+                                <input type="text" id="edit_model" class="form-control" name="model" required>
                             </div>
-                            <div class="col-lg-4 mb-2">
-                                <label>Year</label>
-                                <input type="text" id="edit_year" class="form-control" name="year">
+                            <div class="col-lg-6 mb-2">
+                                <label>Year <span class="text-danger">*</span></label>
+                                <input type="text" id="edit_year" class="form-control" name="year" required>
                             </div>
-                            <div class="col-lg-4 mb-2">
-                                <label>Grade</label>
-                                <input type="text" id="edit_grade" class="form-control" name="grade">
-                            </div>
-                            <div class="col-lg-4 mb-2">
-                                <label>Chassis No.</label>
-                                <input type="text" id="edit_chassis_no" class="form-control" name="chassis_no">
+                            <div class="col-lg-6 mb-2">
+                                <label>Grade <span class="text-danger">*</span></label>
+                                <input type="text" id="edit_grade" class="form-control" name="grade" required>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Budget (¥) <span class="text-danger">*</span></label>
-                                <input type="number" id="edit_budget" class="form-control" name="budget" min="0" required>
+                                <input type="number" id="edit_budget" class="form-control" name="budget" min="1" required>
                             </div>
                         </div>
                     </div>
@@ -218,7 +239,6 @@ function editVehicle(id) {
             $('#edit_model').val(data.model);
             $('#edit_year').val(data.year);
             $('#edit_grade').val(data.grade);
-            $('#edit_chassis_no').val(data.chassis_no);
             $('#edit_budget').val(data.budget);
             $('#edit_customer_id').val(data.customer_id).trigger('change');
 

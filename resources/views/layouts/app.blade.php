@@ -198,5 +198,8 @@
                 </div>
             </div>
         </footer>
+        <script>
+            $.fn.dataTable.defaults.lengthMenu = [[100,250,500,1000,-1],[100,250,500,1000,'All']];
+        </script>
     </body>
 </html>

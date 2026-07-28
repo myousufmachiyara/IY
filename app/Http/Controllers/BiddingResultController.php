@@ -11,10 +11,11 @@ class BiddingResultController extends Controller
 {
     public function index()
     {
-        $bids = Bid::with(['customer', 'vehicle', 'agent'])
-            ->where('result', 'pending')
-            ->latest()
-            ->get();
+        $bids = Bid::with(['customer','vehicle','agent'])
+        ->where('result','pending')
+        ->when($request->customer_id, fn($q)=>$q->where('customer_id',$request->customer_id))
+        ->when($request->agent_id, fn($q)=>$q->where('agent_id',$request->agent_id))
+        ->latest()->get();
 
         $vendors   = Vendor::active()->orderBy('name')->get();
         $customers = Customer::complete()->orderBy('name')->get();
@@ -66,6 +67,27 @@ class BiddingResultController extends Controller
             ->with('success', 'Bid marked won. Vendor payable posted — complete the costing next.');
     }
 
+    public function undoWon(Bid $bid, LedgerService $ledger)
+    {
+        abort_unless(auth()->user()->canBackdate(), 403);
+        abort_unless($bid->result === 'won', 422, 'This bid is not currently marked won.');
+
+        $vehicle = $bid->vehicle;
+        abort_if($vehicle?->invoice, 422, 'Cannot undo — an invoice already exists for this vehicle.');
+
+        DB::transaction(function () use ($bid, $vehicle, $ledger) {
+            if ($vehicle) {
+                foreach (\App\Models\JournalEntry::where('reference_type', $vehicle->getMorphClass())->where('reference_id', $vehicle->id)->get() as $entry) {
+                    $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — bid #{$bid->id} won by mistake, reverted");
+                }
+                $vehicle->costing()->delete();
+                $vehicle->update(['vendor_id'=>null,'buying_price'=>null,'winning_screenshot_path'=>null,'won_at'=>null,'status'=>'requirement']);
+            }
+            $bid->update(['result' => 'pending', 'won_amount' => null, 'vehicle_id' => $vehicle && !$vehicle->exists ? null : $bid->vehicle_id]);
+        });
+
+        return back()->with('success', 'Bid reverted to pending — vendor payable reversed.');
+    }
     public function lost(Bid $bid)
     {
         $bid->update(['result' => 'lost']);

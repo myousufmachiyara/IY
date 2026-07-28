@@ -34,8 +34,13 @@
 
                 <div class="row mb-3">
                     <div class="col-md-3"><strong>Method:</strong> {{ $shipment->method }}</div>
+                    <div class="col-md-3"><strong>Expected Arrival:</strong> {{ optional($shipment->expected_arrival)->format('d-m-Y') ?? '—' }}</div>
+                    <div class="col-md-3"><strong>Container #:</strong> {{ $shipment->container_no ?? '—' }}</div>
+                    <div class="col-md-3"><strong>BL #:</strong> {{ $shipment->bl_no ?? '—' }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>Shipping Company:</strong> {{ $shipment->shipping_company ?? '—' }}</div>
                     <div class="col-md-3"><strong>Shipment Date:</strong> {{ optional($shipment->shipment_date)->format('d-m-Y') ?? 'Not set' }}</div>
-                    <div class="col-md-3"><strong>Expected Arrival:</strong> {{ optional($shipment->expected_arrival)->format('d-m-Y') ?? 'Not set' }}</div>
                     <div class="col-md-3"><strong>Freight Total:</strong> ¥{{ number_format($shipment->freight_total) }}</div>
                 </div>
 
@@ -63,24 +68,19 @@
                     <div class="col-md-6">
                         <div class="card bg-light border">
                             <div class="card-body">
-                                <h5 class="card-title mb-3">Freight &amp; Schedule</h5>
+                                <h5 class="card-title mb-3">Confirm Departure &amp; Freight</h5>
                                 <form method="POST" action="{{ route('shipments.schedule', $shipment) }}">
                                     @csrf @method('PUT')
                                     <div class="mb-2">
-                                        <label>Shipment Date <span class="text-danger">*</span></label>
+                                        <label>Shipment (Departure) Date <span class="text-danger">*</span></label>
                                         <input type="date" class="form-control" name="shipment_date" value="{{ optional($shipment->shipment_date)->format('Y-m-d') }}" required>
-                                    </div>
-                                    <div class="mb-2">
-                                        <label>Expected Arrival <span class="text-danger">*</span></label>
-                                        <input type="date" class="form-control" name="expected_arrival" value="{{ optional($shipment->expected_arrival)->format('Y-m-d') }}" required>
                                     </div>
                                     <div class="mb-2">
                                         <label>Freight Total (¥) <span class="text-danger">*</span></label>
                                         <input type="number" class="form-control" name="freight_total" min="0" value="{{ $shipment->freight_total }}" required>
                                     </div>
-                                    <button type="submit" class="btn btn-primary w-100">Save Schedule</button>
+                                    <button type="submit" class="btn btn-primary w-100">Save</button>
                                 </form>
-                                <small class="text-muted d-block mt-2">Final 50% payment due date = Expected Arrival − 22 days (15 + 7 grace), applied automatically to every invoice in this shipment.</small>
                             </div>
                         </div>
                     </div>
@@ -92,12 +92,12 @@
                                 @if($shipment->status === 'preparing')
                                     <form action="{{ route('shipments.dispatch', $shipment) }}" method="POST" onsubmit="return confirm('Mark this shipment as dispatched?');">
                                         @csrf
-                                        <button type="submit" class="btn btn-info w-100 mb-2" @if(!$shipment->shipment_date) disabled title="Set the schedule first" @endif>
+                                        <button type="submit" class="btn btn-info w-100 mb-2" @if(!$shipment->shipment_date) disabled title="Confirm departure date first" @endif>
                                             <i class="fa fa-ship"></i> Mark Dispatched
                                         </button>
                                     </form>
                                     @if(!$shipment->shipment_date)
-                                        <small class="text-danger d-block">Set freight &amp; schedule before dispatching.</small>
+                                        <small class="text-danger d-block">Confirm departure date &amp; freight before dispatching.</small>
                                     @endif
                                 @elseif($shipment->status === 'dispatched')
                                     <form action="{{ route('shipments.arrive', $shipment) }}" method="POST" onsubmit="return confirm('Mark this shipment as arrived?');">

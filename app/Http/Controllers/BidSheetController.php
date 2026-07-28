@@ -10,17 +10,13 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class BidSheetController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $sheets = BidSheet::with('agent')
-            ->withCount([
-                'bids',
-                'bids as won_count'  => fn ($q) => $q->where('result', 'won'),
-                'bids as lost_count' => fn ($q) => $q->where('result', 'lost'),
-            ])
-            ->latest()
-            ->get();
-
+            ->when($request->from, fn($q)=>$q->whereDate('created_at','>=',$request->from))
+            ->when($request->to, fn($q)=>$q->whereDate('created_at','<=',$request->to))
+            ->withCount(['bids', 'bids as won_count' => fn($q)=>$q->where('result','won'), 'bids as lost_count' => fn($q)=>$q->where('result','lost')])
+            ->latest()->get();
         return view('bidding.sheets.index', compact('sheets'));
     }
 
@@ -33,7 +29,7 @@ class BidSheetController extends Controller
     {
         $request->validate([
             'title'        => ['required', 'string', 'max:255'],
-            'auction_date' => ['nullable', 'date'],
+            'auction_date' => $request->user()->isSuperAdmin() ? ['nullable', 'date'] : ['required', 'date', 'after_or_equal:tomorrow'],
             'file'         => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:5120'],
         ]);
 
@@ -64,7 +60,7 @@ class BidSheetController extends Controller
     public function show(BidSheet $bidSheet)
     {
         $bidSheet->load(['bids' => fn ($q) => $q->latest(), 'agent']);
-        $customers = Customer::complete()->orderBy('name')->get(); // for the Assign Customer modal
+        $customers = Customer::complete()->orderBy('name')->get();
 
         return view('bidding.sheets.show', ['sheet' => $bidSheet, 'customers' => $customers]);
     }
@@ -95,5 +91,21 @@ class BidSheetController extends Controller
         $bid->update(['customer_id' => $customer->id]);
 
         return back()->with('success', "Customer '{$customer->name}' assigned to lot {$bid->lot_no}.");
+    }
+
+    public function bulkAssignCustomer(Request $request)
+    {
+        $data = $request->validate([
+            'bid_ids'     => ['required', 'array', 'min:1'],
+            'bid_ids.*'   => ['exists:bids,id'],
+            'customer_id' => ['required', 'exists:customers,id'],
+        ]);
+
+        $customer = Customer::findOrFail($data['customer_id']);
+        abort_unless($customer->isProfileComplete(), 422, "Customer '{$customer->name}' has an incomplete profile.");
+
+        Bid::whereIn('id', $data['bid_ids'])->where('result', 'pending')->update(['customer_id' => $customer->id]);
+
+        return back()->with('success', count($data['bid_ids']) . ' bid(s) assigned to ' . $customer->name . '.');
     }
 }

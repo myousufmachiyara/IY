@@ -52,6 +52,7 @@ class BidsImport implements ToModel, WithHeadingRow
             'chassis_no'    => $row['chassis_no'] ?? null,
             'max_bid'       => (int) ($row['max_bid'] ?? 0),
             'result'        => 'pending',
+            'priority' => isset($row['priority']) ? (int) $row['priority'] : null,
         ]);
     }
 

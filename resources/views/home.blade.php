@@ -75,10 +75,24 @@
 		@endcan
 	</div>
 
-	<div class="alert alert-light border mt-2">
-		<i class="fa fa-info-circle text-muted"></i>
-		<span class="text-muted">Temporary dashboard — full analytics, charts, and activity feeds come once all modules and reports are built.</span>
-	</div>
+	<section class="card mt-3">
+		<header class="card-header">
+			<h2 class="card-title">Recent Activity</h2>
+		</header>
+		<div class="card-body">
+			<table class="table table-sm table-borderless mb-0">
+				@forelse($stats['recent_activity'] as $a)
+				<tr>
+					<td style="width:110px;"><span class="badge bg-secondary">{{ $a['type'] }}</span></td>
+					<td><a href="{{ $a['url'] }}">{{ $a['label'] }}</a></td>
+					<td class="text-muted small text-end">{{ $a['at']->diffForHumans() }}</td>
+				</tr>
+				@empty
+				<tr><td class="text-center text-muted py-3">No recent activity yet.</td></tr>
+				@endforelse
+			</table>
+		</div>
+	</section>
 
 	<script>
 		$(document).ready(function() {

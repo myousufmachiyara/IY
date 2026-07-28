@@ -30,7 +30,6 @@
                 </div>
 
                 <div class="row">
-                    {{-- ================= COST BREAKDOWN ================= --}}
                     <div class="col-lg-6">
                         <div class="card bg-light border mb-3">
                             <div class="card-body">
@@ -60,6 +59,7 @@
                                         <div class="col-6 mb-2">
                                             <label>Freight Charges (¥)</label>
                                             <input type="number" class="form-control calc-input" id="freight_charges" name="freight_charges" value="{{ old('freight_charges', $costing->freight_charges) }}" min="0" required>
+                                            <small class="text-muted">Auto-synced from Shipment once freight is confirmed there.</small>
                                         </div>
                                         <div class="col-6 mb-2">
                                             <label>Misc Expenses (¥)</label>
@@ -95,7 +95,6 @@
                         </div>
                     </div>
 
-                    {{-- ================= PRICING & SELLING PRICE ================= --}}
                     <div class="col-lg-6">
                         <div class="card bg-light border mb-3">
                             <div class="card-body">
@@ -116,8 +115,9 @@
                                     <div class="mb-2">
                                         <label>Actual Selling Price (¥) <span class="text-danger">*</span></label>
                                         <input type="number" class="form-control" id="selling_price" name="selling_price"
-                                               value="{{ old('selling_price', $vehicle->selling_price ?? $costing->sale_price) }}" min="1" required
-                                               oninput="recalcProfit()">
+                                               value="{{ old('selling_price', $vehicle->selling_price ?? $costing->sale_price) }}"
+                                               min="{{ $vehicle->buying_price }}" required oninput="recalcProfit()">
+                                        <small class="text-muted">Cannot be set below the buying price (¥{{ number_format($vehicle->buying_price) }}).</small>
                                     </div>
                                     <button type="submit" class="btn btn-primary w-100 mb-3">Save Selling Price</button>
                                 </form>
@@ -219,6 +219,7 @@ function recalcProfit() {
 }
 
 document.querySelectorAll('.calc-input').forEach(el => el.addEventListener('input', recalcCosting));
+recalcCosting(); // #31: run once on load so figures self-correct immediately, not just after the first edit
 </script>
 
 @endsection

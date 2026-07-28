@@ -9,9 +9,6 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        // Customer/Vehicle/Invoice all use the ScopedToAgent trait, so these counts
-        // automatically narrow to "my own" for a sales agent, and stay unrestricted
-        // for super admin / accountant — no extra filtering needed here.
         $stats = [
             'customers'      => Customer::count(),
             'in_bidding'     => Vehicle::whereIn('status', ['requirement', 'bidding'])->count(),
@@ -23,6 +20,17 @@ class DashboardController extends Controller
                 ->get()
                 ->sum(fn ($i) => $i->balance()),
         ];
+
+        // #26: system-recorded creation dates, surfaced as a cross-module activity feed.
+        $stats['recent_activity'] = collect()
+            ->merge(Customer::latest()->take(5)->get()->map(fn ($c) => [
+                'type' => 'Customer', 'label' => $c->name, 'at' => $c->created_at, 'url' => route('customers.show', $c),
+            ]))
+            ->merge(Vehicle::latest()->take(5)->get()->map(fn ($v) => [
+                'type' => 'Vehicle', 'label' => $v->label(), 'at' => $v->created_at, 'url' => route('vehicles.show', $v),
+            ]))
+            ->sortByDesc('at')
+            ->take(8);
 
         return view('home', compact('stats'));
     }

@@ -7,7 +7,19 @@ use Maatwebsite\Excel\Concerns\{FromQuery, WithHeadings, WithMapping};
 
 class BidsExport implements FromQuery, WithHeadings, WithMapping
 {
-    public function __construct(private array $filters = []) {}
+    private const LABELS = [
+        'lot_no' => 'Lot', 'auction_house' => 'Auction House', 'auction_date' => 'Date',
+        'agent' => 'Agent', 'customer' => 'Customer', 'make' => 'Make', 'model' => 'Model',
+        'year' => 'Year', 'chassis_no' => 'Chassis', 'max_bid' => 'Max Bid (¥)',
+        'priority' => 'Priority', 'result' => 'Result',
+    ];
+
+    public function __construct(private array $filters = [], private array $columns = [])
+    {
+        if (empty($this->columns)) {
+            $this->columns = array_keys(self::LABELS); // default: every column
+        }
+    }
 
     public function query()
     {
@@ -20,15 +32,26 @@ class BidsExport implements FromQuery, WithHeadings, WithMapping
 
     public function headings(): array
     {
-        return ['Lot', 'Auction House', 'Date', 'Agent', 'Customer', 'Make', 'Model', 'Year', 'Grade', 'Chassis', 'Max Bid (¥)', 'Result'];
+        return array_map(fn ($c) => self::LABELS[$c] ?? $c, $this->columns);
     }
 
     public function map($bid): array
     {
-        return [
-            $bid->lot_no, $bid->auction_house, optional($bid->auction_date)->format('Y-m-d'),
-            $bid->agent?->name, $bid->customer?->name, $bid->make, $bid->model, $bid->year,
-            $bid->grade, $bid->chassis_no, $bid->max_bid, $bid->result,
+        $all = [
+            'lot_no'        => $bid->lot_no,
+            'auction_house' => $bid->auction_house,
+            'auction_date'  => optional($bid->auction_date)->format('Y-m-d'),
+            'agent'         => $bid->agent?->name,
+            'customer'      => $bid->customer?->name,
+            'make'          => $bid->make,
+            'model'         => $bid->model,
+            'year'          => $bid->year,
+            'chassis_no'    => $bid->chassis_no,
+            'max_bid'       => $bid->max_bid,
+            'priority'      => $bid->priority,
+            'result'        => $bid->result,
         ];
+
+        return array_map(fn ($c) => $all[$c] ?? '', $this->columns);
     }
 }

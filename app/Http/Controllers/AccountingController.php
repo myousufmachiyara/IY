@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\{ChartOfAccount, Customer, JournalEntry, JournalLine, Vendor};
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AccountingController extends Controller
 {
@@ -14,6 +15,19 @@ class AccountingController extends Controller
             ->map(fn ($a) => tap($a, fn ($a) => $a->current_balance = $a->balance()));
 
         return view('accounting.chart', compact('accounts'));
+    }
+
+    public function storeAccount(Request $request)
+    {
+        $data = $request->validate(['code'=>['required','unique:chart_of_accounts,code'],'name'=>['required'],'type'=>['required', Rule::in(['asset','liability','equity','income','expense'])]]);
+        ChartOfAccount::create($data + ['is_system' => false, 'is_active' => true]);
+        return back()->with('success', 'Account created.');
+    }
+    public function updateAccount(Request $request, ChartOfAccount $account)
+    {
+        abort_if($account->is_system, 422, 'System accounts cannot be edited.');
+        $account->update($request->validate(['name'=>['required'],'is_active'=>['boolean']]));
+        return back()->with('success', 'Account updated.');
     }
 
     public function journal(Request $request)

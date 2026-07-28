@@ -18,13 +18,14 @@ class DocumentController extends Controller
     {
         $data = $request->validate([
             'type'                => ['nullable', 'string', 'max:60'],
+            'type_other'          => ['nullable', 'string', 'max:60'],
             'title'               => ['required', 'string', 'max:255'],
             'file'                => ['required', 'file', 'max:10240'],
             'is_final_clearance'  => ['boolean'],
         ]);
 
         $vehicle->documents()->create([
-            'type'                => $data['type'] ?? null,
+            'type'                => $data['type'] === 'other' ? $data['type_other'] : ($data['type'] ?? null),
             'title'               => $data['title'],
             'file_path'           => $request->file('file')->store('documents', 'public'),
             'is_final_clearance'  => $request->boolean('is_final_clearance'),
@@ -35,16 +36,11 @@ class DocumentController extends Controller
         return back()->with('success', 'Document uploaded.');
     }
 
-    /** Modal edit form fetches this as JSON. */
-    public function edit(Document $document)
-    {
-        return response()->json($document);
-    }
-
     public function update(Request $request, Document $document)
     {
         $data = $request->validate([
             'type'               => ['nullable', 'string', 'max:60'],
+            'type_other'         => ['nullable', 'string', 'max:60'],
             'title'              => ['required', 'string', 'max:255'],
             'file'               => ['nullable', 'file', 'max:10240'],
             'is_final_clearance' => ['boolean'],
@@ -54,18 +50,15 @@ class DocumentController extends Controller
         $isFinal  = $request->boolean('is_final_clearance');
 
         $document->title = $data['title'];
-        $document->type  = $data['type'] ?? null;
+        $document->type  = $data['type'] === 'other' ? $data['type_other'] : ($data['type'] ?? null);
         $document->is_final_clearance = $isFinal;
 
-        // Flipping final-clearance status re-locks visibility, so it always has
-        // to go through the explicit Release action again rather than staying
-        // exposed (or hidden) based on the previous state.
         if ($isFinal !== $wasFinal) {
             $document->visible_to_customer = ! $isFinal;
         }
 
         if ($request->hasFile('file')) {
-            Storage::disk('public')->delete($document->file_path);
+            \Storage::disk('public')->delete($document->file_path);
             $document->file_path = $request->file('file')->store('documents', 'public');
         }
 
@@ -74,15 +67,22 @@ class DocumentController extends Controller
         return back()->with('success', 'Document updated.');
     }
 
+    /** Modal edit form fetches this as JSON. */
+    public function edit(Document $document)
+    {
+        return response()->json($document);
+    }
+
     public function release(Vehicle $vehicle)
     {
         $invoice = $vehicle->invoice;
-        abort_unless($invoice && $invoice->isFullyPaid(), 403, 'Cannot release: invoice is not 100% paid yet.');
+        $bypass = auth()->user()->isSuperAdmin();
+        abort_unless($bypass || ($invoice && $invoice->isFullyPaid()), 403, 'Cannot release: invoice is not 100% paid yet.');
 
         $released = $vehicle->documents()->where('is_final_clearance', true)->update(['visible_to_customer' => true]);
         abort_if($released === 0, 404, 'No final clearance document uploaded yet.');
 
-        return back()->with('success', 'Final clearance document released to customer.');
+        return back()->with('success', $bypass && !$invoice?->isFullyPaid() ? 'Released by Super Admin override (invoice not fully paid).' : 'Final clearance document released to customer.');
     }
 
     public function destroy(Document $document)

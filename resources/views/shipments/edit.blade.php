@@ -23,17 +23,32 @@
                     @csrf @method('PUT')
 
                     <div class="row mb-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4 mb-2">
                             <label>Shipment Method <span class="text-danger">*</span></label>
                             <select class="form-control select2-js" name="method" required>
                                 <option value="RORO" {{ $shipment->method === 'RORO' ? 'selected' : '' }}>RORO</option>
                                 <option value="Container" {{ $shipment->method === 'Container' ? 'selected' : '' }}>Container</option>
                             </select>
                         </div>
+                        <div class="col-md-4 mb-2">
+                            <label>Expected Arrival <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="expected_arrival" value="{{ optional($shipment->expected_arrival)->format('Y-m-d') }}" required>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label>Container #</label>
+                            <input type="text" class="form-control" name="container_no" value="{{ $shipment->container_no }}">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label>BL #</label>
+                            <input type="text" class="form-control" name="bl_no" value="{{ $shipment->bl_no }}">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label>Shipping Company <small class="text-muted">(optional)</small></label>
+                            <input type="text" class="form-control" name="shipping_company" value="{{ $shipment->shipping_company }}">
+                        </div>
                     </div>
 
                     <h6 class="text-muted text-uppercase small mb-2">Vehicles in this Shipment</h6>
-                    <p class="text-muted small">Uncheck to remove a vehicle back to unassigned. Check any additional eligible vehicle to add it to this batch.</p>
 
                     <div class="table-scroll mb-3">
                         <table class="table table-bordered table-striped mb-0">
@@ -55,7 +70,7 @@
                                     <td>{{ $v->invoice->invoice_no ?? '—' }}</td>
                                     <td>{{ $v->invoice ? $v->invoice->paidPercent() . '%' : '—' }}</td>
                                     <td>¥{{ number_format($v->invoice?->balance() ?? 0) }}</td>
-                                    <td><span class="badge bg-info">Currently in shipment</span></td>
+                                    <td><span class="badge bg-info">In shipment</span></td>
                                 </tr>
                                 @endforeach
                                 @foreach ($additional as $v)
@@ -65,7 +80,7 @@
                                     <td>{{ $v->invoice->invoice_no }}</td>
                                     <td>{{ $v->invoice->paidPercent() }}%</td>
                                     <td>¥{{ number_format($v->invoice->balance()) }}</td>
-                                    <td><span class="badge bg-secondary">Available to add</span></td>
+                                    <td><span class="badge bg-secondary">Available</span></td>
                                 </tr>
                                 @endforeach
                             </tbody>

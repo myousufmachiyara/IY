@@ -22,41 +22,12 @@ class CustomerController extends Controller
         $data = $request->validate($this->rules());
         $data['agent_id']   = $this->resolveAgent($request);
         $data['created_by'] = $request->user()->id;
+        $data['customer_no'] = \App\Services\CustomerNumber::next();
+        Customer::create($data);
 
-        $customer = Customer::create($data);
-
-        // Existing customers have no deposit gate, so their profile is complete
-        // immediately. New customers complete automatically once the deposit is
-        // recorded — see payDeposit() below.
-        if (! $customer->is_new_customer) {
-            $customer->update(['profile_completed_at' => now()]);
-        }
-
-        return back()->with('success', 'Customer created.');
+        return back()->with('success', 'Customer created. Record their security deposit to complete the profile.');
     }
 
-    public function payDeposit(Request $request, Customer $customer, LedgerService $ledger)
-    {
-        abort_unless($customer->is_new_customer, 422, 'Security deposit applies to new customers only.');
-        abort_if($customer->security_deposit_paid, 422, 'Deposit already recorded for this customer.');
-
-        $data = $request->validate([
-            'security_deposit' => ['required', 'integer', 'min:1'],
-            'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
-        ]);
-
-        $customer->update([
-            'security_deposit'      => $data['security_deposit'],
-            'security_deposit_paid' => true,
-            'profile_completed_at'  => now(), // deposit paid completes a new customer's profile immediately
-        ]);
-
-        $ledger->securityDeposit($customer, $data['account']);
-
-        return back()->with('success', 'Security deposit recorded — profile is now complete and bidding is enabled.');
-    }
-
-    /** Modal edit form fetches this as JSON. */
     public function edit(Customer $customer)
     {
         return response()->json($customer);
@@ -75,6 +46,12 @@ class CustomerController extends Controller
         return back()->with('success', 'Customer updated.');
     }
 
+    public function show(Customer $customer)
+    {
+        $customer->load('agent', 'depositReceivedBy', 'depositApprovedBy');
+        return view('customers.show', compact('customer'));
+    }
+
     public function destroy(Customer $customer)
     {
         abort_if($customer->vehicles()->exists(), 422, 'Cannot delete a customer with vehicle records. Remove their vehicles first.');
@@ -83,40 +60,73 @@ class CustomerController extends Controller
         return back()->with('success', 'Customer removed.');
     }
 
-    public function show(Customer $customer)
+    /** Step 1 — Sales Agent records that they've physically received the deposit. */
+    public function receiveDeposit(Request $request, Customer $customer)
     {
-        $customer->load('agent');
-        return view('customers.show', compact('customer'));
+        abort_if($customer->security_deposit_status === 'approved', 422, 'Deposit already approved for this customer.');
+
+        $data = $request->validate([
+            'security_deposit' => ['required', 'integer', 'min:1'],
+            'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
+        ]);
+
+        $customer->update([
+            'security_deposit'                  => $data['security_deposit'],
+            'security_deposit_account'          => $data['account'],
+            'security_deposit_status'           => 'pending',
+            'security_deposit_received_by'      => $request->user()->id,
+            'security_deposit_received_at'      => now(),
+            'security_deposit_rejection_reason' => null,
+        ]);
+
+        return back()->with('success', 'Deposit recorded as received — awaiting accountant approval.');
     }
 
-    /** The bidding gate: mark a profile complete once its prerequisites are met. */
-    public function completeProfile(Customer $customer)
+    /** Step 2 — Accountant / Super Admin confirms the deposit and posts it to the ledger. */
+    public function approveDeposit(Customer $customer, LedgerService $ledger)
     {
-        if ($customer->is_new_customer && ! $customer->security_deposit_paid) {
-            return back()->with('error', 'Security deposit must be paid before completing a new customer profile.');
-        }
-        if (! $customer->vehicles()->exists()) {
-            return back()->with('error', 'Add at least one vehicle requirement before completing the profile.');
-        }
+        abort_unless(request()->user()->canBackdate(), 403, 'Only accountant or super admin may approve deposits.');
+        abort_unless($customer->security_deposit_status === 'pending', 422, 'No pending deposit to approve.');
 
-        $customer->update(['profile_completed_at' => now()]);
+        $customer->update([
+            'security_deposit_status'      => 'approved',
+            'security_deposit_paid'        => true,
+            'security_deposit_approved_by' => request()->user()->id,
+            'security_deposit_approved_at' => now(),
+            'profile_completed_at'         => now(),
+        ]);
 
-        return back()->with('success', 'Profile completed — bidding is now enabled for this customer.');
+        $ledger->securityDeposit($customer, $customer->security_deposit_account ?? LedgerService::BANK);
+
+        return back()->with('success', 'Deposit approved — profile is now complete and bidding is enabled.');
     }
 
-    // ---------- helpers ----------
+    /** Step 2 (alternate) — reject an incorrectly recorded deposit; agent can resubmit. */
+    public function rejectDeposit(Request $request, Customer $customer)
+    {
+        abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may reject deposits.');
+        abort_unless($customer->security_deposit_status === 'pending', 422, 'No pending deposit to reject.');
+
+        $data = $request->validate(['security_deposit_rejection_reason' => ['required', 'string', 'max:500']]);
+
+        $customer->update([
+            'security_deposit_status'           => 'rejected',
+            'security_deposit_rejection_reason' => $data['security_deposit_rejection_reason'],
+        ]);
+
+        return back()->with('success', 'Deposit rejected — the agent can resubmit.');
+    }
 
     private function rules(): array
     {
         return [
-            'name'            => ['required', 'string', 'max:255'],
-            'phone'           => ['nullable', 'string', 'max:40'],
-            'email'           => ['nullable', 'email', 'max:255'],
-            'country'         => ['nullable', 'string', 'max:120'],
-            'address'         => ['nullable', 'string'],
-            'is_new_customer' => ['required', 'boolean'],
-            'agent_id'        => ['nullable', 'exists:users,id'],
-            'status'          => ['required', Rule::in(['active', 'inactive'])],
+            'name'     => ['required', 'string', 'max:255'],
+            'phone'    => ['nullable', 'string', 'max:40'],
+            'email'    => ['nullable', 'email', 'max:255'],
+            'country'  => ['nullable', 'string', 'max:120'],
+            'address'  => ['nullable', 'string'],
+            'agent_id' => ['nullable', 'exists:users,id'],
+            'status'   => ['required', Rule::in(['active', 'inactive'])],
         ];
     }
 

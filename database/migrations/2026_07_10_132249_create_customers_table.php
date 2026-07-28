@@ -10,6 +10,7 @@ return new class extends Migration {
     {
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
+            $table->string('customer_no')->unique()->nullable();
             $table->string('name');
             $table->string('phone')->nullable();
             $table->string('email')->nullable();
@@ -19,9 +20,15 @@ return new class extends Migration {
             // assigned sales agent (creator owns the customer)
             $table->foreignId('agent_id')->constrained('users')->restrictOnDelete();
 
-            $table->boolean('is_new_customer')->default(true);
             $table->unsignedBigInteger('security_deposit')->default(0);   // yen, refundable
             $table->boolean('security_deposit_paid')->default(false);
+            $table->string('security_deposit_status')->default('none'); // none|pending|approved|rejected
+            $table->string('security_deposit_account')->nullable();
+            $table->foreignId('security_deposit_received_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('security_deposit_received_at')->nullable();
+            $table->foreignId('security_deposit_approved_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('security_deposit_approved_at')->nullable();
+            $table->text('security_deposit_rejection_reason')->nullable();
             $table->boolean('security_deposit_refunded')->default(false);
 
             $table->timestamp('profile_completed_at')->nullable();        // bidding gate

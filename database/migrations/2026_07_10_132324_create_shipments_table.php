@@ -12,6 +12,9 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('customer_id')->constrained()->cascadeOnDelete();
             $table->string('method');                        // RORO | Container
+            $table->string('container_no')->nullable();
+            $table->string('bl_no')->nullable();
+            $table->string('shipping_company')->nullable();
             $table->date('shipment_date')->nullable();       // super admin only
             $table->date('expected_arrival')->nullable();    // super admin only
             $table->unsignedBigInteger('freight_total')->default(0);

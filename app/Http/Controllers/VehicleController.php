@@ -9,13 +9,16 @@ class VehicleController extends Controller
 {
     public function index(Request $request)
     {
-        $vehicles = Vehicle::with('customer', 'agent', 'vendor')
+        $vehicles = Vehicle::with('customer', 'agent', 'invoice')
             ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
-            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->make, fn ($q) => $q->where('make', 'like', "%{$request->make}%"))
+            ->when($request->model, fn ($q) => $q->where('model', 'like', "%{$request->model}%"))
+            ->when($request->from, fn ($q) => $q->whereDate('created_at', '>=', $request->from))
+            ->when($request->to, fn ($q) => $q->whereDate('created_at', '<=', $request->to))
+            ->when(! $request->boolean('show_won'), fn ($q) => $q->where('status', 'requirement'))
             ->latest()
             ->get();
 
-        // Customer model is already agent-scoped, so this naturally narrows for sales agents.
         $customers = Customer::orderBy('name')->get();
 
         return view('vehicles.index', compact('vehicles', 'customers'));
@@ -35,7 +38,6 @@ class VehicleController extends Controller
         return back()->with('success', 'Vehicle requirement added.');
     }
 
-    /** Modal edit form fetches this as JSON. */
     public function edit(Vehicle $vehicle)
     {
         return response()->json($vehicle);
@@ -64,16 +66,24 @@ class VehicleController extends Controller
         return back()->with('success', 'Vehicle removed.');
     }
 
+    /** #40 — Agent flags a won vehicle as ready to invoice; accountant/admin still does the actual generation. */
+    public function requestInvoice(Vehicle $vehicle)
+    {
+        abort_unless($vehicle->isWon() && ! $vehicle->invoice, 422, 'Not eligible for an invoice request.');
+        $vehicle->update(['invoice_requested_at' => now()]);
+
+        return back()->with('success', 'Invoice requested — accountant/admin will be notified.');
+    }
+
     private function rules(): array
     {
         return [
             'customer_id' => ['required', 'exists:customers,id'],
-            'make'        => ['nullable', 'string', 'max:120'],
-            'model'       => ['nullable', 'string', 'max:120'],
-            'year'        => ['nullable', 'string', 'max:10'],
-            'grade'       => ['nullable', 'string', 'max:60'],
-            'chassis_no'  => ['nullable', 'string', 'max:100'],
-            'budget'      => ['required', 'integer', 'min:0'],
+            'make'        => ['required', 'string', 'max:120'],
+            'model'       => ['required', 'string', 'max:120'],
+            'year'        => ['required', 'string', 'max:10'],
+            'grade'       => ['required', 'string', 'max:60'],
+            'budget'      => ['required', 'integer', 'min:1'],
         ];
     }
 }

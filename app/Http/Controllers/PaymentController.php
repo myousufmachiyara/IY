@@ -39,11 +39,6 @@ class PaymentController extends Controller
             'is_backdated' => ['boolean'],
         ]);
 
-        $backdated = $request->boolean('is_backdated');
-        if ($backdated) {
-            abort_unless($request->user()->canBackdate(), 403, 'You are not allowed to back-date entries.');
-        }
-
         if (! empty($data['invoice_id'])) {
             $invoice = Invoice::findOrFail($data['invoice_id']);
             abort_unless($invoice->customer_id == $data['customer_id'], 422, 'Invoice does not belong to this customer.');
@@ -78,6 +73,10 @@ class PaymentController extends Controller
     /** Correcting a payment reverses its original ledger entry and posts a fresh one — never edits a posted entry in place. */
     public function update(Request $request, Payment $payment, LedgerService $ledger)
     {
+        if ($payment->invoice?->vehicle?->documents()->where('is_final_clearance', true)->where('visible_to_customer', true)->exists()) {
+            abort(422, 'Payments cannot be changed after the final clearance document has been released.');
+        }
+
         $data = $request->validate([
             'amount'    => ['required', 'integer', 'min:1'],
             'method'    => ['required', Rule::in(['cash', 'bank'])],
@@ -106,6 +105,10 @@ class PaymentController extends Controller
 
     public function destroy(Payment $payment, LedgerService $ledger)
     {
+        if ($payment->invoice?->vehicle?->documents()->where('is_final_clearance', true)->where('visible_to_customer', true)->exists()) {
+            abort(422, 'Payments cannot be changed after the final clearance document has been released.');
+        }
+        
         DB::transaction(function () use ($payment, $ledger) {
             foreach ($payment->journalEntries as $entry) {
                 $ledger->reverseEntry($entry, now()->toDateString(), "Reversal of deleted payment #{$payment->id}");

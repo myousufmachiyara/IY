@@ -13,7 +13,7 @@ class Bid extends Model
     protected $fillable = [
         'bid_sheet_id', 'agent_id', 'customer_id', 'vehicle_id',
         'lot_no', 'auction_house', 'auction_date', 'make', 'model', 'year',
-        'grade', 'chassis_no', 'max_bid', 'result', 'won_amount',
+        'grade', 'chassis_no', 'max_bid', 'priority', 'result', 'won_amount',
     ];
 
     protected function casts(): array
@@ -21,6 +21,7 @@ class Bid extends Model
         return [
             'auction_date' => 'date',
             'max_bid'      => 'integer',
+            'priority'     => 'integer',
             'won_amount'   => 'integer',
         ];
     }

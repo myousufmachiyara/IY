@@ -44,12 +44,15 @@
                         </h6>
                         <p class="mb-2">{{ $finalDoc->title }}</p>
                         @if(!$finalDoc->visible_to_customer)
-                            @if($vehicle->invoice?->isFullyPaid())
+                            @if($vehicle->invoice?->isFullyPaid() || auth()->user()->isSuperAdmin())
                                 @can('documents.edit')
                                     <form action="{{ route('documents.release', $vehicle) }}" method="POST" onsubmit="return confirm('Release the final clearance document to the customer?');">
                                         @csrf
                                         <button class="btn btn-sm btn-success"><i class="fa fa-unlock"></i> Release to Customer</button>
                                     </form>
+                                    @if(!$vehicle->invoice?->isFullyPaid())
+                                        <small class="text-warning d-block mt-1"><i class="fa fa-exclamation-triangle"></i> Super Admin override — invoice is not yet 100% paid.</small>
+                                    @endif
                                 @endcan
                             @else
                                 <p class="small text-danger mb-0">
@@ -122,7 +125,17 @@
                             </div>
                             <div class="col-lg-12 mb-2">
                                 <label>Type</label>
-                                <input type="text" class="form-control" name="type" placeholder="e.g. bill_of_lading, inspection, export_cert">
+                                <select class="form-control select2-js" name="type" id="doc_type_select" onchange="toggleOtherType(this, 'doc_type_other')">
+                                    <option value="">Select type</option>
+                                    <option value="bill_of_lading">Bill of Lading</option>
+                                    <option value="export_certificate">Export Certificate</option>
+                                    <option value="inspection_certificate">Inspection Certificate</option>
+                                    <option value="deregistration_certificate">Deregistration Certificate</option>
+                                    <option value="invoice_copy">Invoice Copy</option>
+                                    <option value="insurance">Insurance</option>
+                                    <option value="other">Other</option>
+                                </select>
+                                <input type="text" class="form-control mt-2 d-none" id="doc_type_other" name="type_other" placeholder="Specify type">
                             </div>
                             <div class="col-lg-12 mb-2">
                                 <label>File <span class="text-danger">*</span></label>
@@ -165,7 +178,17 @@
                             </div>
                             <div class="col-lg-12 mb-2">
                                 <label>Type</label>
-                                <input type="text" id="edit_doc_type" class="form-control" name="type">
+                                <select class="form-control select2-js" name="type" id="edit_doc_type_select" onchange="toggleOtherType(this, 'edit_doc_type_other')">
+                                    <option value="">Select type</option>
+                                    <option value="bill_of_lading">Bill of Lading</option>
+                                    <option value="export_certificate">Export Certificate</option>
+                                    <option value="inspection_certificate">Inspection Certificate</option>
+                                    <option value="deregistration_certificate">Deregistration Certificate</option>
+                                    <option value="invoice_copy">Invoice Copy</option>
+                                    <option value="insurance">Insurance</option>
+                                    <option value="other">Other</option>
+                                </select>
+                                <input type="text" class="form-control mt-2 d-none" id="edit_doc_type_other" name="type_other" placeholder="Specify type">
                             </div>
                             <div class="col-lg-12 mb-2">
                                 <label>Replace File <small class="text-muted">(optional — leave blank to keep current file)</small></label>
@@ -196,14 +219,27 @@
 </div>
 
 <script>
+const KNOWN_DOC_TYPES = ['bill_of_lading','export_certificate','inspection_certificate','deregistration_certificate','invoice_copy','insurance'];
+
+function toggleOtherType(select, otherInputId) {
+    document.getElementById(otherInputId).classList.toggle('d-none', select.value !== 'other');
+}
+
 function editDocument(id) {
     fetch('/documents/' + id + '/edit')
         .then(res => res.json())
         .then(data => {
             $('#editDocForm').attr('action', '/documents/' + id);
             $('#edit_doc_title').val(data.title);
-            $('#edit_doc_type').val(data.type);
             $('#edit_doc_is_final').prop('checked', !!data.is_final_clearance);
+
+            if (data.type && !KNOWN_DOC_TYPES.includes(data.type)) {
+                $('#edit_doc_type_select').val('other').trigger('change');
+                $('#edit_doc_type_other').val(data.type).removeClass('d-none');
+            } else {
+                $('#edit_doc_type_select').val(data.type || '').trigger('change');
+                $('#edit_doc_type_other').addClass('d-none').val('');
+            }
 
             $.magnificPopup.open({ items: { src: '#editDocModal' }, type: 'inline' });
         })

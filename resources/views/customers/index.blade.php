@@ -4,7 +4,16 @@
 
 @section('content')
 
-@php $isPrivileged = auth()->user()->can('data.view_all'); @endphp
+@php
+    $isPrivileged = auth()->user()->can('data.view_all');
+    $canApprove = auth()->user()->canBackdate();
+    $depositBadges = [
+        'none'     => ['secondary', 'Not Submitted'],
+        'pending'  => ['warning text-dark', 'Pending Approval'],
+        'approved' => ['success', 'Approved'],
+        'rejected' => ['danger', 'Rejected'],
+    ];
+@endphp
 
 <div class="row">
     <div class="col">
@@ -38,15 +47,16 @@
                                 <th>Contact</th>
                                 <th>Country</th>
                                 @if($isPrivileged)<th>Agent</th>@endif
-                                <th>Type</th>
                                 <th>Deposit</th>
                                 <th>Profile</th>
                                 <th>Status</th>
+                                <th>Created</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($customers as $c)
+                            @php [$badgeClass, $badgeLabel] = $depositBadges[$c->security_deposit_status] ?? $depositBadges['none']; @endphp
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
                                 <td><a href="{{ route('customers.show', $c) }}"><strong>{{ $c->name }}</strong></a></td>
@@ -54,19 +64,9 @@
                                 <td>{{ $c->country ?? '—' }}</td>
                                 @if($isPrivileged)<td>{{ $c->agent->name ?? '—' }}</td>@endif
                                 <td>
-                                    @if($c->is_new_customer)
-                                        <span class="badge bg-info text-dark">New</span>
-                                    @else
-                                        <span class="badge bg-secondary">Existing</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    @if(!$c->is_new_customer)
-                                        <span class="text-muted">N/A</span>
-                                    @elseif($c->security_deposit_paid)
-                                        <span class="badge bg-success">Paid (¥{{ number_format($c->security_deposit) }})</span>
-                                    @else
-                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    <span class="badge bg-{{ $badgeClass }}">{{ $badgeLabel }}</span>
+                                    @if($c->security_deposit_status === 'approved')
+                                        <br><small class="text-muted">¥{{ number_format($c->security_deposit) }}</small>
                                     @endif
                                 </td>
                                 <td>
@@ -77,6 +77,7 @@
                                     @endif
                                 </td>
                                 <td><span class="badge bg-{{ $c->status==='active'?'success':'danger' }}">{{ $c->status }}</span></td>
+                                <td>{{ $c->created_at->format('d-m-Y') }}</td>
                                 <td class="text-nowrap">
                                     <a href="{{ route('vehicles.index', ['customer_id' => $c->id]) }}" class="text-secondary me-1" title="View Vehicles">
                                         <i class="fa fa-car"></i>
@@ -86,22 +87,23 @@
                                             <i class="fa fa-edit"></i>
                                         </a>
                                     @endcan
-                                    @if($c->is_new_customer && !$c->security_deposit_paid)
-                                        <a href="#" class="text-success me-1" title="Pay Security Deposit" onclick="openDeposit({{ $c->id }}, '{{ $c->name }}')">
-                                            <i class="fa fa-hand-holding-usd"></i>
+
+                                    @if(in_array($c->security_deposit_status, ['none', 'rejected']))
+                                        @can('customers.edit')
+                                            <a href="#" class="text-success me-1" title="Record Deposit Received" onclick="openReceiveDeposit({{ $c->id }}, '{{ $c->name }}')">
+                                                <i class="fa fa-hand-holding-usd"></i>
+                                            </a>
+                                        @endcan
+                                    @elseif($c->security_deposit_status === 'pending' && $canApprove)
+                                        <form action="{{ route('customers.deposit.approve', $c) }}" method="POST" style="display:inline;" onsubmit="return confirm('Approve this deposit? This posts it to the ledger and completes the profile.');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-link p-0 text-success me-1" title="Approve Deposit"><i class="fa fa-check-circle"></i></button>
+                                        </form>
+                                        <a href="#" class="text-danger me-1" title="Reject Deposit" onclick="openRejectDeposit({{ $c->id }}, '{{ $c->name }}')">
+                                            <i class="fa fa-times-circle"></i>
                                         </a>
                                     @endif
-                                    @if(!$c->profile_completed_at)
-                                        @if($c->canCompleteProfile())
-                                            <form action="{{ route('customers.complete', $c) }}" method="POST" style="display:inline;"
-                                                onsubmit="return confirm('Mark this profile complete? This enables bidding.');">
-                                                @csrf
-                                                <button type="submit" class="btn btn-link p-0 text-info me-1" title="Complete Profile">
-                                                    <i class="fa fa-check-circle"></i>
-                                                </button>
-                                            </form>
-                                        @endif
-                                    @endif
+
                                     @can('customers.delete')
                                         <form action="{{ route('customers.destroy', $c) }}" method="POST" style="display:inline;"
                                               onsubmit="return confirm('Delete this customer?');">
@@ -144,13 +146,6 @@
                             <div class="col-lg-6 mb-2">
                                 <label>Country</label>
                                 <input type="text" class="form-control" name="country">
-                            </div>
-                            <div class="col-lg-6 mb-2">
-                                <label>Customer Type <span class="text-danger">*</span></label>
-                                <select class="form-control select2-js" name="is_new_customer" required>
-                                    <option value="1" selected>New Customer</option>
-                                    <option value="0">Existing Customer</option>
-                                </select>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Status <span class="text-danger">*</span></label>
@@ -213,13 +208,6 @@
                                 <input type="text" id="edit_country" class="form-control" name="country">
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Customer Type <span class="text-danger">*</span></label>
-                                <select id="edit_is_new_customer" class="form-control select2-js" name="is_new_customer" required>
-                                    <option value="1">New Customer</option>
-                                    <option value="0">Existing Customer</option>
-                                </select>
-                            </div>
-                            <div class="col-lg-6 mb-2">
                                 <label>Status <span class="text-danger">*</span></label>
                                 <select id="edit_status" class="form-control select2-js" name="status" required>
                                     <option value="active">Active</option>
@@ -253,7 +241,7 @@
         </div>
         @endcan
 
-        @include('customers._deposit_modal')
+        @include('customers._deposit_modals')
     </div>
 </div>
 
@@ -268,7 +256,6 @@ function editCustomer(id) {
             $('#edit_email').val(data.email);
             $('#edit_country').val(data.country);
             $('#edit_address').val(data.address);
-            $('#edit_is_new_customer').val(data.is_new_customer ? '1' : '0').trigger('change');
             $('#edit_status').val(data.status).trigger('change');
             $('#edit_agent_id').val(data.agent_id).trigger('change');
 

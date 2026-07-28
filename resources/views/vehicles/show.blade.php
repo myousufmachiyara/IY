@@ -86,11 +86,22 @@
                                             @csrf
                                             <button class="btn btn-sm btn-primary ms-2">Generate Invoice</button>
                                         </form>
+                                    @else
+                                        @if($vehicle->invoice_requested_at)
+                                            <span class="badge bg-info ms-2">Invoice requested {{ $vehicle->invoice_requested_at->diffForHumans() }}</span>
+                                        @else
+                                            <form action="{{ route('vehicles.request_invoice', $vehicle) }}" method="POST" class="d-inline"><button class="btn btn-sm btn-outline-primary ms-2">@csrf Request Invoice</button></form>
+                                        @endif
                                     @endcan
                                 </div>
-                            @elseif($vehicle->invoice->isHalfPaid() && !$vehicle->shipment)
+                        @elseif(($vehicle->invoice->isHalfPaid() || auth()->user()->isSuperAdmin()) && !$vehicle->shipment)
                             <div class="alert alert-success">
-                                <i class="fa fa-check-circle"></i> 50% or more paid — ready for shipment.
+                                <i class="fa fa-check-circle"></i>
+                                @if($vehicle->invoice->isHalfPaid())
+                                    50% or more paid — ready for shipment.
+                                @else
+                                    Not yet 50% paid, but you can bypass this as Super Admin.
+                                @endif
                                 <div class="alert alert-success">
                                     <i class="fa fa-check-circle"></i> Invoice fully paid — ready for shipment.
                                     @can('shipments.create')

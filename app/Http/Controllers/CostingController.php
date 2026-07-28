@@ -46,8 +46,7 @@ class CostingController extends Controller
     /** Selling price — set by the owning sales agent (or admin/accountant). */
     public function updateSellingPrice(Request $request, Vehicle $vehicle)
     {
-        $data = $request->validate(['selling_price' => ['required', 'integer', 'min:1']]);
-
+        $data = $request->validate(['selling_price' => ['required', 'integer', "min:{$vehicle->buying_price}"]]);
         $vehicle->update(['selling_price' => $data['selling_price']]);
 
         $costing = $vehicle->costing ?: $this->ensureCosting($vehicle);

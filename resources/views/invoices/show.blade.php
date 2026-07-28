@@ -145,7 +145,6 @@
                                 <td class="text-capitalize">{{ $p->method }}</td>
                                 <td>{{ $p->reference ?? '—' }}</td>
                                 <td>{{ $p->recorder->name ?? '—' }}</td>
-                                <td>{{ $p->is_backdated ? 'Yes' : '—' }}</td>
                                 <td class="text-nowrap">
                                     @can('payments.edit')
                                         <a href="#" class="text-primary me-1" title="Edit"
@@ -203,14 +202,6 @@
                                 <label>Reference</label>
                                 <input type="text" class="form-control" name="reference" placeholder="Transaction ID / cheque no.">
                             </div>
-                            @if(auth()->user()->canBackdate())
-                            <div class="col-lg-12 mb-2">
-                                <div class="form-check">
-                                    <input type="checkbox" class="form-check-input" name="is_backdated" id="pay_is_backdated" value="1">
-                                    <label class="form-check-label" for="pay_is_backdated">This is a back-dated entry</label>
-                                </div>
-                            </div>
-                            @endif
                         </div>
                     </div>
                     <footer class="card-footer">

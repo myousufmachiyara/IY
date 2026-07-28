@@ -30,7 +30,7 @@
                         <i class="fa fa-ship me-1"></i> Shipment
                     </a>
                 </li>
-            @elseif($vehicle->status === 'invoiced' && $vehicle->invoice?->isHalfPaid())
+            @elseif($vehicle->status === 'invoiced' && (auth()->user()->isSuperAdmin() || $vehicle->invoice?->isHalfPaid()))
                 @can('shipments.create')
                 <li class="nav-item">
                     <a class="nav-link {{ $active === 'shipment' ? 'active' : '' }}" href="{{ route('shipments.create', $vehicle->customer) }}">
