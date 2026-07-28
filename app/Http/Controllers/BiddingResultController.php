@@ -9,13 +9,14 @@ use Illuminate\Support\Facades\DB;
 
 class BiddingResultController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $bids = Bid::with(['customer','vehicle','agent'])
-        ->where('result','pending')
-        ->when($request->customer_id, fn($q)=>$q->where('customer_id',$request->customer_id))
-        ->when($request->agent_id, fn($q)=>$q->where('agent_id',$request->agent_id))
-        ->latest()->get();
+        $bids = Bid::with(['customer', 'vehicle', 'agent'])
+            ->where('result', 'pending')
+            ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
+            ->when($request->agent_id, fn ($q) => $q->where('agent_id', $request->agent_id))
+            ->latest()
+            ->get();
 
         $vendors   = Vendor::active()->orderBy('name')->get();
         $customers = Customer::complete()->orderBy('name')->get();
