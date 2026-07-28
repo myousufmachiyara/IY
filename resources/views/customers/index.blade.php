@@ -44,6 +44,7 @@
                             <tr>
                                 <th>S.No</th>
                                 <th>Name</th>
+                                <th>Consignee</th>
                                 <th>Contact</th>
                                 <th>Country</th>
                                 @if($isPrivileged)<th>Agent</th>@endif
@@ -60,6 +61,7 @@
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
                                 <td><a href="{{ route('customers.show', $c) }}"><strong>{{ $c->name }}</strong></a></td>
+                                <td>{{ $c->consignee_name ?? '—' }}</td>
                                 <td>{{ $c->phone }}<br><small class="text-muted">{{ $c->email }}</small></td>
                                 <td>{{ $c->country ?? '—' }}</td>
                                 @if($isPrivileged)<td>{{ $c->agent->name ?? '—' }}</td>@endif
@@ -136,16 +138,24 @@
                                 <input type="text" class="form-control" name="name" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Phone</label>
-                                <input type="text" class="form-control" name="phone">
+                                <label>Consignee Name (Company) <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="consignee_name" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Email</label>
-                                <input type="email" class="form-control" name="email">
+                                <label>Phone <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="phone" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Country</label>
-                                <input type="text" class="form-control" name="country">
+                                <label>Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" name="email" required>
+                            </div>
+                            <div class="col-lg-6 mb-2">
+                                <label>Country <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="country" required>
+                            </div>
+                            <div class="col-lg-6 mb-2">
+                                <label>Postal Code <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="postal_code" required>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Status <span class="text-danger">*</span></label>
@@ -156,9 +166,9 @@
                             </div>
                             @if($isPrivileged)
                             <div class="col-lg-6 mb-2">
-                                <label>Assign to Agent</label>
-                                <select class="form-control select2-js" name="agent_id">
-                                    <option value="">Assign to me</option>
+                                <label>Assign to Agent <span class="text-danger">*</span></label>
+                                <select class="form-control select2-js" name="agent_id" required>
+                                    <option value="" disabled selected>Select Agent</option>
                                     @foreach($agents as $agent)
                                         <option value="{{ $agent->id }}">{{ $agent->name }}</option>
                                     @endforeach
@@ -166,8 +176,16 @@
                             </div>
                             @endif
                             <div class="col-lg-12 mb-2">
-                                <label>Address</label>
-                                <textarea class="form-control" rows="2" name="address"></textarea>
+                                <label>Address <span class="text-danger">*</span></label>
+                                <textarea class="form-control" rows="2" name="address" required></textarea>
+                            </div>
+                            <div class="col-lg-12 mb-2">
+                                <label>Destination Port(s) <span class="text-danger">*</span></label>
+                                <select data-plugin-selecttwo class="form-control select2-js" name="ports[]" multiple required>
+                                    @foreach($ports as $p)
+                                        <option value="{{ $p->id }}">{{ $p->name }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -196,16 +214,24 @@
                                 <input type="text" id="edit_name" class="form-control" name="name" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Phone</label>
-                                <input type="text" id="edit_phone" class="form-control" name="phone">
+                                <label>Consignee Name (Company) <span class="text-danger">*</span></label>
+                                <input type="text" id="edit_consignee_name" class="form-control" name="consignee_name" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Email</label>
-                                <input type="email" id="edit_email" class="form-control" name="email">
+                                <label>Phone <span class="text-danger">*</span></label>
+                                <input type="text" id="edit_phone" class="form-control" name="phone" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Country</label>
-                                <input type="text" id="edit_country" class="form-control" name="country">
+                                <label>Email <span class="text-danger">*</span></label>
+                                <input type="email" id="edit_email" class="form-control" name="email" required>
+                            </div>
+                            <div class="col-lg-6 mb-2">
+                                <label>Country <span class="text-danger">*</span></label>
+                                <input type="text" id="edit_country" class="form-control" name="country" required>
+                            </div>
+                            <div class="col-lg-6 mb-2">
+                                <label>Postal Code <span class="text-danger">*</span></label>
+                                <input type="text" id="edit_postal_code" class="form-control" name="postal_code" required>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Status <span class="text-danger">*</span></label>
@@ -216,8 +242,8 @@
                             </div>
                             @if($isPrivileged)
                             <div class="col-lg-6 mb-2">
-                                <label>Assigned Agent</label>
-                                <select id="edit_agent_id" class="form-control select2-js" name="agent_id">
+                                <label>Assigned Agent <span class="text-danger">*</span></label>
+                                <select id="edit_agent_id" class="form-control select2-js" name="agent_id" required>
                                     @foreach($agents as $agent)
                                         <option value="{{ $agent->id }}">{{ $agent->name }}</option>
                                     @endforeach
@@ -225,8 +251,16 @@
                             </div>
                             @endif
                             <div class="col-lg-12 mb-2">
-                                <label>Address</label>
-                                <textarea id="edit_address" class="form-control" rows="2" name="address"></textarea>
+                                <label>Address <span class="text-danger">*</span></label>
+                                <textarea id="edit_address" class="form-control" rows="2" name="address" required></textarea>
+                            </div>
+                            <div class="col-lg-12 mb-2">
+                                <label>Destination Port(s) <span class="text-danger">*</span></label>
+                                <select data-plugin-selecttwo id="edit_ports" class="form-control select2-js" name="ports[]" multiple required>
+                                    @foreach($ports as $p)
+                                        <option value="{{ $p->id }}">{{ $p->name }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -252,12 +286,15 @@ function editCustomer(id) {
         .then(data => {
             $('#editForm').attr('action', '/customers/' + id);
             $('#edit_name').val(data.name);
+            $('#edit_consignee_name').val(data.consignee_name);
             $('#edit_phone').val(data.phone);
             $('#edit_email').val(data.email);
             $('#edit_country').val(data.country);
+            $('#edit_postal_code').val(data.postal_code);
             $('#edit_address').val(data.address);
             $('#edit_status').val(data.status).trigger('change');
             $('#edit_agent_id').val(data.agent_id).trigger('change');
+            $('#edit_ports').val(data.port_ids).trigger('change');
 
             $.magnificPopup.open({ items: { src: '#editModal' }, type: 'inline' });
         })

@@ -15,6 +15,8 @@ return new class extends Migration {
             $table->string('phone')->nullable();
             $table->string('email')->nullable();
             $table->string('country')->nullable();
+            $table->string('postal_code')->nullable();
+            $table->string('consignee_name')->nullable();
             $table->text('address')->nullable();
 
             // assigned sales agent (creator owns the customer)

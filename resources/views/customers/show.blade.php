@@ -34,10 +34,13 @@
                 <div class="row">
                     <div class="col-md-6">
                         <table class="table table-borderless mb-0">
-                            <tr><th width="160">Phone</th><td>{{ $customer->phone ?? '—' }}</td></tr>
+                            <tr><th width="160">Consignee</th><td>{{ $customer->consignee_name ?? '—' }}</td></tr>
+                            <tr><th>Phone</th><td>{{ $customer->phone ?? '—' }}</td></tr>
                             <tr><th>Email</th><td>{{ $customer->email ?? '—' }}</td></tr>
                             <tr><th>Country</th><td>{{ $customer->country ?? '—' }}</td></tr>
+                            <tr><th>Postal Code</th><td>{{ $customer->postal_code ?? '—' }}</td></tr>
                             <tr><th>Address</th><td>{{ $customer->address ?? '—' }}</td></tr>
+                            <tr><th>Destination Ports</th><td>{{ $customer->ports->pluck('name')->join(', ') ?: '—' }}</td></tr>
                             <tr><th>Assigned Agent</th><td>{{ $customer->agent->name ?? '—' }}</td></tr>
                             <tr><th>Created</th><td>{{ $customer->created_at->format('d-m-Y') }}</td></tr>
                             <tr><th>Status</th><td><span class="badge bg-{{ $customer->status==='active'?'success':'danger' }}">{{ $customer->status }}</span></td></tr>

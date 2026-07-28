@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Customer, User};
+use App\Models\{Customer, Port, User};
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -11,44 +11,55 @@ class CustomerController extends Controller
 {
     public function index(Request $request)
     {
-        $customers = Customer::with('agent')->withCount('vehicles')->latest()->get();
+        $customers = Customer::with('agent', 'ports')->withCount('vehicles')->latest()->get();
         $agents    = $this->agents($request);
+        $ports     = Port::active()->orderBy('name')->get();
 
-        return view('customers.index', compact('customers', 'agents'));
+        return view('customers.index', compact('customers', 'agents', 'ports'));
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules());
+        $data  = $request->validate($this->rules());
+        $ports = $data['ports'];
+        unset($data['ports']);
+
         $data['agent_id']   = $this->resolveAgent($request);
         $data['created_by'] = $request->user()->id;
-        $data['customer_no'] = \App\Services\CustomerNumber::next();
-        Customer::create($data);
+
+        $customer = Customer::create($data);
+        $customer->ports()->sync($ports);
 
         return back()->with('success', 'Customer created. Record their security deposit to complete the profile.');
     }
 
     public function edit(Customer $customer)
     {
-        return response()->json($customer);
+        return response()->json([
+            ...$customer->toArray(),
+            'port_ids' => $customer->ports()->pluck('ports.id'),
+        ]);
     }
 
     public function update(Request $request, Customer $customer)
     {
-        $data = $request->validate($this->rules());
+        $data  = $request->validate($this->rules());
+        $ports = $data['ports'];
+        unset($data['ports']);
 
         if (! $request->user()->can('customers.assign_any_agent')) {
             unset($data['agent_id']);
         }
 
         $customer->update($data);
+        $customer->ports()->sync($ports);
 
         return back()->with('success', 'Customer updated.');
     }
 
     public function show(Customer $customer)
     {
-        $customer->load('agent', 'depositReceivedBy', 'depositApprovedBy');
+        $customer->load('agent', 'ports', 'depositReceivedBy', 'depositApprovedBy');
         return view('customers.show', compact('customer'));
     }
 
@@ -60,7 +71,6 @@ class CustomerController extends Controller
         return back()->with('success', 'Customer removed.');
     }
 
-    /** Step 1 — Sales Agent records that they've physically received the deposit. */
     public function receiveDeposit(Request $request, Customer $customer)
     {
         abort_if($customer->security_deposit_status === 'approved', 422, 'Deposit already approved for this customer.');
@@ -82,7 +92,6 @@ class CustomerController extends Controller
         return back()->with('success', 'Deposit recorded as received — awaiting accountant approval.');
     }
 
-    /** Step 2 — Accountant / Super Admin confirms the deposit and posts it to the ledger. */
     public function approveDeposit(Customer $customer, LedgerService $ledger)
     {
         abort_unless(request()->user()->canBackdate(), 403, 'Only accountant or super admin may approve deposits.');
@@ -101,7 +110,6 @@ class CustomerController extends Controller
         return back()->with('success', 'Deposit approved — profile is now complete and bidding is enabled.');
     }
 
-    /** Step 2 (alternate) — reject an incorrectly recorded deposit; agent can resubmit. */
     public function rejectDeposit(Request $request, Customer $customer)
     {
         abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may reject deposits.');
@@ -120,13 +128,17 @@ class CustomerController extends Controller
     private function rules(): array
     {
         return [
-            'name'     => ['required', 'string', 'max:255'],
-            'phone'    => ['nullable', 'string', 'max:40'],
-            'email'    => ['nullable', 'email', 'max:255'],
-            'country'  => ['nullable', 'string', 'max:120'],
-            'address'  => ['nullable', 'string'],
-            'agent_id' => ['nullable', 'exists:users,id'],
-            'status'   => ['required', Rule::in(['active', 'inactive'])],
+            'name'            => ['required', 'string', 'max:255'],
+            'phone'           => ['required', 'string', 'max:40'],
+            'email'           => ['required', 'email', 'max:255'],
+            'country'         => ['required', 'string', 'max:120'],
+            'postal_code'     => ['required', 'string', 'max:20'],
+            'address'         => ['required', 'string'],
+            'consignee_name'  => ['required', 'string', 'max:255'],
+            'agent_id'        => ['nullable', 'exists:users,id'],
+            'status'          => ['required', Rule::in(['active', 'inactive'])],
+            'ports'           => ['required', 'array', 'min:1'],
+            'ports.*'         => ['exists:ports,id'],
         ];
     }
 

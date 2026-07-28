@@ -4,15 +4,15 @@ namespace App\Models;
 
 use App\Models\Concerns\ScopedToAgent;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany, HasMany};
 
 class Customer extends Model
 {
     use ScopedToAgent;
 
     protected $fillable = [
-        'name', 'phone', 'email', 'country', 'address', 'agent_id',
+        'name', 'phone', 'email', 'country', 'postal_code', 'address',
+        'consignee_name', 'agent_id',
         'security_deposit', 'security_deposit_paid', 'security_deposit_refunded',
         'security_deposit_status', 'security_deposit_account',
         'security_deposit_received_by', 'security_deposit_received_at',
@@ -37,6 +37,8 @@ class Customer extends Model
     public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
     public function depositReceivedBy(): BelongsTo { return $this->belongsTo(User::class, 'security_deposit_received_by'); }
     public function depositApprovedBy(): BelongsTo { return $this->belongsTo(User::class, 'security_deposit_approved_by'); }
+
+    public function ports(): BelongsToMany { return $this->belongsToMany(Port::class, 'customer_port'); }
 
     public function vehicles(): HasMany  { return $this->hasMany(Vehicle::class); }
     public function invoices(): HasMany  { return $this->hasMany(Invoice::class); }
