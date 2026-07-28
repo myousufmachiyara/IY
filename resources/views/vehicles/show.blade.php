@@ -65,7 +65,7 @@
                                         @endif
                                     </table>
                                     @if($vehicle->winning_screenshot_path)
-                                        <a href="{{ \Storage\app\public::url($vehicle->winning_screenshot_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                        <a href="{{ \Storage::url($vehicle->winning_screenshot_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
                                             <i class="fa fa-image"></i> View Winning Screenshot
                                         </a>
                                     @endif
