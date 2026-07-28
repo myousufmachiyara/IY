@@ -22,6 +22,11 @@
                 @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
                 @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
                 @if(session('warning'))<div class="alert alert-warning">{{ session('warning') }}</div>@endif
+                @if ($errors->any())
+                    <div class="alert alert-danger">
+                        <ul class="mb-0">@foreach ($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+                    </div>
+                @endif
 
                 <div class="row mb-3">
                     <div class="col-md-4"><strong>Agent:</strong> {{ $sheet->agent->name ?? '—' }}</div>
@@ -29,23 +34,55 @@
                     <div class="col-md-4"><strong>Rows Imported:</strong> {{ $sheet->rows_count }}</div>
                 </div>
 
-                <div class="table-scroll">
-                    <form method="PUT" action="{{ route('bid-sheets.bulk_assign') }}" id="bulkAssignForm">
-                    @csrf @method('PUT')
-                    <div class="d-flex gap-2 mb-2">
-                        <select name="customer_id" class="form-control select2-js" style="max-width:300px;" required>
-                            <option value="" disabled selected>Assign selected to...</option>
-                            @foreach($customers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach
-                        </select>
-                        <button class="btn btn-outline-primary">Bulk Assign</button>
+                {{--
+                    Bulk-assign form. NOTE: method must be POST with @method('PUT') spoofing —
+                    plain HTML forms only support GET/POST as the method attribute; a literal
+                    method="PUT" is invalid HTML and browsers silently fall back to GET, which
+                    would never reach the PUT route at all.
+
+                    The checkboxes below live INSIDE the <table>, not nested inside this <form>,
+                    and are linked back to it via the HTML5 form="bulkAssignForm" attribute. This
+                    keeps the table's DOM structure clean for DataTables (which can misbehave if
+                    a <form> is nested partway through a <table>) while still submitting correctly.
+                --}}
+                @can('bid_sheets.edit')
+                <form method="POST" action="{{ route('bid-sheets.bulk_assign') }}" id="bulkAssignForm">
+                    @csrf
+                    @method('PUT')
+                    <div class="d-flex gap-2 mb-2 align-items-end flex-wrap">
+                        <div style="min-width:280px;">
+                            <label class="small mb-1">Bulk assign selected bids to</label>
+                            <select name="customer_id" class="form-control select2-js" required>
+                                <option value="" disabled selected>Select customer</option>
+                                @forelse($customers as $c)
+                                    <option value="{{ $c->id }}">{{ $c->name }}</option>
+                                @empty
+                                    <option value="" disabled>No customers with a completed profile yet</option>
+                                @endforelse
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fa fa-users"></i> Assign Selected
+                        </button>
+                        <small class="text-muted">Check the boxes on pending rows below, then choose a customer here.</small>
                     </div>
+                </form>
+                @endcan
+
+                <div class="table-scroll">
                     <table class="table table-bordered table-striped mb-0" id="datatable-default">
                         <thead>
                             <tr>
+                                @can('bid_sheets.edit')
+                                    <th style="width:40px;">
+                                        <input type="checkbox" id="checkAll" title="Select all pending rows">
+                                    </th>
+                                @endcan
                                 <th>Lot</th>
                                 <th>Auction House</th>
                                 <th>Vehicle</th>
                                 <th>Chassis</th>
+                                <th>Priority</th>
                                 <th>Customer</th>
                                 <th>Max Bid</th>
                                 <th>Result</th>
@@ -54,10 +91,18 @@
                         <tbody>
                             @forelse ($sheet->bids as $b)
                             <tr>
+                                @can('bid_sheets.edit')
+                                    <td>
+                                        @if($b->result === 'pending')
+                                            <input type="checkbox" class="bid-check" name="bid_ids[]" value="{{ $b->id }}" form="bulkAssignForm">
+                                        @endif
+                                    </td>
+                                @endcan
                                 <td>{{ $b->lot_no ?? '—' }}</td>
                                 <td>{{ $b->auction_house ?? '—' }}</td>
                                 <td>{{ trim("{$b->year} {$b->make} {$b->model}") ?: '—' }}</td>
                                 <td>{{ $b->chassis_no ?? '—' }}</td>
+                                <td>{{ $b->priority ?? '—' }}</td>
                                 <td>
                                     @if($b->customer)
                                         {{ $b->customer->name }}
@@ -74,7 +119,7 @@
                                 <td><span class="badge bg-{{ $resultColors[$b->result] ?? 'secondary' }} text-uppercase">{{ $b->result }}</span></td>
                             </tr>
                             @empty
-                            <tr><td colspan="7" class="text-center text-muted py-4">No rows imported from this sheet.</td></tr>
+                            <tr><td colspan="9" class="text-center text-muted py-4">No rows imported from this sheet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -94,4 +139,10 @@
         @endcan
     </div>
 </div>
+
+<script>
+document.getElementById('checkAll')?.addEventListener('change', function () {
+    document.querySelectorAll('.bid-check').forEach(cb => cb.checked = this.checked);
+});
+</script>
 @endsection
