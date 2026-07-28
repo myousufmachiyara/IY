@@ -77,6 +77,12 @@
                 background-repeat: no-repeat; /* Ensure the icon doesn't repeat */
                 background-position: right bottom; /* Align the icon to the center-right */
             }
+            .userbox .profile-info .username {
+                display: block;
+                font-size: 11px;
+                color: #8a8a8a;
+                line-height: 1.2;
+            }
         </style>
     </head>
     <body>
@@ -124,8 +130,9 @@
                 <div id="userbox" class="userbox" style="float:right !important;">
                     <a href="#" data-bs-toggle="dropdown" style="margin-right: 20px;">
                         <div class="profile-info"> 
-                            <span class="name">{{session('user_name')}}</span>
-                            <span class="role">{{session('role_name')}}</span>
+                            <span class="name">{{ auth()->user()->name }}</span>
+                            <span class="username">@{{ auth()->user()->username }}</span>
+                            <span class="role">{{ auth()->user()->roles->first() ? \Illuminate\Support\Str::headline(auth()->user()->roles->first()->name) : '' }}</span>
                         </div>
                         <i class="fa custom-caret"></i>
                     </a>
@@ -158,8 +165,9 @@
                 <div id="userbox" class="userbox" style="float:right !important;">
                     <a href="#" data-bs-toggle="dropdown" style="margin-right: 20px;">
                         <div class="profile-info"> 
-                            <span class="name">{{session('user_name')}}</span>
-                            <span class="role">{{session('role_name')}}</span>
+                            <span class="name">{{ auth()->user()->name }}</span>
+                            <span class="username">@{{ auth()->user()->username }}</span>
+                            <span class="role">{{ auth()->user()->roles->first() ? \Illuminate\Support\Str::headline(auth()->user()->roles->first()->name) : '' }}</span>
                         </div>
                         <i class="fa custom-caret"></i>
                     </a>
