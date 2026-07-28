@@ -78,7 +78,7 @@
                                 </td>
                             </tr>
                             @empty
-                            <tr><td colspan="8" class="text-center text-muted py-4">No pending bids awaiting a result.</td></tr>
+                                <tr><td colspan="7" class="text-center text-muted">No records found.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
