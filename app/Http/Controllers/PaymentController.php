@@ -36,7 +36,6 @@ class PaymentController extends Controller
             'method'       => ['required', Rule::in(['cash', 'bank'])],
             'paid_at'      => ['required', 'date'],
             'reference'    => ['nullable', 'string', 'max:255'],
-            'is_backdated' => ['boolean'],
         ]);
 
         if (! empty($data['invoice_id'])) {
@@ -45,11 +44,10 @@ class PaymentController extends Controller
             $data['vehicle_id'] = $data['vehicle_id'] ?: $invoice->vehicle_id;
         }
 
-        DB::transaction(function () use ($data, $backdated, $request, $ledger) {
+        DB::transaction(function () use ($data, $request, $ledger) {
             $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
 
             $payment = Payment::create($data + [
-                'is_backdated' => $backdated,
                 'account_id'   => $ledger->account($account)->id,
                 'recorded_by'  => $request->user()->id,
             ]);
