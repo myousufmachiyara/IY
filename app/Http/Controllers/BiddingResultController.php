@@ -64,7 +64,7 @@ class BiddingResultController extends Controller
             );
         });
 
-        return redirect()->route('costings.edit', $bid->fresh()->vehicle_id)
+        return redirect()->route('costings.show', $bid->fresh()->vehicle_id)
             ->with('success', 'Bid marked won. Vendor payable posted — complete the costing next.');
     }
 
