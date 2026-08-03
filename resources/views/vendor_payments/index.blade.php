@@ -124,7 +124,8 @@
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Date Paid <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="paid_at" value="{{ date('Y-m-d') }}" required>
+                                <input type="date" class="form-control" name="paid_at" value="{{ date('Y-m-d') }}"
+                                    @unless(auth()->user()->isSuperAdmin()) min="{{ date('Y-m-d') }}" max="{{ date('Y-m-d') }}" readonly @endunless required>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Reference</label>
@@ -173,7 +174,8 @@
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Date Paid <span class="text-danger">*</span></label>
-                                <input type="date" id="edit_vp_date" class="form-control" name="paid_at" required>
+                                <input type="date" class="form-control" name="paid_at" value="{{ date('Y-m-d') }}"
+                                    @unless(auth()->user()->isSuperAdmin()) min="{{ date('Y-m-d') }}" max="{{ date('Y-m-d') }}" readonly @endunless required>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Reference</label>

@@ -4,66 +4,40 @@
 
 @section('content')
 
-@php
-    $resultColors = ['pending' => 'warning text-dark', 'won' => 'success', 'lost' => 'danger'];
-@endphp
+@php $resultColors = ['pending' => 'warning text-dark', 'won' => 'success', 'lost' => 'danger']; @endphp
 
 <div class="row">
     <div class="col">
         <section class="card">
             <header class="card-header d-flex justify-content-between align-items-center">
                 <h2 class="card-title">{{ $sheet->title }}</h2>
-                <a href="{{ route('bid-sheets.index') }}" class="btn btn-sm btn-default">
-                    <i class="fa fa-arrow-left"></i> Back to Bid Sheets
-                </a>
+                <a href="{{ route('bid-sheets.index') }}" class="btn btn-sm btn-default"><i class="fa fa-arrow-left"></i> Back to Bid Sheets</a>
             </header>
 
             <div class="card-body">
                 @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
                 @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
                 @if(session('warning'))<div class="alert alert-warning">{{ session('warning') }}</div>@endif
-                @if ($errors->any())
-                    <div class="alert alert-danger">
-                        <ul class="mb-0">@foreach ($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
-                    </div>
-                @endif
+                @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach ($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
 
                 <div class="row mb-3">
                     <div class="col-md-4"><strong>Agent:</strong> {{ $sheet->agent->name ?? '—' }}</div>
                     <div class="col-md-4"><strong>Auction Date:</strong> {{ optional($sheet->auction_date)->format('d-m-Y') ?? '—' }}</div>
-                    <div class="col-md-4"><strong>Rows Imported:</strong> {{ $sheet->rows_count }}</div>
+                    <div class="col-md-4"><strong>Rows Imported:</strong> {{ $sheet->live_count }}</div>
                 </div>
 
-                {{--
-                    Bulk-assign form. NOTE: method must be POST with @method('PUT') spoofing —
-                    plain HTML forms only support GET/POST as the method attribute; a literal
-                    method="PUT" is invalid HTML and browsers silently fall back to GET, which
-                    would never reach the PUT route at all.
-
-                    The checkboxes below live INSIDE the <table>, not nested inside this <form>,
-                    and are linked back to it via the HTML5 form="bulkAssignForm" attribute. This
-                    keeps the table's DOM structure clean for DataTables (which can misbehave if
-                    a <form> is nested partway through a <table>) while still submitting correctly.
-                --}}
                 @can('bid_sheets.edit')
                 <form method="POST" action="{{ route('bid-sheets.bulk_assign') }}" id="bulkAssignForm">
-                    @csrf
-                    @method('PUT')
+                    @csrf @method('PUT')
                     <div class="d-flex gap-2 mb-2 align-items-end flex-wrap">
                         <div style="min-width:280px;">
                             <label class="small mb-1">Bulk assign selected bids to</label>
                             <select name="customer_id" class="form-control select2-js" required>
                                 <option value="" disabled selected>Select customer</option>
-                                @forelse($customers as $c)
-                                    <option value="{{ $c->id }}">{{ $c->name }}</option>
-                                @empty
-                                    <option value="" disabled>No customers with a completed profile yet</option>
-                                @endforelse
+                                @forelse($customers as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@empty<option value="" disabled>No customers with a completed profile yet</option>@endforelse
                             </select>
                         </div>
-                        <button type="submit" class="btn btn-outline-primary">
-                            <i class="fa fa-users"></i> Assign Selected
-                        </button>
+                        <button type="submit" class="btn btn-outline-primary"><i class="fa fa-users"></i> Assign Selected</button>
                         <small class="text-muted">Check the boxes on pending rows below, then choose a customer here.</small>
                     </div>
                 </form>
@@ -73,30 +47,16 @@
                     <table class="table table-bordered table-striped mb-0" id="datatable-default">
                         <thead>
                             <tr>
-                                @can('bid_sheets.edit')
-                                    <th style="width:40px;">
-                                        <input type="checkbox" id="checkAll" title="Select all pending rows">
-                                    </th>
-                                @endcan
-                                <th>Lot</th>
-                                <th>Auction House</th>
-                                <th>Vehicle</th>
-                                <th>Chassis</th>
-                                <th>Priority</th>
-                                <th>Customer</th>
-                                <th>Max Bid</th>
-                                <th>Result</th>
+                                @can('bid_sheets.edit')<th style="width:40px;"><input type="checkbox" id="checkAll" title="Select all pending rows"></th>@endcan
+                                <th>Lot</th><th>Auction House</th><th>Vehicle</th><th>Chassis</th><th>Priority</th>
+                                <th>Customer</th><th>Max Bid</th><th>Result</th><th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($sheet->bids as $b)
                             <tr>
                                 @can('bid_sheets.edit')
-                                    <td>
-                                        @if($b->result === 'pending')
-                                            <input type="checkbox" class="bid-check" name="bid_ids[]" value="{{ $b->id }}" form="bulkAssignForm">
-                                        @endif
-                                    </td>
+                                    <td>@if($b->result === 'pending')<input type="checkbox" class="bid-check" name="bid_ids[]" value="{{ $b->id }}" form="bulkAssignForm">@endif</td>
                                 @endcan
                                 <td>{{ $b->lot_no ?? '—' }}</td>
                                 <td>{{ $b->auction_house ?? '—' }}</td>
@@ -108,35 +68,35 @@
                                         {{ $b->customer->name }}
                                     @elseif($b->result === 'pending')
                                         <span class="badge bg-warning text-dark me-1">Unassigned</span>
-                                        @can('bid_sheets.edit')
-                                            <a href="#" class="small" onclick="openAssignCustomer({{ $b->id }}, '{{ $b->lot_no }}')">Assign</a>
-                                        @endcan
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
+                                        @can('bid_sheets.edit')<a href="#" class="small" onclick="openAssignCustomer({{ $b->id }}, '{{ $b->lot_no }}')">Assign</a>@endcan
+                                    @else <span class="text-muted">—</span> @endif
                                 </td>
                                 <td>¥{{ number_format($b->max_bid) }}</td>
                                 <td><span class="badge bg-{{ $resultColors[$b->result] ?? 'secondary' }} text-uppercase">{{ $b->result }}</span></td>
+                                <td>
+                                    @if($b->result === 'pending')
+                                        @can('bid_sheets.edit')
+                                        <form action="{{ route('bids.destroy', $b) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this bid row?');">
+                                            @csrf @method('DELETE')<button type="submit" class="btn btn-link p-0 text-danger" title="Delete"><i class="fa fa-trash-alt"></i></button>
+                                        </form>
+                                        @endcan
+                                    @endif
+                                </td>
                             </tr>
                             @empty
-                            <tr><td colspan="9" class="text-center text-muted py-4">No rows imported from this sheet.</td></tr>
+                            <tr><td colspan="10" class="text-center text-muted py-4">No rows imported from this sheet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
 
                 @can('results.index')
-                    <p class="text-muted small mt-3 mb-0">
-                        <i class="fa fa-info-circle"></i> Pending bids are marked won or lost from the
-                        <a href="{{ route('results.index') }}">Bidding Results</a> screen.
-                    </p>
+                    <p class="text-muted small mt-3 mb-0"><i class="fa fa-info-circle"></i> Pending bids are marked won or lost from the <a href="{{ route('results.index') }}">Bidding Results</a> screen.</p>
                 @endcan
             </div>
         </section>
 
-        @can('bid_sheets.edit')
-            @include('bidding._assign_customer_modal')
-        @endcan
+        @can('bid_sheets.edit')@include('bidding._assign_customer_modal')@endcan
     </div>
 </div>
 

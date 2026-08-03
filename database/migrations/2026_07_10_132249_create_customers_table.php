@@ -26,6 +26,7 @@ return new class extends Migration {
             $table->boolean('security_deposit_paid')->default(false);
             $table->string('security_deposit_status')->default('none'); // none|pending|approved|rejected
             $table->string('security_deposit_account')->nullable();
+            $table->string('security_deposit_evidence_path')->nullable();
             $table->foreignId('security_deposit_received_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('security_deposit_received_at')->nullable();
             $table->foreignId('security_deposit_approved_by')->nullable()->constrained('users')->nullOnDelete();

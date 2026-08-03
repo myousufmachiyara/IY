@@ -56,7 +56,7 @@ class Customer extends Model
     }
 
     public function totalInvoiced(): int { return (int) $this->invoices()->sum('total_payable'); }
-    public function totalPaid(): int     { return (int) $this->payments()->sum('amount'); }
+    public function totalPaid(): int { return (int) $this->payments()->where('status', 'approved')->sum('amount'); }
     public function balance(): int       { return $this->totalInvoiced() - $this->totalPaid(); }
 
     public function scopeComplete($q) { return $q->whereNotNull('profile_completed_at'); }

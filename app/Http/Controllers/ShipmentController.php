@@ -30,7 +30,7 @@ class ShipmentController extends Controller
         $data = $request->validate([
             'customer_id'      => ['required', 'exists:customers,id'],
             'method'           => ['required', Rule::in(['RORO', 'Container'])],
-            'expected_arrival' => ['required', 'date'],
+            'expected_arrival' => ['required', 'date', 'after_or_equal:today'],
             'container_no'     => ['nullable', 'string', 'max:100'],
             'bl_no'            => ['nullable', 'string', 'max:100'],
             'shipping_company' => ['nullable', 'string', 'max:255'],
@@ -85,7 +85,7 @@ class ShipmentController extends Controller
 
         $data = $request->validate([
             'method'           => ['required', Rule::in(['RORO', 'Container'])],
-            'expected_arrival' => ['required', 'date'],
+            'expected_arrival' => ['required', 'date', 'after_or_equal:today'],
             'container_no'     => ['nullable', 'string', 'max:100'],
             'bl_no'            => ['nullable', 'string', 'max:100'],
             'shipping_company' => ['nullable', 'string', 'max:255'],

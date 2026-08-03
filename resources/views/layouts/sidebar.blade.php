@@ -110,11 +110,13 @@
 
           {{-- Bidding Results --}}
           @can('results.index')
-          <li class="{{ request()->routeIs('results.*') ? 'active' : '' }}">
-            <a class="nav-link" href="{{ route('results.index') }}">
-              <i class="fa fa-trophy"></i>
-              <span>Bidding Results</span>
-            </a>
+          <li class="nav-parent {{ request()->routeIs('results.*') ? 'nav-expanded nav-active' : '' }}">
+              <a class="nav-link" href="#"><i class="fa fa-trophy"></i><span>Bidding Results</span></a>
+              <ul class="nav nav-children">
+                  <li class="{{ request()->routeIs('results.index') ? 'active' : '' }}"><a class="nav-link" href="{{ route('results.index') }}">Pending</a></li>
+                  <li class="{{ request()->routeIs('results.won') ? 'active' : '' }}"><a class="nav-link" href="{{ route('results.won') }}">Won</a></li>
+                  <li class="{{ request()->routeIs('results.lost') ? 'active' : '' }}"><a class="nav-link" href="{{ route('results.lost') }}">Lost</a></li>
+              </ul>
           </li>
           @endcan
 
@@ -164,6 +166,12 @@
               </ul>
           </li>
           @endif
+
+          @can('finance.backdate')
+            <li class="{{ request()->routeIs('approvals.*') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('approvals.index') }}"><i class="fa fa-clipboard-check"></i><span>Pending Approvals</span></a>
+            </li>
+          @endcan
 
           {{-- Accounting --}}
           @can('accounting.index')

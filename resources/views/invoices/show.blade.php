@@ -128,35 +128,36 @@
                     <table class="table table-bordered table-striped mb-0">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Amount</th>
-                                <th>Method</th>
-                                <th>Reference</th>
-                                <th>Recorded By</th>
-                                <th>Backdated</th>
-                                <th>Action</th>
+                                <th>Date</th><th>Amount</th><th>Method</th><th>Status</th><th>Attachment</th>
+                                <th>Recorded By</th><th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($invoice->payments as $p)
+                            @php $statusBadge = ['pending'=>'warning text-dark','approved'=>'success','rejected'=>'danger'][$p->status] ?? 'secondary'; @endphp
                             <tr>
                                 <td>{{ $p->paid_at->format('d-m-Y') }}</td>
                                 <td>¥{{ number_format($p->amount) }}</td>
                                 <td class="text-capitalize">{{ $p->method }}</td>
-                                <td>{{ $p->reference ?? '—' }}</td>
+                                <td><span class="badge bg-{{ $statusBadge }}">{{ ucfirst($p->status) }}</span></td>
+                                <td>
+                                    @if($p->attachment_path)
+                                        <a href="{{ \App\Services\PublicStorage::url($p->attachment_path) }}" target="_blank"><i class="fa fa-paperclip"></i></a>
+                                    @else <span class="text-muted">—</span> @endif
+                                </td>
                                 <td>{{ $p->recorder->name ?? '—' }}</td>
                                 <td class="text-nowrap">
+                                    @if($p->status === 'pending' && auth()->user()->canBackdate())
+                                        <form action="{{ route('payments.approve', $p) }}" method="POST" class="d-inline" onsubmit="return confirm('Approve this payment?');">
+                                            @csrf<button class="btn btn-link p-0 text-success me-1" title="Approve"><i class="fa fa-check-circle"></i></button>
+                                        </form>
+                                    @endif
                                     @can('payments.edit')
-                                        <a href="#" class="text-primary me-1" title="Edit"
-                                           onclick="editPayment({{ $p->id }}, {{ $p->amount }}, '{{ $p->method }}', '{{ $p->paid_at->format('Y-m-d') }}', '{{ $p->reference }}')">
-                                            <i class="fa fa-edit"></i>
-                                        </a>
+                                        <a href="#" class="text-primary me-1" title="Edit" onclick="editPayment({{ $p->id }}, {{ $p->amount }}, '{{ $p->method }}', '{{ $p->paid_at->format('Y-m-d') }}', '{{ $p->reference }}')"><i class="fa fa-edit"></i></a>
                                     @endcan
                                     @can('payments.delete')
-                                        <form action="{{ route('payments.destroy', $p) }}" method="POST" style="display:inline;"
-                                              onsubmit="return confirm('Delete this payment? The ledger entry will be reversed.');">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="btn btn-link p-0 text-danger"><i class="fa fa-trash-alt"></i></button>
+                                        <form action="{{ route('payments.destroy', $p) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this payment?');">
+                                            @csrf @method('DELETE')<button type="submit" class="btn btn-link p-0 text-danger"><i class="fa fa-trash-alt"></i></button>
                                         </form>
                                     @endcan
                                 </td>
@@ -174,7 +175,7 @@
         @can('payments.create')
         <div id="paymentModal" class="modal-block modal-block-primary mfp-hide">
             <section class="card">
-                <form method="POST" action="{{ route('payments.store') }}" onkeydown="return event.key != 'Enter';">
+                <form method="POST" enctype="multipart/form-data" action="{{ route('payments.store') }}" onkeydown="return event.key != 'Enter';">
                     @csrf
                     <input type="hidden" name="customer_id" value="{{ $invoice->customer_id }}">
                     <input type="hidden" name="invoice_id" value="{{ $invoice->id }}">
@@ -196,11 +197,17 @@
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Date Paid <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="paid_at" value="{{ date('Y-m-d') }}" required>
+                                <input type="date" class="form-control" name="paid_at" value="{{ date('Y-m-d') }}"
+                                    @unless(auth()->user()->isSuperAdmin()) min="{{ date('Y-m-d') }}" max="{{ date('Y-m-d') }}" readonly @endunless required>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Reference</label>
                                 <input type="text" class="form-control" name="reference" placeholder="Transaction ID / cheque no.">
+                            </div>
+                            <div class="col-lg-12 mb-2">
+                                <label>Attachment {{ auth()->user()->canBackdate() ? '' : '(required)' }}</label>
+                                <input type="file" class="form-control" name="attachment" accept=".jpg,.jpeg,.png,.pdf" {{ auth()->user()->canBackdate() ? '' : 'required' }}>
+                                <small class="text-muted">Receipt / transfer screenshot as evidence.</small>
                             </div>
                         </div>
                     </div>

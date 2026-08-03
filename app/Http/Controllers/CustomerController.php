@@ -11,9 +11,15 @@ class CustomerController extends Controller
 {
     public function index(Request $request)
     {
-        $customers = Customer::with('agent', 'ports')->withCount('vehicles')->latest()->get();
-        $agents    = $this->agents($request);
-        $ports     = Port::active()->orderBy('name')->get();
+        $customers = Customer::with('agent', 'ports')->withCount('vehicles')
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->deposit_status, fn ($q) => $q->where('security_deposit_status', $request->deposit_status))
+            ->when($request->agent_id, fn ($q) => $q->where('agent_id', $request->agent_id))
+            ->when($request->country, fn ($q) => $q->where('country', 'like', "%{$request->country}%"))
+            ->latest()->get();
+
+        $agents = $this->agents($request);
+        $ports  = Port::active()->orderBy('name')->get();
 
         return view('customers.index', compact('customers', 'agents', 'ports'));
     }
@@ -70,7 +76,7 @@ class CustomerController extends Controller
 
         return back()->with('success', 'Customer removed.');
     }
-
+    
     public function receiveDeposit(Request $request, Customer $customer)
     {
         abort_if($customer->security_deposit_status === 'approved', 422, 'Deposit already approved for this customer.');
@@ -78,11 +84,13 @@ class CustomerController extends Controller
         $data = $request->validate([
             'security_deposit' => ['required', 'integer', 'min:1'],
             'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
+            'evidence'          => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
 
         $customer->update([
             'security_deposit'                  => $data['security_deposit'],
             'security_deposit_account'          => $data['account'],
+            'security_deposit_evidence_path'    => $request->file('evidence')->store('deposit_evidence', 'public'),
             'security_deposit_status'           => 'pending',
             'security_deposit_received_by'      => $request->user()->id,
             'security_deposit_received_at'      => now(),
@@ -92,6 +100,38 @@ class CustomerController extends Controller
         return back()->with('success', 'Deposit recorded as received — awaiting accountant approval.');
     }
 
+    /** #11 — agent can correct a not-yet-approved deposit. */
+    public function editDeposit(Customer $customer)
+    {
+        abort_if($customer->security_deposit_status === 'approved', 422, 'Approved deposits cannot be edited.');
+        return response()->json($customer->only(['security_deposit', 'security_deposit_account']));
+    }
+
+    public function updateDeposit(Request $request, Customer $customer)
+    {
+        abort_if($customer->security_deposit_status === 'approved', 422, 'Approved deposits cannot be edited.');
+
+        $data = $request->validate([
+            'security_deposit' => ['required', 'integer', 'min:1'],
+            'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
+            'evidence'          => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+        ]);
+
+        if ($request->hasFile('evidence')) {
+            if ($customer->security_deposit_evidence_path) {
+                \Storage::disk('public')->delete($customer->security_deposit_evidence_path);
+            }
+            $data['security_deposit_evidence_path'] = $request->file('evidence')->store('deposit_evidence', 'public');
+        }
+
+        $customer->update([
+            'security_deposit'         => $data['security_deposit'],
+            'security_deposit_account' => $data['account'],
+            'security_deposit_status'  => 'pending', // resets to pending — a correction needs re-approval
+        ] + array_intersect_key($data, ['security_deposit_evidence_path' => true]));
+
+        return back()->with('success', 'Deposit updated — pending approval again.');
+    }
     public function approveDeposit(Customer $customer, LedgerService $ledger)
     {
         abort_unless(request()->user()->canBackdate(), 403, 'Only accountant or super admin may approve deposits.');

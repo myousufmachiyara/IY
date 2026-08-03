@@ -9,7 +9,6 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class BidsImport implements ToModel, WithHeadingRow
 {
-    /** @var array<int, string> Human-readable reasons for any rows that were skipped. */
     public array $skipped = [];
 
     public function __construct(private BidSheet $sheet) {}
@@ -17,21 +16,17 @@ class BidsImport implements ToModel, WithHeadingRow
     public function model(array $row): ?Bid
     {
         if (empty($row['make']) && empty($row['lot_no'])) {
-            return null; // skip blank rows silently
+            return null;
         }
 
         $customerId = $row['customer_id'] ?? null;
 
-        // A row can be uploaded without a customer yet (assigned later) — only
-        // validate profile completion when a customer_id is actually provided.
         if ($customerId) {
             $customer = Customer::find($customerId);
-
             if (! $customer) {
                 $this->skipped[] = "Lot {$row['lot_no']}: customer_id {$customerId} not found.";
                 return null;
             }
-
             if (! $customer->isProfileComplete()) {
                 $this->skipped[] = "Lot {$row['lot_no']}: customer '{$customer->name}' has an incomplete profile — bidding is not allowed yet.";
                 return null;
@@ -51,8 +46,8 @@ class BidsImport implements ToModel, WithHeadingRow
             'grade'         => $row['grade'] ?? null,
             'chassis_no'    => $row['chassis_no'] ?? null,
             'max_bid'       => (int) ($row['max_bid'] ?? 0),
+            'priority'      => isset($row['priority']) && $row['priority'] !== '' ? (int) $row['priority'] : null,
             'result'        => 'pending',
-            'priority' => isset($row['priority']) ? (int) $row['priority'] : null,
         ]);
     }
 

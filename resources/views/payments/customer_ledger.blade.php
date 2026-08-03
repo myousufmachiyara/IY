@@ -143,7 +143,7 @@
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Date Paid <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="paid_at" value="{{ date('Y-m-d') }}" required>
+                                <input type="date" class="form-control" name="paid_at" value="{{ date('Y-m-d') }}" readonly required>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Reference</label>

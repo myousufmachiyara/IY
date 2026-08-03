@@ -14,21 +14,17 @@ class VendorPaymentController extends Controller
     {
         $payments = VendorPayment::with('vendor', 'vehicle')
             ->when($request->vendor_id, fn ($q, $v) => $q->where('vendor_id', $v))
-            ->latest('paid_at')
-            ->get();
+            ->latest('paid_at')->get();
 
         $vendors = Vendor::orderBy('name')->get();
 
-        $vehicles = Vehicle::whereNotNull('vendor_id')
-            ->whereNotNull('buying_price')
-            ->with('vendor', 'customer')
-            ->get()
+        $vehicles = Vehicle::whereNotNull('vendor_id')->whereNotNull('buying_price')
+            ->with('vendor', 'customer')->get()
             ->map(function ($v) {
                 $v->outstanding = $v->buying_price - $v->vendorPayments()->sum('amount');
                 return $v;
             })
-            ->filter(fn ($v) => $v->outstanding > 0)
-            ->values();
+            ->filter(fn ($v) => $v->outstanding > 0)->values();
 
         return view('vendor_payments.index', compact('payments', 'vendors', 'vehicles'));
     }
@@ -36,22 +32,21 @@ class VendorPaymentController extends Controller
     public function store(Request $request, LedgerService $ledger)
     {
         $data = $request->validate([
-            'vehicle_id'   => ['required', 'exists:vehicles,id'],
-            'amount'       => ['required', 'integer', 'min:1'],
-            'method'       => ['required', Rule::in(['cash', 'bank'])],
-            'paid_at'      => ['required', 'date'],
-            'reference'    => ['nullable', 'string', 'max:255'],
-            'is_backdated' => ['boolean'],
+            'vehicle_id' => ['required', 'exists:vehicles,id'],
+            'amount'     => ['required', 'integer', 'min:1'],
+            'method'     => ['required', Rule::in(['cash', 'bank'])],
+            'paid_at'    => ['required', 'date'],
+            'reference'  => ['nullable', 'string', 'max:255'],
         ]);
 
-        $backdated = $request->boolean('is_backdated');
-        if ($backdated) {
-            abort_unless($request->user()->canBackdate(), 403, 'You are not allowed to back-date entries.');
+        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
+            return back()->withErrors(['paid_at' => 'Only Super Admin may record a vendor payment with a date other than today.'])->withInput();
         }
 
         $vehicle = Vehicle::findOrFail($data['vehicle_id']);
         abort_unless($vehicle->vendor_id, 422, 'This vehicle has no vendor assigned.');
 
+        $backdated = \Carbon\Carbon::parse($data['paid_at'])->lt(today());
         $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
 
         DB::transaction(function () use ($data, $backdated, $request, $ledger, $vehicle, $account) {
@@ -65,7 +60,6 @@ class VendorPaymentController extends Controller
                 'is_backdated' => $backdated,
                 'recorded_by'  => $request->user()->id,
             ]);
-
             $ledger->vendorPayment($payment, $account);
         });
 
@@ -86,11 +80,14 @@ class VendorPaymentController extends Controller
             'reference' => ['nullable', 'string', 'max:255'],
         ]);
 
+        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
+            return back()->withErrors(['paid_at' => 'Only Super Admin may set a vendor payment date other than today.'])->withInput();
+        }
+
         DB::transaction(function () use ($vendorPayment, $data, $ledger) {
             foreach ($vendorPayment->journalEntries as $entry) {
                 $ledger->reverseEntry($entry, now()->toDateString(), "Correction to vendor payment #{$vendorPayment->id}");
             }
-
             $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
             $vendorPayment->update($data + ['account_id' => $ledger->account($account)->id]);
             $ledger->vendorPayment($vendorPayment->fresh(), $account);

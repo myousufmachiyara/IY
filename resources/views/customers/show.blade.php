@@ -23,6 +23,11 @@
                 <a href="{{ route('customers.index') }}" class="btn btn-sm btn-default">
                     <i class="fa fa-arrow-left"></i> Back to All Customers
                 </a>
+                @can('invoices.create')
+                    <a href="{{ route('invoices.bulk_create_form', $customer) }}" class="btn btn-sm btn-outline-primary mb-2">
+                        <i class="fa fa-file-invoice"></i> Bulk Generate Invoices
+                    </a>
+                @endcan
             </header>
 
             @include('customers._tabs', ['customer' => $customer, 'active' => 'overview'])

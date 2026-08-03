@@ -104,7 +104,7 @@
                                 @endif
                                 <div class="alert alert-success">
                                     <i class="fa fa-check-circle"></i> Invoice fully paid — ready for shipment.
-                                    @can('shipments.create')
+                                    @can('invoices.request')
                                         <a href="{{ route('shipments.create', $vehicle->customer) }}" class="alert-link ms-1">Prepare Shipment &rarr;</a>
                                     @endcan
                                 </div>

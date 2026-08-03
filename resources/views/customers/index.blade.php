@@ -38,6 +38,33 @@
             </header>
 
             <div class="card-body">
+                <form method="GET" action="{{ route('customers.index') }}" class="row g-2 mb-3">
+                    <div class="col-md-2">
+                        <select name="status" class="form-control select2-js" onchange="this.form.submit()">
+                            <option value="">All Status</option>
+                            <option value="active" @selected(request('status')==='active')>Active</option>
+                            <option value="inactive" @selected(request('status')==='inactive')>Inactive</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select name="deposit_status" class="form-control select2-js" onchange="this.form.submit()">
+                            <option value="">All Deposit States</option>
+                            @foreach(['none'=>'Not Submitted','pending'=>'Pending Approval','approved'=>'Approved','rejected'=>'Rejected'] as $k=>$v)
+                                <option value="{{ $k }}" @selected(request('deposit_status')===$k)>{{ $v }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @if($isPrivileged)
+                    <div class="col-md-3">
+                        <select name="agent_id" class="form-control select2-js" onchange="this.form.submit()">
+                            <option value="">All Agents</option>
+                            @foreach($agents as $a)<option value="{{ $a->id }}" @selected(request('agent_id')==$a->id)>{{ $a->name }}</option>@endforeach
+                        </select>
+                    </div>
+                    @endif
+                    <div class="col-md-2"><input type="text" name="country" class="form-control" placeholder="Country" value="{{ request('country') }}"></div>
+                    <div class="col-md-2"><button class="btn btn-outline-secondary w-100">Filter</button></div>
+                </form>
                 <div class="table-scroll">
                     <table class="table table-bordered table-striped mb-0" id="datatable-default">
                         <thead>

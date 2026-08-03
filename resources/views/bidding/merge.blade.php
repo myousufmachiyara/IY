@@ -21,26 +21,15 @@
 
             <div class="card-body">
                 <form method="GET" action="{{ route('bids.index') }}" class="row g-2 mb-3">
-                    <div class="col-md-3">
-                        <label>Sales Agent</label>
-                        <select name="agent_id" class="form-control select2-js" onchange="this.form.submit()">
-                            <option value="">All Agents</option>
-                            @foreach($agents as $a)
-                                <option value="{{ $a->id }}" {{ request('agent_id') == $a->id ? 'selected' : '' }}>{{ $a->name }}</option>
-                            @endforeach
+                    <div class="col-md-4">
+                        <label>Sales Agent(s)</label>
+                        <select name="agent_ids[]" class="form-control select2-js" multiple onchange="this.form.submit()">
+                            @foreach($agents as $a)<option value="{{ $a->id }}" @selected(in_array($a->id, request('agent_ids', [])))>{{ $a->name }}</option>@endforeach
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label>From Date</label>
-                        <input type="date" name="from" class="form-control" value="{{ request('from') }}">
-                    </div>
-                    <div class="col-md-3">
-                        <label>To Date</label>
-                        <input type="date" name="to" class="form-control" value="{{ request('to') }}">
-                    </div>
-                    <div class="col-md-3 d-flex align-items-end">
-                        <button class="btn btn-outline-secondary">Filter</button>
-                    </div>
+                    <div class="col-md-3"><label>From Date</label><input type="date" name="from" class="form-control" value="{{ request('from') }}"></div>
+                    <div class="col-md-3"><label>To Date</label><input type="date" name="to" class="form-control" value="{{ request('to') }}"></div>
+                    <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-secondary w-100">Filter</button></div>
                 </form>
 
                 @can('bids.print')

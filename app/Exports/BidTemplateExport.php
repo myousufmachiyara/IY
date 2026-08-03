@@ -15,8 +15,6 @@ class BidTemplateExport implements FromArray, WithHeadings
 
     public function headings(): array
     {
-        // customer_id intentionally removed (#10) — assignment happens through the
-        // app's Assign Customer / Bulk Assign UI, not the import file.
         return ['lot_no', 'auction_house', 'auction_date', 'make', 'model', 'year', 'grade', 'chassis_no', 'max_bid', 'priority'];
     }
 }

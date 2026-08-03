@@ -91,40 +91,37 @@
                 <span class="sr-only">Loading...</span>
             </div>
         </div>
-        
         <div id="changePassword" class="zoom-anim-dialog modal-block modal-block-danger mfp-hide">
-            <form id="changePasswordForm" method="post" style="width: 75%" enctype="multipart/form-data" onkeydown="return event.key != 'Enter';">
+            <form id="changePasswordForm" method="post" action="{{ route('profile.password.update') }}" style="width: 75%" onkeydown="return event.key != 'Enter';">
                 @csrf
-                <header class="card-header">
-                    <h2 class="card-title">Change Password</h2>
-                </header>
+                <header class="card-header"><h2 class="card-title">Change Password</h2></header>
                 <div class="card-body">
-                    <div class="row form-group">    
+                    @if ($errors->any())
+                        <div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>
+                    @endif
+                    <div class="row form-group">
                         <div class="col-12 mb-2">
                             <label>Current Password</label>
-                            <input type="password" class="form-control" placeholder="Current Password" id="current_password" name="current_password" required>
-                        </div> 
+                            <input type="password" class="form-control" placeholder="Current Password" name="current_password" required>
+                        </div>
                         <div class="col-12 mb-2">
                             <label>New Password</label>
-                            <input type="password" class="form-control" placeholder="New Password" id="new_password" minlength="8" name="new_password" required>
+                            <input type="password" class="form-control" placeholder="New Password" minlength="8" name="new_password" required>
                         </div>
                         <div class="col-12 mb-2">
                             <label>Confirm New Password</label>
-                            <input type="password" class="form-control" placeholder="Confirm New Password" minlength="8" id="confirm_new_password" required>
+                            <input type="password" class="form-control" placeholder="Confirm New Password" minlength="8" name="new_password_confirmation" required>
                         </div>
                     </div>
                 </div>
                 <footer class="card-footer">
-                    <div class="row">
-                        <div class="col-md-12 text-end">
-                            <button type="submit" class="btn btn-primary">Change Password</button>
-                            <button type="button" class="btn btn-default modal-dismiss">Cancel</button>
-                        </div>
-                    </div>
+                    <div class="row"><div class="col-md-12 text-end">
+                        <button type="submit" class="btn btn-primary">Change Password</button>
+                        <button type="button" class="btn btn-default modal-dismiss">Cancel</button>
+                    </div></div>
                 </footer>
             </form>
         </div>
-
         <header class="page-header">
             <div class="logo-container d-none d-md-block">
                 <div id="userbox" class="userbox" style="float:right !important;">
@@ -207,6 +204,13 @@
         </footer>
         <script>
             $.fn.dataTable.defaults.lengthMenu = [[100,250,500,1000,-1],[100,250,500,1000,'All']];
+w
+            function toggleReveal(inputId, btn) {
+                const input = document.getElementById(inputId);
+                input.type = input.type === 'password' ? 'text' : 'password';
+                btn.querySelector('i').classList.toggle('fa-eye');
+                btn.querySelector('i').classList.toggle('fa-eye-slash');
+            }
         </script>
     </body>
 </html>

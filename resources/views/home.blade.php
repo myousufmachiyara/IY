@@ -11,14 +11,10 @@
 		@can('customers.index')
 		<div class="col-12 col-md-3 mb-2">
 			<section class="card card-featured-left card-featured-primary">
-				<div class="card-body icon-container data-container">
-					<h3 class="amount text-dark"><strong>{{ auth()->user()->isSalesAgent() ? 'My Customers' : 'Total Customers' }}</strong></h3>
-					<h2 class="amount m-0 text-primary">
-						<strong data-value="">{{ number_format($stats['customers']) }}</strong>
-					</h2>
-					<div class="summary-footer">
-						<a class="text-primary text-uppercase" href="{{ route('customers.index') }}">View Details</a>
-					</div>
+				<div class="card-body">
+					<h3 class="text-dark"><strong>{{ auth()->user()->isSalesAgent() ? 'My Customers' : 'Total Customers' }}</strong></h3>
+					<h2 class="m-0 text-primary">{{ number_format($stats['customers']) }}</h2>
+					<div class="summary-footer"><a class="text-primary text-uppercase" href="{{ route('customers.index') }}">View Details</a></div>
 				</div>
 			</section>
 		</div>
@@ -27,15 +23,10 @@
 		@can('vehicles.index')
 		<div class="col-12 col-md-3 mb-2">
 			<section class="card card-featured-left card-featured-tertiary">
-				<div class="card-body icon-container data-container">
-					<h3 class="amount text-dark"><strong>In Bidding</strong></h3>
-					<h2 class="amount m-0 text-tertiary">
-						<strong data-value="">{{ number_format($stats['in_bidding']) }}</strong>
-						<span class="title text-end text-dark h6"> vehicles</span>
-					</h2>
-					<div class="summary-footer">
-						<a class="text-tertiary text-uppercase" href="{{ route('vehicles.index') }}">View Details</a>
-					</div>
+				<div class="card-body">
+					<h3 class="text-dark"><strong>Open Requirements</strong></h3>
+					<h2 class="m-0 text-tertiary">{{ number_format($stats['requirements']) }}</h2>
+					<div class="summary-footer"><a class="text-tertiary text-uppercase" href="{{ route('vehicles.index') }}">View Details</a></div>
 				</div>
 			</section>
 		</div>
@@ -43,16 +34,20 @@
 
 		@can('results.index')
 		<div class="col-12 col-md-3 mb-2">
+			<section class="card card-featured-left card-featured-warning">
+				<div class="card-body">
+					<h3 class="text-dark"><strong>Pending Bids</strong></h3>
+					<h2 class="m-0 text-warning">{{ number_format($stats['pending_bids']) }}</h2>
+					<div class="summary-footer"><a class="text-warning text-uppercase" href="{{ route('results.index') }}">View Details</a></div>
+				</div>
+			</section>
+		</div>
+		<div class="col-12 col-md-3 mb-2">
 			<section class="card card-featured-left card-featured-success">
-				<div class="card-body icon-container data-container">
-					<h3 class="amount text-dark"><strong>Won This Month</strong></h3>
-					<h2 class="amount m-0 text-success">
-						<strong data-value="">{{ number_format($stats['won_this_month']) }}</strong>
-						<span class="title text-end text-dark h6"> vehicles</span>
-					</h2>
-					<div class="summary-footer">
-						<a class="text-success text-uppercase" href="{{ route('results.index') }}">View Details</a>
-					</div>
+				<div class="card-body">
+					<h3 class="text-dark"><strong>Won This Month</strong></h3>
+					<h2 class="m-0 text-success">{{ number_format($stats['won_this_month']) }}</h2>
+					<div class="summary-footer"><a class="text-success text-uppercase" href="{{ route('results.won') }}">View Details</a></div>
 				</div>
 			</section>
 		</div>
@@ -61,57 +56,55 @@
 		@can('invoices.index')
 		<div class="col-12 col-md-3 mb-2">
 			<section class="card card-featured-left card-featured-danger">
-				<div class="card-body icon-container data-container">
-					<h3 class="amount text-dark"><strong>Outstanding Balance</strong></h3>
-					<h2 class="amount m-0 text-danger">
-						<strong data-value="">¥{{ number_format($stats['outstanding']) }}</strong>
-					</h2>
-					<div class="summary-footer">
-						<a class="text-danger text-uppercase" href="{{ route('invoices.index') }}">View Details</a>
-					</div>
+				<div class="card-body">
+					<h3 class="text-dark"><strong>Outstanding Balance</strong></h3>
+					<h2 class="m-0 text-danger">¥{{ number_format($stats['outstanding']) }}</h2>
+					<div class="summary-footer"><a class="text-danger text-uppercase" href="{{ route('invoices.index') }}">View Details</a></div>
+				</div>
+			</section>
+		</div>
+		<div class="col-12 col-md-3 mb-2">
+			<section class="card card-featured-left card-featured-danger">
+				<div class="card-body">
+					<h3 class="text-dark"><strong>Overdue Invoices</strong></h3>
+					<h2 class="m-0 text-danger">{{ number_format($stats['overdue_invoices']) }}</h2>
+					<div class="summary-footer"><a class="text-danger text-uppercase" href="{{ route('invoices.index') }}">View Details</a></div>
 				</div>
 			</section>
 		</div>
 		@endcan
-	</div>
 
-	<section class="card mt-3">
-		<header class="card-header">
-			<h2 class="card-title">Recent Activity</h2>
-		</header>
-		<div class="card-body">
-			<table class="table table-sm table-borderless mb-0">
-				@forelse($stats['recent_activity'] as $a)
-				<tr>
-					<td style="width:110px;"><span class="badge bg-secondary">{{ $a['type'] }}</span></td>
-					<td><a href="{{ $a['url'] }}">{{ $a['label'] }}</a></td>
-					<td class="text-muted small text-end">{{ $a['at']->diffForHumans() }}</td>
-				</tr>
-				@empty
-				<tr><td class="text-center text-muted py-3">No recent activity yet.</td></tr>
-				@endforelse
-			</table>
+		@if($isPrivileged)
+		<div class="col-12 col-md-3 mb-2">
+			<section class="card card-featured-left card-featured-warning">
+				<div class="card-body">
+					<h3 class="text-dark"><strong>Pending Deposit Approvals</strong></h3>
+					<h2 class="m-0 text-warning">{{ number_format($stats['pending_deposits']) }}</h2>
+					<div class="summary-footer"><a class="text-warning text-uppercase" href="{{ route('customers.index') }}">Review</a></div>
+				</div>
+			</section>
 		</div>
-	</section>
+		<div class="col-12 col-md-3 mb-2">
+			<section class="card card-featured-left card-featured-tertiary">
+				<div class="card-body">
+					<h3 class="text-dark"><strong>Vendor Payable</strong></h3>
+					<h2 class="m-0 text-tertiary">¥{{ number_format($stats['vendor_payable']) }}</h2>
+					<div class="summary-footer"><a class="text-tertiary text-uppercase" href="{{ route('accounting.payables') }}">View Details</a></div>
+				</div>
+			</section>
+		</div>
+		@endif
+	</div>
 
 	<script>
 		$(document).ready(function() {
 			const now = new Date();
 			const day = getDaySuffix(now.getDate());
-			const formattedDate = `${now.toLocaleString('en-GB', { weekday: 'long' })}, ${day} ${now.toLocaleString('en-GB', { month: 'long' })} ${now.getFullYear()}`;
-			document.getElementById('currentDate').innerText = formattedDate;
+			document.getElementById('currentDate').innerText = `${now.toLocaleString('en-GB', { weekday: 'long' })}, ${day} ${now.toLocaleString('en-GB', { month: 'long' })} ${now.getFullYear()}`;
 		});
-
 		function getDaySuffix(day) {
-			if (day >= 11 && day <= 13) {
-				return day + 'th';
-			}
-			switch (day % 10) {
-				case 1: return day + 'st';
-				case 2: return day + 'nd';
-				case 3: return day + 'rd';
-				default: return day + 'th';
-			}
+			if (day >= 11 && day <= 13) return day + 'th';
+			switch (day % 10) { case 1: return day+'st'; case 2: return day+'nd'; case 3: return day+'rd'; default: return day+'th'; }
 		}
 	</script>
 @endsection

@@ -91,6 +91,14 @@
                                 <td class="fw-bold {{ $inv->balance() > 0 ? 'text-danger' : 'text-success' }}">¥{{ number_format($inv->balance()) }}</td>
                                 <td><span class="badge bg-{{ $statusColors[$inv->status] ?? 'secondary' }} text-uppercase">{{ $inv->status }}</span></td>
                                 <td class="text-nowrap">
+                                    @can('invoices.delete')
+                                        @if($invoice->amount_paid == 0)
+                                            <form action="{{ route('invoices.destroy', $invoice) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this invoice? This cannot be undone.');">
+                                                @csrf @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                            </form>
+                                        @endif
+                                    @endcan
                                     <a href="{{ route('invoices.show', $inv) }}" class="text-secondary me-1" title="View">
                                         <i class="fa fa-eye"></i>
                                     </a>

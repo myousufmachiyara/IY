@@ -13,5 +13,8 @@
         @can('reports.bid_won')
             <li class="nav-item"><a class="nav-link {{ $active === 'bid_won' ? 'active' : '' }}" href="{{ route('reports.bid_won') }}">Bid Won</a></li>
         @endcan
+        @can('reports.customer_wise')
+            <li class="nav-item"><a class="nav-link {{ $active === 'customer_wise' ? 'active' : '' }}" href="{{ route('reports.customer_wise') }}">Customer-wise</a></li>
+        @endcan
     </ul>
 </div>

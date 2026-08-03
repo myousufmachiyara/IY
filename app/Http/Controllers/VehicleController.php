@@ -9,18 +9,17 @@ class VehicleController extends Controller
 {
     public function index(Request $request)
     {
-        $vehicles = Vehicle::with('customer', 'agent', 'invoice')
+        // #1/#13 — Vehicles is a pure lead/CRM list; won/lost/etc. tracking lives entirely in Bidding Results.
+        $vehicles = Vehicle::with('customer', 'agent')
+            ->where('status', 'requirement')
             ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
             ->when($request->make, fn ($q) => $q->where('make', 'like', "%{$request->make}%"))
             ->when($request->model, fn ($q) => $q->where('model', 'like', "%{$request->model}%"))
             ->when($request->from, fn ($q) => $q->whereDate('created_at', '>=', $request->from))
             ->when($request->to, fn ($q) => $q->whereDate('created_at', '<=', $request->to))
-            ->when(! $request->boolean('show_won'), fn ($q) => $q->where('status', 'requirement'))
-            ->latest()
-            ->get();
+            ->latest()->get();
 
         $customers = Customer::orderBy('name')->get();
-
         return view('vehicles.index', compact('vehicles', 'customers'));
     }
 
@@ -46,9 +45,7 @@ class VehicleController extends Controller
     public function update(Request $request, Vehicle $vehicle)
     {
         abort_if($vehicle->isWon(), 422, 'Won vehicles cannot have their requirement edited here — use Costing instead.');
-
         $vehicle->update($request->validate($this->rules()));
-
         return back()->with('success', 'Vehicle updated.');
     }
 
@@ -62,16 +59,13 @@ class VehicleController extends Controller
     {
         abort_if($vehicle->isWon(), 422, 'A won vehicle cannot be deleted.');
         $vehicle->delete();
-
         return back()->with('success', 'Vehicle removed.');
     }
 
-    /** #40 — Agent flags a won vehicle as ready to invoice; accountant/admin still does the actual generation. */
     public function requestInvoice(Vehicle $vehicle)
     {
         abort_unless($vehicle->isWon() && ! $vehicle->invoice, 422, 'Not eligible for an invoice request.');
         $vehicle->update(['invoice_requested_at' => now()]);
-
         return back()->with('success', 'Invoice requested — accountant/admin will be notified.');
     }
 

@@ -49,7 +49,7 @@ class Invoice extends Model
     public function refreshTotals(): static
     {
         $this->total_payable = $this->computedPayable();
-        $this->amount_paid   = (int) $this->payments()->sum('amount');
+        $this->amount_paid   = (int) $this->payments()->where('status', 'approved')->sum('amount'); // #25/#27 — unapproved money never counts
 
         $this->status = match (true) {
             $this->status === 'cancelled' => 'cancelled',

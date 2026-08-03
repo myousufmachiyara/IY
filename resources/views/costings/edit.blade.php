@@ -81,15 +81,16 @@
                                     <button type="submit" class="btn btn-primary w-100">Save Costing</button>
                                 </form>
                                 @else
-                                <table class="table table-sm table-borderless mb-0">
-                                    <tr><td>Vendor Commission</td><td class="text-end">{{ $costing->vendor_commission_percent }}% (¥{{ number_format($costing->vendor_commission_amount) }})</td></tr>
-                                    <tr><td>Inland Charges</td><td class="text-end">¥{{ number_format($costing->inland_charges) }}</td></tr>
-                                    <tr><td>Auction Commission</td><td class="text-end">¥{{ number_format($costing->auction_commission) }}</td></tr>
-                                    <tr><td>Freight Charges</td><td class="text-end">¥{{ number_format($costing->freight_charges) }}</td></tr>
-                                    <tr><td>Misc Expenses</td><td class="text-end">¥{{ number_format($costing->misc_expenses) }}</td></tr>
-                                    <tr class="fw-bold border-top"><td>Total Costing</td><td class="text-end">¥{{ number_format($costing->total_costing) }}</td></tr>
-                                </table>
-                                <p class="text-muted small mb-0 mt-2"><i class="fa fa-lock"></i> Only Accountant / Super Admin can edit the cost breakdown.</p>
+                                    <p class="text-muted mb-0"><i class="fa fa-lock"></i> Cost breakdown is not visible to your role.</p>
+                                    {{-- <table class="table table-sm table-borderless mb-0">
+                                        <tr><td>Vendor Commission</td><td class="text-end">{{ $costing->vendor_commission_percent }}% (¥{{ number_format($costing->vendor_commission_amount) }})</td></tr>
+                                        <tr><td>Inland Charges</td><td class="text-end">¥{{ number_format($costing->inland_charges) }}</td></tr>
+                                        <tr><td>Auction Commission</td><td class="text-end">¥{{ number_format($costing->auction_commission) }}</td></tr>
+                                        <tr><td>Freight Charges</td><td class="text-end">¥{{ number_format($costing->freight_charges) }}</td></tr>
+                                        <tr><td>Misc Expenses</td><td class="text-end">¥{{ number_format($costing->misc_expenses) }}</td></tr>
+                                        <tr class="fw-bold border-top"><td>Total Costing</td><td class="text-end">¥{{ number_format($costing->total_costing) }}</td></tr>
+                                    </table>
+                                    <p class="text-muted small mb-0 mt-2"><i class="fa fa-lock"></i> Only Accountant / Super Admin can edit the cost breakdown.</p> --}}
                                 @endif
                             </div>
                         </div>
@@ -106,26 +107,28 @@
                                     <tr><td>+ Inland Charges</td><td class="text-end">¥<span id="calc_inland2">{{ number_format($costing->inland_charges) }}</span></td></tr>
                                     <tr><td>+ Freight Charges</td><td class="text-end">¥<span id="calc_freight2">{{ number_format($costing->freight_charges) }}</span></td></tr>
                                     <tr><td>+ Misc Expenses</td><td class="text-end">¥<span id="calc_misc2">{{ number_format($costing->misc_expenses) }}</span></td></tr>
-                                    <tr class="fw-bold border-top"><td>Suggested Sale Price</td><td class="text-end">¥<span id="calc_suggested_price">{{ number_format($costing->sale_price) }}</span></td></tr>
+                                    <tr class="fw-bold border-top"><td>Cost Price</td><td class="text-end">¥<span id="calc_suggested_price">{{ number_format($costing->sale_price) }}</span></td></tr>
                                 </table>
 
                                 @can('costings.edit')
-                                <form method="POST" action="{{ route('costings.selling', $vehicle) }}">
-                                    @csrf @method('PUT')
-                                    <div class="mb-2">
-                                        <label>Actual Selling Price (¥) <span class="text-danger">*</span></label>
-                                        <input type="number" class="form-control" id="selling_price" name="selling_price"
-                                               value="{{ old('selling_price', $vehicle->selling_price ?? $costing->sale_price) }}"
-                                               min="{{ $vehicle->buying_price }}" required oninput="recalcProfit()">
-                                        <small class="text-muted">Cannot be set below the buying price (¥{{ number_format($vehicle->buying_price) }}).</small>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary w-100 mb-3">Save Selling Price</button>
-                                </form>
+                                    @if(is_null($vehicle->selling_price))
+                                        <form method="POST" action="{{ route('costings.selling', $vehicle) }}">
+                                            @csrf @method('PUT')
+                                            <div class="mb-2">
+                                                <label>Actual Selling Price (¥) <span class="text-danger">*</span></label>
+                                                <input type="number" class="form-control" id="selling_price" name="selling_price"
+                                                    value="{{ old('selling_price', $vehicle->selling_price ?? $costing->sale_price) }}"
+                                                    min="{{ $vehicle->buying_price }}" required oninput="recalcProfit()">
+                                                <small class="text-muted">Cannot be set below the buying price (¥{{ number_format($vehicle->buying_price) }}).</small>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary w-100 mb-3">Save Selling Price</button>
+                                        </form>
+                                    @else
+                                        <p class="mb-3"><strong>Selling Price:</strong> ¥{{ number_format($vehicle->selling_price) }} <span class="badge bg-secondary">Locked</span></p>
+                                        <p class="text-muted small">#24 — selling price cannot be changed after saving.</p>
+                                    @endif
                                 @else
-                                <p class="mb-3">
-                                    <strong>Selling Price:</strong>
-                                    ¥{{ number_format($vehicle->selling_price ?? $costing->sale_price) }}
-                                </p>
+                                    <p class="mb-3"><strong>Selling Price:</strong> ¥{{ number_format($vehicle->selling_price ?? $costing->sale_price) }}</p>
                                 @endcan
 
                                 <hr>

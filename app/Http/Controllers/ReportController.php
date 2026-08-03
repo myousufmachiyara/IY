@@ -78,4 +78,18 @@ class ReportController extends Controller
 
         return view($view, compact('rows', 'headings'));
     }
+    
+    public function customerWise(Request $request)
+    {
+        $rows = Customer::with('agent')->get()->map(fn ($c) => [
+            'customer' => $c->name,
+            'agent'    => $c->agent->name ?? '—',
+            'vehicles' => $c->vehicles()->count(),
+            'invoiced' => $c->totalInvoiced(),
+            'paid'     => $c->totalPaid(),
+            'balance'  => $c->balance(),
+        ]);
+
+        return $this->respond($request, 'reports.customer_wise', $rows, ['Customer', 'Agent', 'Vehicles', 'Invoiced (¥)', 'Paid (¥)', 'Balance (¥)']);
+    }
 }

@@ -25,7 +25,7 @@ class ExpenseController extends Controller
             'category'     => ['required', Rule::in(['salary', 'office', 'utilities', 'misc'])],
             'description'  => ['nullable', 'string', 'max:255'],
             'amount'       => ['required', 'integer', 'min:1'],
-            'expense_date' => ['required', 'date'],
+            'expense_date' => ['required', 'date', 'before_or_equal:today'],
             'method'       => ['required', Rule::in(['cash', 'bank'])],
             'is_backdated' => ['boolean'],
         ]);
@@ -59,7 +59,7 @@ class ExpenseController extends Controller
             'category'     => ['required', Rule::in(['salary', 'office', 'utilities', 'misc'])],
             'description'  => ['nullable', 'string', 'max:255'],
             'amount'       => ['required', 'integer', 'min:1'],
-            'expense_date' => ['required', 'date'],
+            'expense_date' => ['required', 'date', 'before_or_equal:today'],
             'method'       => ['required', Rule::in(['cash', 'bank'])],
         ]);
 

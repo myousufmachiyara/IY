@@ -24,7 +24,6 @@ return new class extends Migration {
             $table->string('grade')->nullable();
             $table->string('chassis_no')->nullable();
             $table->unsignedBigInteger('max_bid')->default(0);
-            $table->unsignedTinyInteger('priority')->nullable();
 
             $table->string('result')->default('pending');      // pending | won | lost
             $table->unsignedBigInteger('won_amount')->nullable();
