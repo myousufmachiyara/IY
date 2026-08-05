@@ -26,7 +26,9 @@ class BidSheetController extends Controller
     {
         $request->validate([
             'title'        => ['required', 'string', 'max:255'],
-            'auction_date' => $request->user()->can('dates.future') ? ['nullable', 'date'] : ['required', 'date', 'after_or_equal:tomorrow'],
+            'auction_date' => $request->user()->can('dates.future')
+                ? ['nullable', 'date']
+                : ['required', 'date', 'date_equals:tomorrow'],
             'file'         => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:5120'],
         ]);
 

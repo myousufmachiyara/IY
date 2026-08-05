@@ -122,16 +122,22 @@
                             <div class="col-lg-12 mb-2">
                                 <label>
                                     Auction Date
-                                    @if(!auth()->user()->isSuperAdmin())
+                                    @if(!auth()->user()->can('dates.future'))
                                         <span class="text-danger">*</span>
-                                        <small class="text-muted">(must be tomorrow)</small>
+                                        <small class="text-muted">(fixed to tomorrow — {{ now()->addDay()->format('d-m-Y') }})</small>
                                     @else
-                                        <small class="text-muted">(no restriction for Super Admin)</small>
+                                        <small class="text-muted">(no restriction — you hold the "dates.future" permission)</small>
                                     @endif
                                 </label>
                                 <input type="date" class="form-control @error('auction_date') is-invalid @enderror"
-                                       name="auction_date" value="{{ old('auction_date') }}"
-                                       @if(!auth()->user()->isSuperAdmin()) min="{{ now()->addDay()->toDateString() }}" required @endif>
+                                    name="auction_date"
+                                    value="{{ old('auction_date', auth()->user()->can('dates.future') ? '' : now()->addDay()->toDateString()) }}"
+                                    @unless(auth()->user()->can('dates.future'))
+                                        min="{{ now()->addDay()->toDateString() }}"
+                                        max="{{ now()->addDay()->toDateString() }}"
+                                        readonly
+                                    @endunless
+                                    required>
                                 @error('auction_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
                             <div class="col-lg-12 mb-2">
