@@ -20,7 +20,7 @@
 		</div>
 		@endcan
 
-		@can('vehicles.index')
+		@can('vehicle_requirement.index')
 		<div class="col-12 col-md-3 mb-2">
 			<section class="card card-featured-left card-featured-tertiary">
 				<div class="card-body">
@@ -32,7 +32,7 @@
 		</div>
 		@endcan
 
-		@can('results.index')
+		@can('bid_results.index')
 		<div class="col-12 col-md-3 mb-2">
 			<section class="card card-featured-left card-featured-warning">
 				<div class="card-body">

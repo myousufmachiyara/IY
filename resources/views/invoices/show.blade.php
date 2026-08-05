@@ -53,7 +53,7 @@
                         @endif
                         This vehicle can be resold to another customer.
                     </div>
-                    @can('vehicles.edit')
+                    @can('vehicle_requirement.edit')
                         <button type="button" class="btn btn-sm btn-outline-danger modal-with-form" href="#reassignModal">
                             Reassign Vehicle
                         </button>

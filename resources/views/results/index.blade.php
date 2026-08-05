@@ -24,7 +24,7 @@
                 </form>
                 @endif
 
-                @can('results.edit')
+                @can('bid_results.edit')
                 <form method="POST" action="{{ route('results.bulk_lost') }}" id="bulkLostForm">
                     @csrf
                     <button type="submit" class="btn btn-outline-danger mb-2" onclick="return confirm('Mark all selected bids as lost?');">
@@ -37,7 +37,7 @@
                     <table class="table table-bordered table-striped mb-0" id="datatable-default">
                         <thead>
                             <tr>
-                                @can('results.edit')<th style="width:40px;"><input type="checkbox" id="checkAll"></th>@endcan
+                                @can('bid_results.edit')<th style="width:40px;"><input type="checkbox" id="checkAll"></th>@endcan
                                 <th>Lot</th><th>Customer</th><th>Vehicle</th><th>Priority</th><th>Chassis</th>
                                 @if($isPrivileged)<th>Agent</th>@endif
                                 <th>Max Bid</th><th>Auction Date</th><th>Action</th>
@@ -46,7 +46,7 @@
                         <tbody>
                             @forelse ($bids as $b)
                             <tr>
-                                @can('results.edit')
+                                @can('bid_results.edit')
                                     <td>@if($b->customer_id)<input type="checkbox" name="bid_ids[]" value="{{ $b->id }}" form="bulkLostForm">@endif</td>
                                 @endcan
                                 <td>{{ $b->lot_no ?? '—' }}</td>
@@ -61,9 +61,9 @@
                                     @if(!$b->customer_id)
                                         @can('bid_sheets.edit')<a href="#" class="btn btn-sm btn-warning text-dark me-1" onclick="openAssignCustomer({{ $b->id }}, '{{ $b->lot_no }}')">Assign Customer</a>@endcan
                                     @else
-                                        @can('results.edit')<a href="#" class="btn btn-sm btn-success me-1" onclick="openWon({{ $b->id }}, '{{ $b->customer->name }}', {{ $b->max_bid }})">Mark Won</a>@endcan
+                                        @can('bid_results.edit')<a href="#" class="btn btn-sm btn-success me-1" onclick="openWon({{ $b->id }}, '{{ $b->customer->name }}', {{ $b->max_bid }})">Mark Won</a>@endcan
                                     @endif
-                                    @can('results.edit')
+                                    @can('bid_results.edit')
                                         <form action="{{ route('bids.lost', $b) }}" method="POST" style="display:inline;" onsubmit="return confirm('Mark this bid as lost?');">
                                             @csrf<button type="submit" class="btn btn-sm btn-outline-danger">Mark Lost</button>
                                         </form>
@@ -79,7 +79,7 @@
             </div>
         </section>
 
-        @can('results.edit')
+        @can('bid_results.edit')
         <div id="wonModal" class="modal-block modal-block-success mfp-hide">
             <section class="card">
                 <form method="POST" id="wonForm" action="" enctype="multipart/form-data" onkeydown="return event.key != 'Enter';">

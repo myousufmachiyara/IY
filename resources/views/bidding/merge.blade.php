@@ -32,7 +32,7 @@
                     <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-secondary w-100">Filter</button></div>
                 </form>
 
-                @can('bids.print')
+                @can('merge_bids.print')
                 <form method="GET" action="{{ route('bids.export') }}" class="mb-3 border rounded p-3 bg-light">
                     <input type="hidden" name="agent_id" value="{{ request('agent_id') }}">
                     <input type="hidden" name="from" value="{{ request('from') }}">

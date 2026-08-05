@@ -20,7 +20,7 @@
                         @if($isPrivileged)<td>{{ $b->agent->name ?? '—' }}</td>@endif
                         <td>{{ optional($b->vehicle?->won_at)->format('d-m-Y') ?? '—' }}</td>
                         <td>
-                            @can('results.edit')
+                            @can('bid_results.edit')
                                 @if(!$b->vehicle?->invoice)
                                 <form action="{{ route('bids.undo_won', $b) }}" method="POST" onsubmit="return confirm('Revert this bid to pending? The vendor payable will be reversed.');">
                                     @csrf<button class="btn btn-sm btn-outline-warning">Undo Won</button>
