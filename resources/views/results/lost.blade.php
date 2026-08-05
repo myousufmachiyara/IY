@@ -11,7 +11,7 @@
         @if($isPrivileged && $agents->isNotEmpty())
         <form method="GET" class="row g-2 mb-3">
             <div class="col-auto">
-                <select name="agent_ids[]" class="form-select" multiple>
+                <select name="agent_ids[]" class="form-select select2-js" multiple>
                     @foreach($agents as $agent)
                         <option value="{{ $agent->id }}" @selected(in_array($agent->id, (array) request('agent_ids')))>
                             {{ $agent->name }}
