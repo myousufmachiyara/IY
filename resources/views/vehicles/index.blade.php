@@ -15,7 +15,7 @@
             <header class="card-header">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <h2 class="card-title">Vehicle Requirements</h2>
-                    @can('vehicles.create')
+                    @can('vehicle_requirement.create')
                         <button type="button" class="modal-with-form btn btn-primary" href="#addModal">
                             <i class="fas fa-plus"></i> Add Vehicle Requirement
                         </button>
@@ -58,8 +58,8 @@
                                 <td>{{ $v->created_at->format('d-m-Y') }}</td>
                                 <td class="text-nowrap">
                                     <a href="{{ route('vehicles.show', $v) }}" class="text-secondary me-1"><i class="fa fa-eye"></i></a>
-                                    @can('vehicles.edit')<a href="#" class="text-primary me-1" onclick="editVehicle({{ $v->id }})"><i class="fa fa-edit"></i></a>@endcan
-                                    @can('vehicles.delete')
+                                    @can('vehicle_requirement.edit')<a href="#" class="text-primary me-1" onclick="editVehicle({{ $v->id }})"><i class="fa fa-edit"></i></a>@endcan
+                                    @can('vehicle_requirement.delete')
                                         <form action="{{ route('vehicles.destroy', $v) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this vehicle requirement?');">
                                             @csrf @method('DELETE')<button type="submit" class="btn btn-link p-0 text-danger"><i class="fa fa-trash-alt"></i></button>
                                         </form>
@@ -73,7 +73,7 @@
             </div>
         </section>
 
-        @can('vehicles.create')
+        @can('vehicle_requirement.create')
         <div id="addModal" class="modal-block modal-block-primary mfp-hide">
             <section class="card">
                 <form method="POST" action="{{ route('vehicles.store') }}" onkeydown="return event.key != 'Enter';">
@@ -103,7 +103,7 @@
         </div>
         @endcan
 
-        @can('vehicles.edit')
+        @can('vehicle_requirement.edit')
         <div id="editModal" class="modal-block modal-block-primary mfp-hide">
             <section class="card">
                 <form method="POST" id="editForm" action="" onkeydown="return event.key != 'Enter';">
