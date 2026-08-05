@@ -13,7 +13,7 @@
             <header class="card-header">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <h2 class="card-title">Team Members</h2>
-                    @can('team.create')
+                    @can('members.create')
                         <button type="button" class="modal-with-form btn btn-primary" href="#addModal">
                             <i class="fas fa-plus"></i> Add Member
                         </button>
@@ -46,10 +46,10 @@
                                 </td>
                                 <td><span class="badge bg-{{ $u->status==='active'?'success':'danger' }}">{{ $u->status }}</span></td>
                                 <td>
-                                    @can('team.edit')
+                                    @can('members.edit')
                                         <a href="#" class="text-primary me-1" onclick="editUser({{ $u->id }})"><i class="fa fa-edit"></i></a>
                                     @endcan
-                                    @can('team.delete')
+                                    @can('members.delete')
                                         <form action="{{ route('team.destroy', $u) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this member?');">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn btn-link p-0 text-danger"><i class="fa fa-trash-alt"></i></button>
@@ -64,7 +64,7 @@
             </div>
         </section>
 
-        @can('team.create')
+        @can('members.create')
         <div id="addModal" class="modal-block modal-block-primary mfp-hide">
             <section class="card">
                 <form method="POST" action="{{ route('team.store') }}" onkeydown="return event.key != 'Enter';">
@@ -102,7 +102,7 @@
         </div>
         @endcan
 
-        @can('team.edit')
+        @can('members.edit')
         <div id="editModal" class="modal-block modal-block-primary mfp-hide">
             <section class="card">
                 <form method="POST" id="editForm" action="" onkeydown="return event.key != 'Enter';">
