@@ -21,8 +21,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
     Route::get('files/{path}', [FileController::class, 'show'])->where('path', '.*')->name('files.show');
 
-    Route::resource('team', UserController::class)->except('show')->middleware('permission:team');
-    Route::resource('roles', RoleController::class)->except('show')->middleware('permission:user_roles');
+    Route::resource('team', UserController::class)->except('show')->middleware('permission:members');
+    Route::resource('roles', RoleController::class)->except('show')->middleware('permission:roles');
 
     Route::resource('customers', CustomerController::class)->middleware('permission:customers');
     Route::post('customers/{customer}/deposit/receive', [CustomerController::class, 'receiveDeposit'])->middleware('permission:customers.edit')->name('customers.deposit.receive');
@@ -32,7 +32,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('customers/{customer}/deposit/reject',  [CustomerController::class, 'rejectDeposit'])->middleware('permission:customers.edit')->name('customers.deposit.reject');
 
     Route::resource('vendors', VendorController::class)->except('show')->middleware('permission:vendors');
-    Route::resource('vehicles', VehicleController::class)->middleware('permission:vehicles');
+    Route::resource('vehicles', VehicleController::class)->middleware('permission:vehicle_requirement');
     Route::post('vehicles/{vehicle}/request-invoice', [VehicleController::class, 'requestInvoice'])->middleware('permission:invoices.request')->name('vehicles.request_invoice');
 
     Route::get('bid-sheets/template', [BidSheetController::class, 'template'])->middleware('permission:bid_sheets.index')->name('bid-sheets.template');
@@ -40,16 +40,16 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('bid-sheets', BidSheetController::class)->except(['edit', 'update'])->middleware('permission:bid_sheets');
     Route::delete('bids/{bid}', [BidSheetController::class, 'destroyBid'])->middleware('permission:bid_sheets.edit')->name('bids.destroy');
 
-    Route::get('bids',        [BidController::class, 'index'])->middleware('permission:bids.index')->name('bids.index');
-    Route::get('bids/export', [BidController::class, 'export'])->middleware('permission:bids.print')->name('bids.export');
+    Route::get('bids',        [BidController::class, 'index'])->middleware('permission:merge_bids.index')->name('bids.index');
+    Route::get('bids/export', [BidController::class, 'export'])->middleware('permission:merge_bids.print')->name('bids.export');
 
-    Route::get('results', [BiddingResultController::class, 'index'])->middleware('permission:results.index')->name('results.index');
-    Route::get('results/won', [BiddingResultController::class, 'wonList'])->middleware('permission:results.index')->name('results.won');
-    Route::get('results/lost', [BiddingResultController::class, 'lostList'])->middleware('permission:results.index')->name('results.lost');
-    Route::post('results/bulk-lost', [BiddingResultController::class, 'bulkLost'])->middleware('permission:results.edit')->name('results.bulk_lost');
-    Route::post('bids/{bid}/won',  [BiddingResultController::class, 'won'])->middleware('permission:results.edit')->name('bids.won');
-    Route::post('bids/{bid}/lost', [BiddingResultController::class, 'lost'])->middleware('permission:results.edit')->name('bids.lost');
-    Route::post('bids/{bid}/undo-won', [BiddingResultController::class, 'undoWon'])->middleware('permission:results.edit')->name('bids.undo_won');
+    Route::get('results', [BiddingResultController::class, 'index'])->middleware('permission:bid_results.index')->name('results.index');
+    Route::get('results/won', [BiddingResultController::class, 'wonList'])->middleware('permission:bid_results.index')->name('results.won');
+    Route::get('results/lost', [BiddingResultController::class, 'lostList'])->middleware('permission:bid_results.index')->name('results.lost');
+    Route::post('results/bulk-lost', [BiddingResultController::class, 'bulkLost'])->middleware('permission:bid_results.edit')->name('results.bulk_lost');
+    Route::post('bids/{bid}/won',  [BiddingResultController::class, 'won'])->middleware('permission:bid_results.edit')->name('bids.won');
+    Route::post('bids/{bid}/lost', [BiddingResultController::class, 'lost'])->middleware('permission:bid_results.edit')->name('bids.lost');
+    Route::post('bids/{bid}/undo-won', [BiddingResultController::class, 'undoWon'])->middleware('permission:bid_results.edit')->name('bids.undo_won');
     Route::put('bids/{bid}/assign-customer', [BidSheetController::class, 'assignCustomer'])->middleware('permission:bid_sheets.edit')->name('bids.assign_customer');
 
     Route::get('vehicles/{vehicle}/costing', [CostingController::class, 'show'])->middleware('permission:costings.show')->name('costings.show');
@@ -75,7 +75,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->middleware('permission:payments.delete')->name('payments.destroy');
     Route::get('customers/{customer}/ledger', [PaymentController::class, 'customerLedger'])->middleware('permission:payments.index')->name('payments.customer_ledger');
 
-    Route::get('approvals', [ApprovalController::class, 'index'])->middleware('permission:finance.backdate')->name('approvals.index');
+    Route::get('approvals', [ApprovalController::class, 'index'])->middleware('permission:pending_approvals.index')->name('approvals.index');
 
     Route::get('customers/{customer}/shipments/create', [ShipmentController::class, 'create'])->middleware('permission:shipments.create')->name('shipments.create');
     Route::resource('shipments', ShipmentController::class)->only(['index', 'store', 'show', 'edit', 'update'])->middleware('permission:shipments');
@@ -83,7 +83,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('shipments/{shipment}/dispatch', [ShipmentController::class, 'dispatch'])->middleware('permission:shipments.edit')->name('shipments.dispatch');
     Route::post('shipments/{shipment}/arrive',   [ShipmentController::class, 'arrive'])->middleware('permission:shipments.edit')->name('shipments.arrive');
 
-    Route::post('vehicles/{vehicle}/reassign', [VehicleReassignController::class, 'reassign'])->middleware('permission:vehicles.edit')->name('vehicles.reassign');
+    Route::post('vehicles/{vehicle}/reassign', [VehicleReassignController::class, 'reassign'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign');
 
     Route::get('vehicles/{vehicle}/documents',  [DocumentController::class, 'index'])->middleware('permission:documents.index')->name('documents.index');
     Route::post('vehicles/{vehicle}/documents', [DocumentController::class, 'store'])->middleware('permission:documents.create')->name('documents.store');

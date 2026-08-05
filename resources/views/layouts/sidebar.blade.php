@@ -33,19 +33,19 @@
           </li>
 
           {{-- Team --}}
-          @if(auth()->user()->can('team.index') || auth()->user()->can('user_roles.index'))
+          @if(auth()->user()->can('members.index') || auth()->user()->can('roles.index'))
           <li class="nav-parent {{ request()->routeIs('team.*') || request()->routeIs('roles.*') ? 'nav-expanded nav-active' : '' }}">
             <a class="nav-link" href="#">
               <i class="fa fa-user-shield"></i>
               <span>Team</span>
             </a>
             <ul class="nav nav-children">
-              @can('team.index')
+              @can('members.index')
                 <li class="{{ request()->routeIs('team.*') ? 'active' : '' }}">
-                  <a class="nav-link" href="{{ route('team.index') }}">All Members</a>
+                  <a class="nav-link" href="{{ route('team.index') }}">Members</a>
                 </li>
               @endcan
-              @can('user_roles.index')
+              @can('roles.index')
                 <li class="{{ request()->routeIs('roles.*') ? 'active' : '' }}">
                   <a class="nav-link" href="{{ route('roles.index') }}">Roles &amp; Permissions</a>
                 </li>
@@ -55,7 +55,7 @@
           @endif
 
           {{-- Customers & Vehicles --}}
-          @if(auth()->user()->can('customers.index') || auth()->user()->can('vehicles.index'))
+          @if(auth()->user()->can('customers.index') || auth()->user()->can('vehicle_requirement.index'))
           <li class="nav-parent {{ request()->routeIs('customers.*') || request()->routeIs('vehicles.*') ? 'nav-expanded nav-active' : '' }}">
             <a class="nav-link" href="#">
               <i class="fa fa-users"></i>
@@ -67,7 +67,7 @@
                   <a class="nav-link" href="{{ route('customers.index') }}">All Customers</a>
                 </li>
               @endcan
-              @can('vehicles.index')
+              @can('vehicle_requirement.index')
                 <li class="{{ request()->routeIs('vehicles.*') ? 'active' : '' }}">
                   <a class="nav-link" href="{{ route('vehicles.index') }}">Vehicle Requirements</a>
                 </li>
@@ -87,7 +87,7 @@
           @endcan
 
           {{-- Bidding --}}
-          @if(auth()->user()->can('bid_sheets.index') || auth()->user()->can('bids.index'))
+          @if(auth()->user()->can('bid_sheets.index') || auth()->user()->can('merge_bids.index'))
           <li class="nav-parent {{ request()->routeIs('bid-sheets.*') || request()->routeIs('bids.*') ? 'nav-expanded nav-active' : '' }}">
             <a class="nav-link" href="#">
               <i class="fa fa-gavel"></i>
@@ -99,19 +99,19 @@
                   <a class="nav-link" href="{{ route('bid-sheets.index') }}">My Bid Sheets</a>
                 </li>
               @endcan
-              @can('bids.index')
+              @can('merge_bids.index')
                 <li class="{{ request()->routeIs('bids.index') ? 'active' : '' }}">
-                  <a class="nav-link" href="{{ route('bids.index') }}">Merge &amp; Export</a>
+                  <a class="nav-link" href="{{ route('bids.index') }}">Merge Bids</a>
                 </li>
               @endcan
             </ul>
           </li>
           @endif
 
-          {{-- Bidding Results --}}
-          @can('results.index')
+          {{-- Bid Results --}}
+          @can('bid_results.index')
           <li class="nav-parent {{ request()->routeIs('results.*') ? 'nav-expanded nav-active' : '' }}">
-              <a class="nav-link" href="#"><i class="fa fa-trophy"></i><span>Bidding Results</span></a>
+              <a class="nav-link" href="#"><i class="fa fa-trophy"></i><span>Bid Results</span></a>
               <ul class="nav nav-children">
                   <li class="{{ request()->routeIs('results.index') ? 'active' : '' }}"><a class="nav-link" href="{{ route('results.index') }}">Pending</a></li>
                   <li class="{{ request()->routeIs('results.won') ? 'active' : '' }}"><a class="nav-link" href="{{ route('results.won') }}">Won</a></li>
@@ -167,7 +167,8 @@
           </li>
           @endif
 
-          @can('finance.backdate')
+          {{-- Pending Approvals --}}
+          @can('pending_approvals.index')
             <li class="{{ request()->routeIs('approvals.*') ? 'active' : '' }}">
                 <a class="nav-link" href="{{ route('approvals.index') }}"><i class="fa fa-clipboard-check"></i><span>Pending Approvals</span></a>
             </li>
@@ -204,7 +205,7 @@
           @endcan
 
           {{-- Reports --}}
-          @if(auth()->user()->can('reports.agent_wise') || auth()->user()->can('reports.vendor_wise') || auth()->user()->can('reports.bid_wise') || auth()->user()->can('reports.bid_won'))
+          @if(auth()->user()->can('reports.agent_wise') || auth()->user()->can('reports.vendor_wise') || auth()->user()->can('reports.bid_wise') || auth()->user()->can('reports.bid_won') || auth()->user()->can('reports.customer_wise'))
           <li class="nav-parent {{ request()->routeIs('reports.*') ? 'nav-expanded nav-active' : '' }}">
             <a class="nav-link" href="#">
               <i class="fa fa-chart-bar"></i>
@@ -229,6 +230,11 @@
               @can('reports.bid_won')
                 <li class="{{ request()->routeIs('reports.bid_won') ? 'active' : '' }}">
                   <a class="nav-link" href="{{ route('reports.bid_won') }}">Bid Won</a>
+                </li>
+              @endcan
+              @can('reports.customer_wise')
+                <li class="{{ request()->routeIs('reports.customer_wise') ? 'active' : '' }}">
+                  <a class="nav-link" href="{{ route('reports.customer_wise') }}">Customer-wise</a>
                 </li>
               @endcan
             </ul>

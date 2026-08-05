@@ -16,13 +16,22 @@ class DatabaseSeeder extends Seeder
 
         $superAdminRole = Role::firstOrCreate(['name' => 'super_admin']);
 
+        // Clean up permissions from modules that have since been renamed —
+        // prevents duplicate/orphaned rows in the Roles & Permissions UI, and
+        // ensures nothing keeps quietly checking a name no route uses anymore.
+        // team→members, user_roles→roles, vehicles→vehicle_requirement,
+        // bids→merge_bids, results→bid_results.
+        foreach (['team', 'user_roles', 'vehicles', 'bids', 'results'] as $oldModule) {
+            Permission::where('name', 'like', "{$oldModule}.%")->delete();
+        }
+
         // ── Permissions: module.action ──────────────────────────────────────
 
         $modules = [
-            'team', 'user_roles', 'customers', 'vendors', 'vehicles',
-            'bid_sheets', 'bids', 'results', 'costings',
-            'invoices', 'payments', 'vendor_payments', 'expenses',
-            'shipments', 'documents', 'accounting',
+            'members', 'roles', 'customers', 'vehicle_requirement', 'vendors',
+            'bid_sheets', 'merge_bids', 'bid_results', 'invoices', 'shipments',
+            'payments', 'vendor_payments', 'expenses', 'pending_approvals',
+            'accounting', 'costings', 'documents',
         ];
 
         $actions = ['index', 'show', 'create', 'edit', 'delete', 'print'];

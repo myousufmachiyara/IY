@@ -37,7 +37,7 @@ class User extends Authenticatable
 
     public function isSalesAgent(): bool { return $this->can('scope.by_agent'); }
     public function canBackdate(): bool  { return $this->can('finance.backdate'); }
-    public function isSuperAdmin(): bool { return $this->can('user_roles.edit'); }
+    public function isSuperAdmin(): bool { return $this->can('roles.edit'); }
 
     public function creator(): BelongsTo { return $this->belongsTo(self::class, 'created_by'); }
 
