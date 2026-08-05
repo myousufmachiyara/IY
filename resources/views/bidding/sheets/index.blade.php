@@ -124,7 +124,7 @@
                                     Auction Date
                                     @if(!auth()->user()->isSuperAdmin())
                                         <span class="text-danger">*</span>
-                                        <small class="text-muted">(must be tomorrow or later)</small>
+                                        <small class="text-muted">(must be tomorrow)</small>
                                     @else
                                         <small class="text-muted">(no restriction for Super Admin)</small>
                                     @endif
