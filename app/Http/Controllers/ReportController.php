@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\ArrayExport;
-use App\Models\{Bid, User, Vehicle, Vendor};
+use App\Models\{Bid, User, Vehicle, Vendor, Customer};
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
