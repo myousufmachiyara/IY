@@ -8,7 +8,6 @@ use Spatie\Permission\Models\{Role, Permission};
 
 class RoleController extends Controller
 {
-    /** Canonical module sequence — must be kept in sync with DatabaseSeeder's $modules array. */
     private array $moduleOrder = [
         'members', 'roles', 'customers', 'vehicle_requirement', 'vendors',
         'bid_sheets', 'merge_bids', 'bid_results', 'invoices', 'shipments',
@@ -112,13 +111,18 @@ class RoleController extends Controller
         $grouped = Permission::where('name', 'not like', 'reports.%')
             ->whereNotIn('name', $special)
             ->get()
-            ->groupBy(fn ($p) => explode('.', $p->name)[0]);
+            ->groupBy(fn ($p) => explode('.', $p->name)[0])
+            // Eloquent Collection's except()/getDictionary() assume every item is a
+            // Model and call ->getKey() on it — but groupBy() nests per-module
+            // Collections-of-permissions here, not individual models. Dropping to a
+            // plain base Collection makes except() do simple array-key exclusion
+            // instead, which is what this actually needs.
+            ->toBase();
 
         $ordered = collect($this->moduleOrder)
             ->filter(fn ($m) => $grouped->has($m))
             ->mapWithKeys(fn ($m) => [$m => $grouped[$m]]);
 
-        // Anything unexpected (a leftover custom permission not in the canonical list) still shows up, just at the end.
         return $ordered->merge($grouped->except($ordered->keys()));
     }
 
