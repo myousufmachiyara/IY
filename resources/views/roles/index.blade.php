@@ -12,7 +12,7 @@
             <header class="card-header">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <h2 class="card-title">Roles &amp; Permissions</h2>
-                    @can('user_roles.create')
+                    @can('roles.create')
                         <a href="{{ route('roles.create') }}" class="btn btn-primary btn-sm">+ New Role</a>
                     @endcan
                 </div>
@@ -28,10 +28,10 @@
                                 <td>{{ $r->permissions_count }}</td>
                                 <td>{{ $r->users_count }}</td>
                                 <td class="text-end">
-                                    @can('user_roles.edit')
+                                    @can('roles.edit')
                                         <a href="{{ route('roles.edit', $r) }}" class="btn btn-sm btn-outline-primary">Edit Permissions</a>
                                     @endcan
-                                    @can('user_roles.delete')
+                                    @can('roles.delete')
                                         <form action="{{ route('roles.destroy', $r) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this role?');">
                                             @csrf @method('DELETE')
                                             <button class="btn btn-sm btn-outline-danger" @if($r->users_count > 0) disabled title="Cannot delete a role assigned to users" @endif>Delete</button>
