@@ -4,15 +4,12 @@ namespace App\Models;
 
 use App\Models\Concerns\ScopedToAgent;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany, HasOne};
 
 class Vehicle extends Model
 {
     use ScopedToAgent;
 
-    // Lifecycle
     public const STATUS = [
         'requirement', 'bidding', 'won', 'lost',
         'invoiced', 'dispatched', 'arrived', 'delivered',
@@ -22,20 +19,20 @@ class Vehicle extends Model
         'customer_id', 'agent_id', 'vendor_id', 'shipment_id',
         'make', 'model', 'year', 'grade', 'chassis_no', 'budget',
         'buying_price', 'selling_price', 'winning_screenshot_path',
-        'won_at', 'status', 'created_by',
+        'won_at', 'status', 'invoice_requested_at', 'created_by',
     ];
 
     protected function casts(): array
     {
         return [
-            'budget'        => 'integer',
-            'buying_price'  => 'integer',
-            'selling_price' => 'integer',
-            'won_at'        => 'datetime',
+            'budget'               => 'integer',
+            'buying_price'         => 'integer',
+            'selling_price'        => 'integer',
+            'won_at'               => 'datetime',
+            'invoice_requested_at' => 'datetime',
         ];
     }
 
-    // ---- relationships ----
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
     public function agent(): BelongsTo    { return $this->belongsTo(User::class, 'agent_id'); }
     public function vendor(): BelongsTo   { return $this->belongsTo(Vendor::class, 'vendor_id'); }
@@ -47,15 +44,14 @@ class Vehicle extends Model
     public function vendorPayments(): HasMany { return $this->hasMany(VendorPayment::class); }
     public function bid(): HasOne         { return $this->hasOne(Bid::class); }
 
-    // ---- helpers ----
-    public function isWon(): bool  { return in_array($this->status, ['won','invoiced','dispatched','arrived','delivered'], true); }
+    public function isWon(): bool { return in_array($this->status, ['won','invoiced','dispatched','arrived','delivered'], true); }
+
     public function label(): string
     {
         return trim("{$this->year} {$this->make} {$this->model}") ?: "Vehicle #{$this->id}";
     }
 
-    public function scopeWon($q)          { return $q->where('status', 'won'); }
-    public function scopeForCustomer($q, int $id) { return $q->where('customer_id', $id); }
+    /** Simplified 3-stage display status for the Won list — purely derived, no separate field. */
     public function yardStatus(): ?string
     {
         return match ($this->status) {
@@ -65,4 +61,7 @@ class Vehicle extends Model
             default                 => null,
         };
     }
+
+    public function scopeWon($q) { return $q->where('status', 'won'); }
+    public function scopeForCustomer($q, int $id) { return $q->where('customer_id', $id); }
 }
