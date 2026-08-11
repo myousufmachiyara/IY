@@ -34,6 +34,8 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('vendors', VendorController::class)->except('show')->middleware('permission:vendors');
     Route::resource('vehicles', VehicleController::class)->middleware('permission:vehicle_requirement');
     Route::post('vehicles/{vehicle}/request-invoice', [VehicleController::class, 'requestInvoice'])->middleware('permission:invoices.request')->name('vehicles.request_invoice');
+    Route::post('vehicles/{vehicle}/reassign', [VehicleReassignController::class, 'reassign'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign');
+    Route::post('vehicles/{vehicle}/reassign-agent', [VehicleReassignController::class, 'reassignAgent'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign_agent');
 
     Route::get('bid-sheets/template', [BidSheetController::class, 'template'])->middleware('permission:bid_sheets.index')->name('bid-sheets.template');
     Route::put('bid-sheets/bulk-assign-customer', [BidSheetController::class, 'bulkAssignCustomer'])->middleware('permission:bid_sheets.edit')->name('bid-sheets.bulk_assign');
@@ -50,6 +52,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('bids/{bid}/won',  [BiddingResultController::class, 'won'])->middleware('permission:bid_results.edit')->name('bids.won');
     Route::post('bids/{bid}/lost', [BiddingResultController::class, 'lost'])->middleware('permission:bid_results.edit')->name('bids.lost');
     Route::post('bids/{bid}/undo-won', [BiddingResultController::class, 'undoWon'])->middleware('permission:bid_results.edit')->name('bids.undo_won');
+    Route::post('bids/{bid}/undo-lost', [BiddingResultController::class, 'undoLost'])->middleware('permission:bid_results.edit')->name('bids.undo_lost');
     Route::put('bids/{bid}/assign-customer', [BidSheetController::class, 'assignCustomer'])->middleware('permission:bid_sheets.edit')->name('bids.assign_customer');
 
     Route::get('vehicles/{vehicle}/costing', [CostingController::class, 'show'])->middleware('permission:costings.show')->name('costings.show');
@@ -70,6 +73,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('payments', [PaymentController::class, 'store'])->middleware('permission:payments.create')->name('payments.store');
     Route::post('payments/{payment}/approve', [PaymentController::class, 'approve'])->middleware('permission:payments.edit')->name('payments.approve');
     Route::post('payments/{payment}/reject', [PaymentController::class, 'reject'])->middleware('permission:payments.edit')->name('payments.reject');
+    Route::post('payments/{payment}/undo-approval', [PaymentController::class, 'undoApproval'])->middleware('permission:payments.edit')->name('payments.undo_approval');
     Route::get('payments/{payment}/edit', [PaymentController::class, 'edit'])->middleware('permission:payments.edit')->name('payments.edit');
     Route::put('payments/{payment}', [PaymentController::class, 'update'])->middleware('permission:payments.edit')->name('payments.update');
     Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->middleware('permission:payments.delete')->name('payments.destroy');
@@ -83,11 +87,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('shipments/{shipment}/dispatch', [ShipmentController::class, 'dispatch'])->middleware('permission:shipments.edit')->name('shipments.dispatch');
     Route::post('shipments/{shipment}/arrive',   [ShipmentController::class, 'arrive'])->middleware('permission:shipments.edit')->name('shipments.arrive');
 
-    Route::post('vehicles/{vehicle}/reassign', [VehicleReassignController::class, 'reassign'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign');
-
     Route::get('vehicles/{vehicle}/documents',  [DocumentController::class, 'index'])->middleware('permission:documents.index')->name('documents.index');
     Route::post('vehicles/{vehicle}/documents', [DocumentController::class, 'store'])->middleware('permission:documents.create')->name('documents.store');
     Route::post('vehicles/{vehicle}/documents/release', [DocumentController::class, 'release'])->middleware('permission:documents.edit')->name('documents.release');
+    Route::post('vehicles/{vehicle}/documents/undo-release', [DocumentController::class, 'undoRelease'])->middleware('permission:documents.edit')->name('documents.undo_release');
     Route::get('documents/{document}/edit', [DocumentController::class, 'edit'])->middleware('permission:documents.edit')->name('documents.edit');
     Route::put('documents/{document}', [DocumentController::class, 'update'])->middleware('permission:documents.edit')->name('documents.update');
     Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->middleware('permission:documents.delete')->name('documents.destroy');
@@ -102,6 +105,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('journal',     [AccountingController::class, 'journal'])->name('journal');
         Route::get('ledger/{account}', [AccountingController::class, 'ledger'])->name('ledger');
         Route::get('cash-bank',   [AccountingController::class, 'cashBankBook'])->name('cash_bank');
+        Route::get('trial-balance', [AccountingController::class, 'trialBalance'])->name('trial_balance');
+        Route::get('balance-sheet', [AccountingController::class, 'balanceSheet'])->name('balance_sheet');
         Route::get('receivables', [AccountingController::class, 'receivables'])->name('receivables');
         Route::get('payables',    [AccountingController::class, 'payables'])->name('payables');
         Route::get('profit-loss', [AccountingController::class, 'profitLoss'])->name('profit_loss');
@@ -117,11 +122,4 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('system/logs', [LogViewerController::class, 'index'])->middleware('permission:system.logs')->name('system.logs');
     Route::get('system/logs/{file}/download', [LogViewerController::class, 'download'])->middleware('permission:system.logs')->name('system.logs.download');
-
-    Route::post('bids/{bid}/undo-lost', [BiddingResultController::class, 'undoLost'])->middleware('permission:bid_results.edit')->name('bids.undo_lost');
-    Route::post('vehicles/{vehicle}/reassign-agent', [VehicleReassignController::class, 'reassignAgent'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign_agent');
-    Route::post('payments/{payment}/undo-approval', [PaymentController::class, 'undoApproval'])->middleware('permission:payments.edit')->name('payments.undo_approval');
-    Route::post('vehicles/{vehicle}/documents/undo-release', [DocumentController::class, 'undoRelease'])->middleware('permission:documents.edit')->name('documents.undo_release');
-    Route::get('accounting/trial-balance', [AccountingController::class, 'trialBalance'])->middleware('permission:accounting.index')->name('accounting.trial_balance');
-    Route::get('accounting/balance-sheet', [AccountingController::class, 'balanceSheet'])->middleware('permission:accounting.index')->name('accounting.balance_sheet');
 });
