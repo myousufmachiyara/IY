@@ -51,6 +51,7 @@ class DashboardController extends Controller
             'labels' => array_values($statusLabels),
             'data'   => collect($statusLabels)->keys()->map(fn ($s) => Invoice::where('status', $s)->count())->all(),
         ];
+        $invoiceStatusChart['total'] = array_sum($invoiceStatusChart['data']);
 
         $agentChart  = null;
         $vendorChart = null;
