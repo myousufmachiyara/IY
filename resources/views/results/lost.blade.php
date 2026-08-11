@@ -48,7 +48,13 @@
                     <tr>
                         <td>{{ $b->lot_no ?? '—' }}</td>
                         <td>{{ $b->customer->name ?? '—' }}</td>
-                        <td><a href="{{ route('vehicles.show', $b->vehicle) }}">{{ trim("{$b->year} {$b->make} {$b->model}") ?: '—' }}</a></td>
+                        <td>
+                            @if($b->vehicle)
+                                <a href="{{ route('vehicles.show', $b->vehicle) }}">{{ trim("{$b->year} {$b->make} {$b->model}") ?: '—' }}</a>
+                            @else
+                                {{ trim("{$b->year} {$b->make} {$b->model}") ?: '—' }}
+                            @endif
+                        </td>
                         <td>¥{{ number_format($b->max_bid) }}</td>
                         @if($isPrivileged)<td>{{ $b->agent->name ?? '—' }}</td>@endif
                         <td>{{ optional($b->updated_at)->format('d-m-Y') ?? '—' }}</td>
