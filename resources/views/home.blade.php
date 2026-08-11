@@ -3,6 +3,8 @@
 @section('title', 'Dashboard')
 
 @section('content')
+	<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
 	<div>
 		<h2 class="text-dark"><strong id="currentDate"></strong></h2>
 	</div>
