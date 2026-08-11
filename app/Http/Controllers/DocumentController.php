@@ -92,4 +92,15 @@ class DocumentController extends Controller
 
         return back()->with('success', 'Document removed.');
     }
+
+    /** Super Admin can re-lock a final clearance document after it was released. */
+    public function undoRelease(Vehicle $vehicle)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Only Super Admin may undo a document release.');
+
+        $updated = $vehicle->documents()->where('is_final_clearance', true)->update(['visible_to_customer' => false]);
+        abort_if($updated === 0, 404, 'No released final clearance document found.');
+
+        return back()->with('success', 'Final clearance document re-locked.');
+    }
 }   

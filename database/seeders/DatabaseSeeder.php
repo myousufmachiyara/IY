@@ -66,7 +66,7 @@ class DatabaseSeeder extends Seeder
             ['code' => '5000', 'name' => 'Cost of Vehicles',            'type' => 'expense'],
             ['code' => '5100', 'name' => 'Freight & Shipping',          'type' => 'expense'],
             ['code' => '5200', 'name' => 'Inland Charges',              'type' => 'expense'],
-            ['code' => '5300', 'name' => 'Auction Commission',          'type' => 'expense'],
+            ['code' => '5300', 'name' => 'Auction Platform Commission Charges', 'type' => 'expense'],
             ['code' => '5400', 'name' => 'Vendor Commission',           'type' => 'expense'],
             ['code' => '5500', 'name' => 'Salaries',                    'type' => 'expense'],
             ['code' => '5600', 'name' => 'Office Expenses',             'type' => 'expense'],

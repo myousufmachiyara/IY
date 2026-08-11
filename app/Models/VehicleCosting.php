@@ -36,13 +36,6 @@ class VehicleCosting extends Model
     public function vehicle(): BelongsTo  { return $this->belongsTo(Vehicle::class); }
     public function preparer(): BelongsTo { return $this->belongsTo(User::class, 'prepared_by'); }
 
-    /**
-     * Company service charge tier (yen), based on buying price:
-     *   0 – 5 lac      => 90,000
-     *   5 – 10 lac     => 110,000
-     *   above 10 lac   => 10% of buying price
-     * (1 lac = 100,000 yen)
-     */
     public static function serviceChargeFor(int $buyingPrice): int
     {
         return match (true) {
@@ -53,28 +46,46 @@ class VehicleCosting extends Model
     }
 
     /**
-     * Recompute every derived figure from the raw inputs already set on the model,
-     * plus the agent's commission % / fixed bonus. Call ->save() after.
+     * Recompute every derived figure. $sellingPrice is the AGENT'S actual entered
+     * selling price (from vehicles.selling_price) — pass null if not yet set, in
+     * which case profit/commission preview against the suggested cost price instead.
+     *
+     * IMPORTANT: `sale_price` on this model means "Cost Price for Agent" — the
+     * agent's floor price and the base their commission is measured against. It is
+     * NEVER overwritten with the actual selling price; that lives separately on
+     * vehicles.selling_price.
+     *
+     * CALL SIGNATURE CHANGED — every caller must now pass $sellingPrice FIRST:
+     *   recalculate($sellingPrice, $agentCommissionPercent, $agentFixedBonus)
+     * The old 2-argument callers (percent, bonus) will silently corrupt the costing
+     * if not updated — this is exactly the bug fixed in ShipmentController below.
      */
-    public function recalculate(float $agentCommissionPercent = 15, int $agentFixedBonus = 0): static
+    public function recalculate(?int $sellingPrice = null, float $agentCommissionPercent = 15, int $agentFixedBonus = 0): static
     {
         $this->vendor_commission_amount = (int) round($this->buying_price * ($this->vendor_commission_percent / 100));
 
-        // Total costing = buying + vendor commission + inland + auction + freight + misc
         $this->total_costing =
             $this->buying_price + $this->vendor_commission_amount + $this->inland_charges +
             $this->auction_commission + $this->freight_charges + $this->misc_expenses;
 
-        // Sale price = buying + company service charge + inland + freight + misc
         $this->company_service_charge = self::serviceChargeFor($this->buying_price);
+
+        // "Cost Price for Agent" — deliberately excludes vendor/auction commission.
         $this->sale_price =
             $this->buying_price + $this->company_service_charge +
             $this->inland_charges + $this->freight_charges + $this->misc_expenses;
 
-        $this->profit = $this->sale_price - $this->total_costing;
+        $sellingPrice ??= $this->vehicle?->selling_price;
 
-        // Agent earning = (profit * 15%) + fixed bonus  (bonus only when there IS profit / a won bid)
-        $this->agent_commission_amount = (int) round(max($this->profit, 0) * ($agentCommissionPercent / 100));
+        if ($sellingPrice) {
+            $this->profit = $sellingPrice - $this->total_costing; // company gross margin at the ACTUAL selling price
+            $this->agent_commission_amount = (int) round(max($sellingPrice - $this->sale_price, 0) * ($agentCommissionPercent / 100));
+        } else {
+            // No selling price yet — preview against the suggested cost price.
+            $this->profit = $this->sale_price - $this->total_costing;
+            $this->agent_commission_amount = 0;
+        }
+
         $this->agent_bonus = $agentFixedBonus;
 
         return $this;
@@ -83,5 +94,11 @@ class VehicleCosting extends Model
     public function agentEarning(): int
     {
         return $this->agent_commission_amount + $this->agent_bonus;
+    }
+
+    /** Company's true bottom line, after paying out the agent's full earning. */
+    public function finalProfit(): int
+    {
+        return $this->profit - $this->agentEarning();
     }
 }

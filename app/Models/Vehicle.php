@@ -56,4 +56,13 @@ class Vehicle extends Model
 
     public function scopeWon($q)          { return $q->where('status', 'won'); }
     public function scopeForCustomer($q, int $id) { return $q->where('customer_id', $id); }
+    public function yardStatus(): ?string
+    {
+        return match ($this->status) {
+            'won', 'invoiced'      => 'At Yard',
+            'dispatched'            => 'In Transit',
+            'arrived', 'delivered'  => 'Delivered',
+            default                 => null,
+        };
+    }
 }

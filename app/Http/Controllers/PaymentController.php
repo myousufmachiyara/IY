@@ -188,4 +188,23 @@ class PaymentController extends Controller
         $customer->load(['invoices' => fn ($q) => $q->latest(), 'payments' => fn ($q) => $q->latest()->with('invoice', 'approver')]);
         return view('payments.customer_ledger', compact('customer'));
     }
+
+    /** Super Admin can revert an already-approved payment back to pending, reversing its ledger post. */
+    public function undoApproval(Payment $payment, LedgerService $ledger)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Only Super Admin may undo an approved payment.');
+        abort_unless($payment->status === 'approved', 422, 'This payment is not currently approved.');
+
+        DB::transaction(function () use ($payment, $ledger) {
+            foreach ($payment->journalEntries as $entry) {
+                $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — payment #{$payment->id} approval undone");
+            }
+            $payment->update(['status' => 'pending', 'approved_by' => null, 'approved_at' => null]);
+            if ($payment->invoice_id) {
+                Invoice::find($payment->invoice_id)?->refreshTotals()->save();
+            }
+        });
+
+        return back()->with('success', 'Payment approval undone — reverted to pending.');
+    }
 }

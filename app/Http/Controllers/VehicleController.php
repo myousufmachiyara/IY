@@ -52,7 +52,11 @@ class VehicleController extends Controller
     public function show(Vehicle $vehicle)
     {
         $vehicle->load('customer', 'agent', 'vendor', 'costing', 'invoice.payments', 'documents', 'shipment', 'bid');
-        return view('vehicles.show', compact('vehicle'));
+
+        $customers = Customer::where('id', '!=', $vehicle->customer_id)->orderBy('name')->get();
+        $agents = \App\Models\User::permission('scope.by_agent')->orderBy('name')->get();
+
+        return view('vehicles.show', compact('vehicle', 'customers', 'agents'));
     }
 
     public function destroy(Vehicle $vehicle)

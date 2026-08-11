@@ -26,6 +26,7 @@ class BidsExport implements FromQuery, WithHeadings, WithMapping
         return Bid::query()->with(['agent', 'customer'])
             ->whereNotNull('customer_id')
             ->when($this->filters['agent_ids'] ?? null, fn ($q, $v) => $q->whereIn('agent_id', $v))
+            ->when($this->filters['result'] ?? null, fn ($q, $v) => $q->where('result', $v))
             ->when($this->filters['from'] ?? null, fn ($q, $v) => $q->whereDate('auction_date', '>=', $v))
             ->when($this->filters['to'] ?? null, fn ($q, $v) => $q->whereDate('auction_date', '<=', $v))
             ->orderBy('auction_date');

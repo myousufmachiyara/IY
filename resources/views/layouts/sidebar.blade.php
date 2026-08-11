@@ -200,6 +200,12 @@
               <li class="{{ request()->routeIs('accounting.profit_loss') ? 'active' : '' }}">
                 <a class="nav-link" href="{{ route('accounting.profit_loss') }}">Profit &amp; Loss</a>
               </li>
+              <li class="{{ request()->routeIs('accounting.trial_balance') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.trial_balance') }}">Trial Balance</a>
+              </li>
+              <li class="{{ request()->routeIs('accounting.balance_sheet') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.balance_sheet') }}">Balance Sheet</a>
+              </li>
             </ul>
           </li>
           @endcan

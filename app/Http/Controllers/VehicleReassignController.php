@@ -20,8 +20,6 @@ class VehicleReassignController extends Controller
 
         DB::transaction(function () use ($vehicle, $data, $ledger) {
             if ($invoice = $vehicle->invoice) {
-                // Reverse the receivable posted when this invoice was issued — otherwise
-                // a phantom AR/Sales entry survives the cancellation forever.
                 foreach ($invoice->journalEntries as $entry) {
                     $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — invoice {$invoice->invoice_no} cancelled on reassignment");
                 }
@@ -40,5 +38,16 @@ class VehicleReassignController extends Controller
         });
 
         return back()->with('success', 'Vehicle reassigned to new customer. Generate a fresh invoice to continue.');
+    }
+
+    /** Change the agent on a vehicle independently of its customer's own assigned agent. */
+    public function reassignAgent(Request $request, Vehicle $vehicle)
+    {
+        abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may reassign the agent.');
+
+        $data = $request->validate(['agent_id' => ['required', 'exists:users,id']]);
+        $vehicle->update(['agent_id' => $data['agent_id']]);
+
+        return back()->with('success', 'Vehicle reassigned to a new agent.');
     }
 }

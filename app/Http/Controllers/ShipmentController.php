@@ -8,20 +8,16 @@ use Illuminate\Validation\Rule;
 
 class ShipmentController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $shipments = Shipment::with('customer','vehicles')
-            ->when($request->status, fn($q)=>$q->where('status',$request->status))
-            ->latest()->get();
+        $shipments = Shipment::with('customer', 'vehicles')->latest()->get();
         return view('shipments.index', compact('shipments'));
     }
 
     public function create(Customer $customer)
     {
         $eligible = $this->eligibleVehicles($customer);
-
         abort_if($eligible->isEmpty(), 422, 'This customer has no vehicles eligible for shipment yet.');
-
         return view('shipments.create', compact('customer', 'eligible'));
     }
 
@@ -30,7 +26,7 @@ class ShipmentController extends Controller
         $data = $request->validate([
             'customer_id'      => ['required', 'exists:customers,id'],
             'method'           => ['required', Rule::in(['RORO', 'Container'])],
-            'expected_arrival' => ['required', 'date', 'after_or_equal:today'],
+            'expected_arrival' => ['required', 'date'],
             'container_no'     => ['nullable', 'string', 'max:100'],
             'bl_no'            => ['nullable', 'string', 'max:100'],
             'shipping_company' => ['nullable', 'string', 'max:255'],
@@ -51,7 +47,7 @@ class ShipmentController extends Controller
             'created_by'       => $request->user()->id,
         ]);
 
-        $dueFinal = \Carbon\Carbon::parse($data['expected_arrival'])->subDays(22); // 15 days + 7 days grace before arrival
+        $dueFinal = \Carbon\Carbon::parse($data['expected_arrival'])->subDays(22);
 
         foreach ($data['vehicle_ids'] as $vehicleId) {
             $vehicle = Vehicle::findOrFail($vehicleId);
@@ -72,10 +68,8 @@ class ShipmentController extends Controller
     public function edit(Shipment $shipment)
     {
         abort_unless($shipment->status === 'preparing', 422, 'Only shipments still in "preparing" status can be edited.');
-
         $shipment->load('vehicles.invoice');
         $additional = $this->eligibleVehicles($shipment->customer)->whereNotIn('id', $shipment->vehicles->pluck('id'));
-
         return view('shipments.edit', compact('shipment', 'additional'));
     }
 
@@ -85,7 +79,7 @@ class ShipmentController extends Controller
 
         $data = $request->validate([
             'method'           => ['required', Rule::in(['RORO', 'Container'])],
-            'expected_arrival' => ['required', 'date', 'after_or_equal:today'],
+            'expected_arrival' => ['required', 'date'],
             'container_no'     => ['nullable', 'string', 'max:100'],
             'bl_no'            => ['nullable', 'string', 'max:100'],
             'shipping_company' => ['nullable', 'string', 'max:255'],
@@ -125,7 +119,6 @@ class ShipmentController extends Controller
         return redirect()->route('shipments.show', $shipment)->with('success', 'Shipment updated.');
     }
 
-    /** Actual departure confirmation + freight cost — expected_arrival is already set at creation. */
     public function setSchedule(Request $request, Shipment $shipment)
     {
         $data = $request->validate([
@@ -135,10 +128,18 @@ class ShipmentController extends Controller
 
         $shipment->update($data);
 
+        // Shipment's freight is authoritative once confirmed here — push it into
+        // each vehicle's Costing and recompute. FIXED: must pass $sellingPrice as
+        // the first argument to recalculate() — the old 2-arg call here would have
+        // silently corrupted the costing the first time freight was ever set.
         foreach ($shipment->vehicles as $vehicle) {
             if ($costing = $vehicle->costing) {
-                $costing->freight_charges = $data['freight_total']; // shipment freight is authoritative once set
-                $costing->recalculate($vehicle->agent->sales_commission_percent ?? 15, (int)($vehicle->agent->sales_fixed_bonus ?? 0))->save();
+                $costing->freight_charges = $data['freight_total'];
+                $costing->recalculate(
+                    $vehicle->selling_price,
+                    $vehicle->agent->sales_commission_percent ?? 15,
+                    (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
+                )->save();
             }
         }
 
@@ -148,10 +149,8 @@ class ShipmentController extends Controller
     public function dispatch(Shipment $shipment)
     {
         abort_unless($shipment->shipment_date, 422, 'Set the shipment date before dispatching.');
-
         $shipment->update(['status' => 'dispatched']);
         $shipment->vehicles()->update(['status' => 'dispatched']);
-
         return back()->with('success', 'Shipment marked as dispatched.');
     }
 
@@ -159,11 +158,9 @@ class ShipmentController extends Controller
     {
         $shipment->update(['status' => 'arrived']);
         $shipment->vehicles()->update(['status' => 'arrived']);
-
         return back()->with('success', 'Shipment marked as arrived.');
     }
 
-    /** Won+invoiced, unassigned, and (50% paid unless the viewer is Super Admin specifically). */
     private function eligibleVehicles(Customer $customer)
     {
         $bypass = auth()->user()->isSuperAdmin();

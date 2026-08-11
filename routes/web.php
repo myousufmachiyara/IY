@@ -117,4 +117,11 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('system/logs', [LogViewerController::class, 'index'])->middleware('permission:system.logs')->name('system.logs');
     Route::get('system/logs/{file}/download', [LogViewerController::class, 'download'])->middleware('permission:system.logs')->name('system.logs.download');
+
+    Route::post('bids/{bid}/undo-lost', [BiddingResultController::class, 'undoLost'])->middleware('permission:bid_results.edit')->name('bids.undo_lost');
+    Route::post('vehicles/{vehicle}/reassign-agent', [VehicleReassignController::class, 'reassignAgent'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign_agent');
+    Route::post('payments/{payment}/undo-approval', [PaymentController::class, 'undoApproval'])->middleware('permission:payments.edit')->name('payments.undo_approval');
+    Route::post('vehicles/{vehicle}/documents/undo-release', [DocumentController::class, 'undoRelease'])->middleware('permission:documents.edit')->name('documents.undo_release');
+    Route::get('accounting/trial-balance', [AccountingController::class, 'trialBalance'])->middleware('permission:accounting.index')->name('accounting.trial_balance');
+    Route::get('accounting/balance-sheet', [AccountingController::class, 'balanceSheet'])->middleware('permission:accounting.index')->name('accounting.balance_sheet');
 });

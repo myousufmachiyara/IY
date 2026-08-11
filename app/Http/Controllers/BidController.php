@@ -12,10 +12,11 @@ class BidController extends Controller
     public function index(Request $request)
     {
         $bids = Bid::with(['agent', 'customer'])
-            ->whereNotNull('customer_id') // #17 — unassigned bids never appear in the merge/export list
-            ->when($request->agent_ids, fn ($q) => $q->whereIn('agent_id', $request->agent_ids))
-            ->when($request->from, fn ($q) => $q->whereDate('auction_date', '>=', $request->from))
-            ->when($request->to, fn ($q) => $q->whereDate('auction_date', '<=', $request->to))
+            ->whereNotNull('customer_id')
+            ->when($request->agent_ids, fn ($q, $v) => $q->whereIn('agent_id', $v))
+            ->when($request->result, fn ($q, $v) => $q->where('result', $v))
+            ->when($request->from, fn ($q, $v) => $q->whereDate('auction_date', '>=', $v))
+            ->when($request->to, fn ($q, $v) => $q->whereDate('auction_date', '<=', $v))
             ->orderBy('auction_date')->get();
 
         $agents = User::permission('scope.by_agent')->orderBy('name')->get();
@@ -25,7 +26,7 @@ class BidController extends Controller
 
     public function export(Request $request)
     {
-        $filters = $request->only('agent_ids', 'from', 'to');
+        $filters = $request->only('agent_ids', 'from', 'to', 'result');
         return Excel::download(new BidsExport($filters, $request->columns ?: []), 'final-bidding-sheet.xlsx');
     }
 }

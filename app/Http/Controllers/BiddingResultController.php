@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Bid, Customer, JournalEntry, Vehicle, VehicleCosting, Vendor};
+use App\Models\{Bid, Customer, JournalEntry, User, Vehicle, VehicleCosting, Vendor};
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -14,12 +14,12 @@ class BiddingResultController extends Controller
         $bids = Bid::with(['customer', 'vehicle', 'agent'])
             ->where('result', 'pending')
             ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
-            ->when($request->agent_ids, fn ($q) => $q->whereIn('agent_id', $request->agent_ids))
+            ->when($request->agent_ids, fn ($q, $v) => $q->whereIn('agent_id', $v))
             ->latest()->get();
 
         $vendors   = Vendor::active()->orderBy('name')->get();
         $customers = Customer::complete()->orderBy('name')->get();
-        $agents    = \App\Models\User::permission('scope.by_agent')->orderBy('name')->get();
+        $agents    = User::permission('scope.by_agent')->orderBy('name')->get();
 
         return view('results.index', compact('bids', 'vendors', 'customers', 'agents'));
     }
@@ -28,9 +28,9 @@ class BiddingResultController extends Controller
     {
         $bids = Bid::with(['customer', 'vehicle', 'agent'])
             ->where('result', 'won')
-            ->when($request->agent_ids, fn ($q) => $q->whereIn('agent_id', $request->agent_ids))
+            ->when($request->agent_ids, fn ($q, $v) => $q->whereIn('agent_id', $v))
             ->latest()->get();
-        $agents = \App\Models\User::permission('scope.by_agent')->orderBy('name')->get();
+        $agents = User::permission('scope.by_agent')->orderBy('name')->get();
 
         return view('results.won', compact('bids', 'agents'));
     }
@@ -39,9 +39,9 @@ class BiddingResultController extends Controller
     {
         $bids = Bid::with(['customer', 'vehicle', 'agent'])
             ->where('result', 'lost')
-            ->when($request->agent_ids, fn ($q) => $q->whereIn('agent_id', $request->agent_ids))
+            ->when($request->agent_ids, fn ($q, $v) => $q->whereIn('agent_id', $v))
             ->latest()->get();
-        $agents = \App\Models\User::permission('scope.by_agent')->orderBy('name')->get();
+        $agents = User::permission('scope.by_agent')->orderBy('name')->get();
 
         return view('results.lost', compact('bids', 'agents'));
     }
@@ -65,18 +65,26 @@ class BiddingResultController extends Controller
             ]);
 
             $vehicle->update([
-                'vendor_id' => $data['vendor_id'], 'buying_price' => $data['buying_price'],
+                'vendor_id'               => $data['vendor_id'],
+                'buying_price'            => $data['buying_price'],
                 'winning_screenshot_path' => $request->file('screenshot')->store('winning_screenshots', 'public'),
-                'won_at' => now(), 'status' => 'won',
+                'won_at'                  => now(),
+                'status'                  => 'won',
             ]);
 
             $bid->update(['result' => 'won', 'won_amount' => $data['buying_price'], 'vehicle_id' => $vehicle->id]);
+
             $ledger->vendorPayable($vehicle->fresh());
 
-            VehicleCosting::firstOrCreate(
+            $costing = VehicleCosting::firstOrCreate(
                 ['vehicle_id' => $vehicle->id],
                 ['buying_price' => $vehicle->buying_price, 'vendor_commission_percent' => $vehicle->vendor->commission_percent ?? 7]
             );
+            $costing->recalculate(
+                $vehicle->selling_price,
+                $vehicle->agent->sales_commission_percent ?? 15,
+                (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
+            )->save();
         });
 
         return redirect()->route('costings.show', $bid->fresh()->vehicle_id)
@@ -87,10 +95,10 @@ class BiddingResultController extends Controller
     {
         $bid->update(['result' => 'lost']);
         $bid->vehicle?->update(['status' => 'lost']);
+
         return back()->with('success', 'Bid marked as lost.');
     }
 
-    /** #20 — bulk lost only; "won" always needs per-row vendor/price/screenshot so isn't bulkable. */
     public function bulkLost(Request $request)
     {
         $data = $request->validate(['bid_ids' => ['required', 'array', 'min:1'], 'bid_ids.*' => ['exists:bids,id']]);
@@ -118,11 +126,25 @@ class BiddingResultController extends Controller
                     $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — bid #{$bid->id} won by mistake, reverted");
                 }
                 $vehicle->costing()->delete();
-                $vehicle->update(['vendor_id' => null, 'buying_price' => null, 'winning_screenshot_path' => null, 'won_at' => null, 'status' => 'requirement']);
+                $vehicle->update([
+                    'vendor_id' => null, 'buying_price' => null,
+                    'winning_screenshot_path' => null, 'won_at' => null, 'status' => 'requirement',
+                ]);
             }
             $bid->update(['result' => 'pending', 'won_amount' => null]);
         });
 
         return back()->with('success', 'Bid reverted to pending — vendor payable reversed.');
+    }
+
+    public function undoLost(Bid $bid)
+    {
+        abort_unless(auth()->user()->can('bid_results.edit'), 403);
+        abort_unless($bid->result === 'lost', 422, 'This bid is not currently marked lost.');
+
+        $bid->update(['result' => 'pending']);
+        $bid->vehicle?->update(['status' => 'requirement']);
+
+        return back()->with('success', 'Bid reverted to pending.');
     }
 }

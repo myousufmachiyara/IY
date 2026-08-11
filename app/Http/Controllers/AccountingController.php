@@ -117,4 +117,36 @@ class AccountingController extends Controller
 
         return view('accounting.profit_loss', compact('income', 'expense', 'totalIncome', 'totalExpense', 'netProfit', 'from', 'to'));
     }
+
+    public function trialBalance(Request $request)
+    {
+        $rows = ChartOfAccount::orderBy('code')->get()->map(function ($a) {
+            $balance = $a->balance();
+            $debitNormal = in_array($a->type, ['asset', 'expense']);
+            return ['account' => $a, 'debit' => $debitNormal ? max($balance, 0) : 0, 'credit' => !$debitNormal ? max($balance, 0) : 0];
+        })->filter(fn ($r) => $r['debit'] != 0 || $r['credit'] != 0);
+
+        return view('accounting.trial_balance', [
+            'rows' => $rows, 'totalDebit' => $rows->sum('debit'), 'totalCredit' => $rows->sum('credit'),
+        ]);
+    }
+
+    public function balanceSheet(Request $request)
+    {
+        $assets      = ChartOfAccount::type('asset')->get()->map(fn ($a) => ['account' => $a, 'amount' => $a->balance()]);
+        $liabilities = ChartOfAccount::type('liability')->get()->map(fn ($a) => ['account' => $a, 'amount' => $a->balance()]);
+        $equity      = ChartOfAccount::type('equity')->get()->map(fn ($a) => ['account' => $a, 'amount' => $a->balance()]);
+
+        $totalAssets      = $assets->sum('amount');
+        $totalLiabilities = $liabilities->sum('amount');
+        $totalEquityBase  = $equity->sum('amount');
+
+        $income  = ChartOfAccount::type('income')->get()->sum(fn ($a) => $a->balance());
+        $expense = ChartOfAccount::type('expense')->get()->sum(fn ($a) => $a->balance());
+        $netProfit = $income - $expense; // not yet formally closed into an equity account
+
+        return view('accounting.balance_sheet', compact(
+            'assets', 'liabilities', 'equity', 'totalAssets', 'totalLiabilities', 'totalEquityBase', 'netProfit'
+        ));
+    }
 }

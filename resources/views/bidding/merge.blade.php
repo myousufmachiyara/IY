@@ -27,6 +27,15 @@
                             @foreach($agents as $a)<option value="{{ $a->id }}" @selected(in_array($a->id, request('agent_ids', [])))>{{ $a->name }}</option>@endforeach
                         </select>
                     </div>
+                    <div class="col-md-2">
+                        <label>Status</label>
+                        <select name="result" class="form-control select2-js">
+                            <option value="">All</option>
+                            <option value="pending" @selected(request('result')==='pending')>Pending</option>
+                            <option value="won" @selected(request('result')==='won')>Won</option>
+                            <option value="lost" @selected(request('result')==='lost')>Lost</option>
+                        </select>
+                    </div>
                     <div class="col-md-3"><label>From Date</label><input type="date" name="from" class="form-control" value="{{ request('from') }}"></div>
                     <div class="col-md-3"><label>To Date</label><input type="date" name="to" class="form-control" value="{{ request('to') }}"></div>
                     <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-secondary w-100">Filter</button></div>

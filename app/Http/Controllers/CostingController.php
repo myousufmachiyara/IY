@@ -17,7 +17,6 @@ class CostingController extends Controller
         return view('costings.edit', compact('vehicle', 'costing'));
     }
 
-    /** Cost inputs — restricted to Super Admin / Accountant (also gated at the route). */
     public function updateCosting(Request $request, Vehicle $vehicle)
     {
         abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may edit costing.');
@@ -36,35 +35,50 @@ class CostingController extends Controller
         $costing->prepared_by  = $request->user()->id;
 
         $costing->recalculate(
+            $vehicle->selling_price,
             $vehicle->agent->sales_commission_percent ?? 15,
-            (int) ($vehicle->agent->sales_fixed_bonus ?? 0),
+            (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
         )->save();
 
         return back()->with('success', 'Costing updated. Profit and agent earning recalculated.');
     }
 
-    /** Selling price — set by the owning sales agent (or admin/accountant). */
     public function updateSellingPrice(Request $request, Vehicle $vehicle)
     {
-        $data = $request->validate(['selling_price' => ['required', 'integer', "min:{$vehicle->buying_price}"]]);
+        $costing = $vehicle->costing ?: $this->ensureCosting($vehicle);
+
+        // Floor is the Cost Price for Agent, not the raw buying price — matches
+        // "NOTE: MINIMUM IS COST PRICE" from the spreadsheet.
+        $data = $request->validate([
+            'selling_price' => ['required', 'integer', "min:{$costing->sale_price}"],
+        ]);
+
         $vehicle->update(['selling_price' => $data['selling_price']]);
 
-        $costing = $vehicle->costing ?: $this->ensureCosting($vehicle);
-        $costing->sale_price = $data['selling_price'];
-        $costing->profit     = $costing->sale_price - $costing->total_costing;
-        $costing->agent_commission_amount =
-            (int) round(max($costing->profit, 0) * (($vehicle->agent->sales_commission_percent ?? 15) / 100));
-        $costing->save();
+        $costing->recalculate(
+            $data['selling_price'],
+            $vehicle->agent->sales_commission_percent ?? 15,
+            (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
+        )->save();
 
         return back()->with('success', 'Selling price saved.');
     }
 
     private function ensureCosting(Vehicle $vehicle): VehicleCosting
     {
-        return VehicleCosting::create([
+        $costing = VehicleCosting::create([
             'vehicle_id'                => $vehicle->id,
             'buying_price'              => $vehicle->buying_price,
             'vendor_commission_percent' => $vehicle->vendor->commission_percent ?? 7,
         ]);
+
+        $costing->recalculate(
+            $vehicle->selling_price,
+            $vehicle->agent->sales_commission_percent ?? 15,
+            (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
+        );
+        $costing->save();
+
+        return $costing;
     }
 }
