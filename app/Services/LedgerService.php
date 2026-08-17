@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{ChartOfAccount, Customer, Expense, Invoice, JournalEntry, Payment, Vehicle, VendorPayment};
+use App\Models\{ChartOfAccount, Customer, Expense, Invoice, JournalEntry, JournalLine, Payment, Vehicle, VendorPayment};
 use Illuminate\Support\Facades\{Auth, DB};
 use InvalidArgumentException;
 
@@ -20,10 +20,6 @@ class LedgerService
         return $this->cache[$code] ??= ChartOfAccount::where('code', $code)->firstOrFail();
     }
 
-    /**
-     * Post a balanced journal entry.
-     * @param array<array{account:string,debit?:int,credit?:int,party?:?object,memo?:?string}> $lines
-     */
     public function post(string $date, string $description, array $lines, ?object $reference = null, bool $backdated = false): JournalEntry
     {
         $debit  = array_sum(array_column($lines, 'debit'));
@@ -65,8 +61,6 @@ class LedgerService
         return 'JE' . str_pad((int) JournalEntry::max('id') + 1, 6, '0', STR_PAD_LEFT);
     }
 
-    // ---------- convenience postings ----------
-
     public function securityDeposit(Customer $c, string $cashAccount = self::BANK): JournalEntry
     {
         return $this->post(today()->toDateString(), "Security deposit received — {$c->name}", [
@@ -75,13 +69,46 @@ class LedgerService
         ], $c);
     }
 
-    /** Bid won: vehicle cost becomes payable to the vendor. */
-    public function vendorPayable(Vehicle $v): JournalEntry
+    /**
+     * Post (or top-up) the vendor payable for a vehicle so it always matches the
+     * CURRENT total costing (buying price + vendor commission + inland + auction +
+     * freight + misc) — not just the raw buying price. Safe to call repeatedly:
+     * only the DIFFERENCE between what's already posted and what should now be
+     * posted gets entered, so calling this after every costing edit keeps the
+     * ledger exactly in sync without ever reversing or double-posting.
+     */
+    public function adjustVendorPayable(Vehicle $vehicle): ?JournalEntry
     {
-        return $this->post(($v->won_at ?? now())->toDateString(), "Vehicle purchase payable — {$v->label()}", [
-            ['account' => self::COST_VEHICLES, 'debit'  => $v->buying_price],
-            ['account' => self::AP_VENDOR,     'credit' => $v->buying_price, 'party' => $v->vendor],
-        ], $v);
+        $vehicle->loadMissing('costing', 'vendor');
+        $targetPayable = $vehicle->costing?->total_costing ?? $vehicle->buying_price;
+
+        $apAccount = $this->account(self::AP_VENDOR);
+
+        $currentlyPosted = (int) JournalLine::whereHas('entry', fn ($q) => $q
+                ->where('reference_type', $vehicle->getMorphClass())
+                ->where('reference_id', $vehicle->id))
+            ->where('account_id', $apAccount->id)
+            ->get()
+            ->sum(fn ($l) => $l->credit - $l->debit);
+
+        $delta = $targetPayable - $currentlyPosted;
+
+        if ($delta === 0) {
+            return null;
+        }
+
+        if ($delta > 0) {
+            return $this->post(now()->toDateString(), "Vendor payable — {$vehicle->label()} (total costing)", [
+                ['account' => self::COST_VEHICLES, 'debit'  => $delta],
+                ['account' => self::AP_VENDOR,      'credit' => $delta, 'party' => $vehicle->vendor],
+            ], $vehicle);
+        }
+
+        $delta = abs($delta);
+        return $this->post(now()->toDateString(), "Vendor payable correction — {$vehicle->label()} (total costing decreased)", [
+            ['account' => self::AP_VENDOR,      'debit'  => $delta, 'party' => $vehicle->vendor],
+            ['account' => self::COST_VEHICLES, 'credit' => $delta],
+        ], $vehicle);
     }
 
     public function invoiceReceivable(Invoice $inv): JournalEntry
@@ -108,10 +135,16 @@ class LedgerService
         ], $vp, $vp->is_backdated);
     }
 
-    /**
- * Reverse a previously posted entry by mirroring its lines with debit/credit swapped.
- * Never mutates or deletes the original — audit trail stays intact.
- */
+    public function expense(Expense $e, string $cashAccount = self::BANK): JournalEntry
+    {
+        $account = ['salary' => self::SALARY, 'office' => self::OFFICE][$e->category] ?? self::MISC;
+
+        return $this->post($e->expense_date->toDateString(), "Expense: {$e->category}", [
+            ['account' => $account,     'debit'  => $e->amount],
+            ['account' => $cashAccount, 'credit' => $e->amount],
+        ], $e, $e->is_backdated);
+    }
+
     public function reverseEntry(JournalEntry $original, string $date, ?string $description = null): JournalEntry
     {
         return DB::transaction(function () use ($original, $date, $description) {
@@ -138,15 +171,5 @@ class LedgerService
 
             return $entry;
         });
-    }
-
-    public function expense(Expense $e, string $cashAccount = self::BANK): JournalEntry
-    {
-        $account = ['salary' => self::SALARY, 'office' => self::OFFICE][$e->category] ?? self::MISC;
-
-        return $this->post($e->expense_date->toDateString(), "Expense: {$e->category}", [
-            ['account' => $account,     'debit'  => $e->amount],
-            ['account' => $cashAccount, 'credit' => $e->amount],
-        ], $e, $e->is_backdated);
     }
 }
