@@ -94,23 +94,25 @@
                                     <tr><td>+ Misc Expenses</td><td class="text-end">¥<span id="calc_misc2">{{ number_format($costing->misc_expenses) }}</span></td></tr>
                                     <tr class="fw-bold border-top"><td>COST PRICE FOR AGENT</td><td class="text-end">¥<span id="calc_cost_price">{{ number_format($costing->sale_price) }}</span></td></tr>
                                 </table>
-
                                 @can('costings.edit')
-                                    @if(is_null($vehicle->selling_price))
                                     <form method="POST" action="{{ route('costings.selling', $vehicle) }}">
                                         @csrf @method('PUT')
                                         <div class="mb-1">
                                             <label>Selling Price (¥) <span class="text-danger">*</span></label>
                                             <input type="number" class="form-control" id="selling_price" name="selling_price"
-                                                   value="{{ old('selling_price', $costing->sale_price) }}"
-                                                   min="{{ $costing->sale_price }}" required oninput="recalcAgentEarning()">
+                                                value="{{ old('selling_price', $vehicle->selling_price ?? $costing->sale_price) }}"
+                                                min="{{ $costing->sale_price }}" required oninput="recalcAgentEarning()">
                                         </div>
                                         <small class="text-muted d-block mb-2">NOTE: minimum is Cost Price (¥{{ number_format($costing->sale_price) }}).</small>
-                                        <button type="submit" class="btn btn-primary w-100 mb-3">Save Selling Price</button>
+                                        <button type="submit" class="btn btn-primary w-100 mb-3">
+                                            {{ $vehicle->selling_price ? 'Update Selling Price' : 'Save Selling Price' }}
+                                        </button>
+                                        @if($vehicle->selling_price && $vehicle->invoice)
+                                            <small class="text-warning d-block">
+                                                <i class="fa fa-exclamation-triangle"></i> An invoice already exists for this vehicle — changing the price here updates this page's figures only, it will not change the amount already invoiced.
+                                            </small>
+                                        @endif
                                     </form>
-                                    @else
-                                    <p class="mb-3"><strong>Selling Price:</strong> ¥{{ number_format($vehicle->selling_price) }} <span class="badge bg-secondary">Locked</span></p>
-                                    @endif
                                 @else
                                     <p class="mb-3"><strong>Selling Price:</strong> ¥{{ number_format($vehicle->selling_price ?? $costing->sale_price) }}</p>
                                 @endcan
