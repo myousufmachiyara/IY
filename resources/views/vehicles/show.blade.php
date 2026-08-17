@@ -73,9 +73,7 @@
                                             @endif
                                         </table>
                                         @if($vehicle->winning_screenshot_path)
-                                            <a href="{{ \Storage::url($vehicle->winning_screenshot_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                                                <i class="fa fa-image"></i> View Winning Screenshot
-                                            </a>
+                                            <a href="{{ \App\Services\PublicStorage::url($vehicle->winning_screenshot_path) }}" target="_blank" class="btnbtn-sm btn-outline-secondary">
                                         @endif
                                     </div>
                                 </div>
