@@ -19,15 +19,17 @@
                         {{ $vehicle->label() }}
                         <span class="badge bg-{{ $statusColors[$vehicle->status] ?? 'secondary' }} text-uppercase ms-1">{{ $vehicle->status }}</span>
                     </h2>
-                    <a href="{{ route('vehicles.index') }}" class="btn btn-sm btn-default">
-                        <i class="fa fa-arrow-left"></i> Back to All Vehicles
-                    </a>
-                    @can('vehicle_requirement.edit')
-                        @if($vehicle->isWon())
-                            <button type="button" class="btn btn-sm btn-outline-warning modal-with-form" href="#reassignCustomerModal"><i class="fa fa-user-edit"></i> Reassign Customer</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary modal-with-form" href="#reassignAgentModal"><i class="fa fa-user-tie"></i> Reassign Agent</button>
-                        @endif
-                    @endcan
+                    <div>
+                        <a href="{{ route('vehicles.index') }}" class="btn btn-sm btn-default">
+                            <i class="fa fa-arrow-left"></i> Back to All Vehicles
+                        </a>
+                        @can('vehicle_requirement.edit')
+                            @if($vehicle->isWon())
+                                <button type="button" class="btn btn-sm btn-outline-warning modal-with-form" href="#reassignCustomerModal"><i class="fa fa-user-edit"></i> Reassign Customer</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary modal-with-form" href="#reassignAgentModal"><i class="fa fa-user-tie"></i> Reassign Agent</button>
+                            @endif
+                        @endcan
+                    </div>
                 </header>
 
                 @include('vehicles._tabs', ['vehicle' => $vehicle, 'active' => 'overview'])
