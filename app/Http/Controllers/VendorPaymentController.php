@@ -19,9 +19,12 @@ class VendorPaymentController extends Controller
         $vendors = Vendor::orderBy('name')->get();
 
         $vehicles = Vehicle::whereNotNull('vendor_id')->whereNotNull('buying_price')
-            ->with('vendor', 'customer')->get()
+            ->with('vendor', 'customer', 'costing')
+            ->get()
             ->map(function ($v) {
-                $v->outstanding = $v->buying_price - $v->vendorPayments()->sum('amount');
+                // Outstanding = TOTAL COSTING FOR COMPANY, not just buying_price.
+                $totalOwed = $v->costing?->total_costing ?? $v->buying_price;
+                $v->outstanding = $totalOwed - $v->vendorPayments()->sum('amount');
                 return $v;
             })
             ->filter(fn ($v) => $v->outstanding > 0)->values();
@@ -110,6 +113,6 @@ class VendorPaymentController extends Controller
 
     public function outstanding(Vehicle $vehicle): int
     {
-        return max($vehicle->buying_price - $vehicle->vendorPayments()->sum('amount'), 0);
+        return max(($vehicle->costing?->total_costing ?? $vehicle->buying_price) - $vehicle->vendorPayments()->sum('amount'), 0);
     }
 }
