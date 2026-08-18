@@ -25,7 +25,7 @@
                         <i class="fa fa-arrow-left"></i> Back to All Customers
                     </a>
                     @can('invoices.create')
-                        <a href="{{ route('invoices.bulk_create_form', $customer) }}" class="btn btn-sm btn-outline-primary mb-2">
+                        <a href="{{ route('invoices.bulk_create_form', $customer) }}" class="btn btn-sm btn-outline-primary">
                             <i class="fa fa-file-invoice"></i> Bulk Generate Invoices
                         </a>
                     @endcan
