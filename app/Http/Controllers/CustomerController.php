@@ -132,10 +132,12 @@ class CustomerController extends Controller
 
         return back()->with('success', 'Deposit updated — pending approval again.');
     }
+
     public function approveDeposit(Customer $customer, LedgerService $ledger)
     {
         abort_unless(request()->user()->canBackdate(), 403, 'Only accountant or super admin may approve deposits.');
         abort_unless($customer->security_deposit_status === 'pending', 422, 'No pending deposit to approve.');
+        abort_unless($customer->security_deposit_evidence_path, 422, 'Cannot approve — no evidence attached to this deposit. Edit the deposit and attach a file first.');
 
         $customer->update([
             'security_deposit_status'      => 'approved',
