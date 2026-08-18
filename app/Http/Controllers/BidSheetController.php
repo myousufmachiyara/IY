@@ -6,6 +6,7 @@ use App\Exports\BidTemplateExport;
 use App\Imports\BidsImport;
 use App\Models\{Bid, BidSheet, Customer};
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 class BidSheetController extends Controller
@@ -53,31 +54,43 @@ class BidSheetController extends Controller
     public function show(BidSheet $bidSheet)
     {
         $bidSheet->load(['bids' => fn ($q) => $q->latest(), 'agent']);
-        $bidSheet->live_count = $bidSheet->bids->count(); // #15 — always live, never trust the stored rows_count
+        $bidSheet->live_count = $bidSheet->bids->count();
         $customers = Customer::complete()->orderBy('name')->get();
 
         return view('bidding.sheets.show', ['sheet' => $bidSheet, 'customers' => $customers]);
     }
 
+    /**
+     * Deleting a sheet must never silently destroy bids that already have real
+     * financial consequences (a won bid can have a live Vehicle, vendor payable,
+     * invoice, and payments attached). Pending bids carry no such history and are
+     * safe to remove outright; won/lost bids are only detached from the sheet,
+     * mirroring the same rule destroyBid() already enforces on single deletes.
+     */
     public function destroy(BidSheet $bidSheet)
     {
-        $bidSheet->delete();
-        return back()->with('success', 'Bid sheet removed.');
+        DB::transaction(function () use ($bidSheet) {
+            $bidSheet->bids()->where('result', 'pending')->delete();
+            $bidSheet->bids()->update(['bid_sheet_id' => null]);
+            $bidSheet->delete();
+        });
+
+        return back()->with('success', 'Bid sheet removed. Pending bids were deleted; won/lost bids were kept and detached from this sheet.');
     }
 
-    /** #15 — delete a single bid row; only while still pending, and only from within its sheet context. */
+    public function template() { return Excel::download(new BidTemplateExport, 'bid-sheet-template.xlsx'); }
+
+    /** Delete a single bid row; only while still pending, and only from within its sheet context. */
     public function destroyBid(Bid $bid)
     {
         abort_unless($bid->result === 'pending', 422, 'Only pending bids can be deleted.');
         $sheet = $bid->sheet;
         $bid->delete();
         if ($sheet) {
-            $sheet->update(['rows_count' => $sheet->bids()->count()]); // keep the stored column in sync too
+            $sheet->update(['rows_count' => $sheet->bids()->count()]);
         }
         return back()->with('success', 'Bid removed.');
     }
-
-    public function template() { return Excel::download(new BidTemplateExport, 'bid-sheet-template.xlsx'); }
 
     public function assignCustomer(Request $request, Bid $bid)
     {
