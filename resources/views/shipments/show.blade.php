@@ -90,24 +90,53 @@
                                 <h5 class="card-title mb-3">Status Actions</h5>
 
                                 @if($shipment->status === 'preparing')
-                                    <form action="{{ route('shipments.dispatch', $shipment) }}" method="POST" onsubmit="return confirm('Mark this shipment as dispatched?');">
-                                        @csrf
-                                        <button type="submit" class="btn btn-info w-100 mb-2" @if(!$shipment->shipment_date) disabled title="Confirm departure date first" @endif>
-                                            <i class="fa fa-ship"></i> Mark Dispatched
-                                        </button>
-                                    </form>
-                                    @if(!$shipment->shipment_date)
-                                        <small class="text-danger d-block">Confirm departure date &amp; freight before dispatching.</small>
-                                    @endif
+                                    @can('shipments.edit')
+                                        <form action="{{ route('shipments.dispatch', $shipment) }}" method="POST" onsubmit="return confirm('Mark this shipment as dispatched?');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-info w-100 mb-2" @if(!$shipment->shipment_date) disabled title="Confirm departure date first" @endif>
+                                                <i class="fa fa-ship"></i> Mark Dispatched
+                                            </button>
+                                        </form>
+                                        @if(!$shipment->shipment_date)
+                                            <small class="text-danger d-block mb-2">Confirm departure date &amp; freight before dispatching.</small>
+                                        @endif
+                                    @endcan
+
+                                    @can('shipments.delete')
+                                        <form action="{{ route('shipments.cancel', $shipment) }}" method="POST" onsubmit="return confirm('Cancel this shipment entirely? Vehicles will be returned to Invoiced status.');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-outline-danger w-100 mt-2">
+                                                <i class="fa fa-times"></i> Cancel Shipment
+                                            </button>
+                                        </form>
+                                    @endcan
+
                                 @elseif($shipment->status === 'dispatched')
-                                    <form action="{{ route('shipments.arrive', $shipment) }}" method="POST" onsubmit="return confirm('Mark this shipment as arrived?');">
-                                        @csrf
-                                        <button type="submit" class="btn btn-success w-100">
-                                            <i class="fa fa-anchor"></i> Mark Arrived
-                                        </button>
-                                    </form>
+                                    @can('shipments.edit')
+                                        <form action="{{ route('shipments.arrive', $shipment) }}" method="POST" onsubmit="return confirm('Mark this shipment as arrived?');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-success w-100 mb-2">
+                                                <i class="fa fa-anchor"></i> Mark Arrived
+                                            </button>
+                                        </form>
+                                        <form action="{{ route('shipments.undo_dispatch', $shipment) }}" method="POST" onsubmit="return confirm('Undo dispatch? This reverts the shipment back to Preparing.');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-outline-warning w-100">
+                                                <i class="fa fa-undo"></i> Undo Dispatch
+                                            </button>
+                                        </form>
+                                    @endcan
+
                                 @else
-                                    <p class="text-muted mb-0">This shipment has arrived. Manage final document release from each vehicle's Documents tab.</p>
+                                    <p class="text-muted mb-2">This shipment has arrived. Manage final document release from each vehicle's Documents tab.</p>
+                                    @can('shipments.edit')
+                                        <form action="{{ route('shipments.undo_arrive', $shipment) }}" method="POST" onsubmit="return confirm('Undo arrival? This reverts the shipment back to Dispatched.');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-outline-warning w-100">
+                                                <i class="fa fa-undo"></i> Undo Arrival
+                                            </button>
+                                        </form>
+                                    @endcan
                                 @endif
                             </div>
                         </div>

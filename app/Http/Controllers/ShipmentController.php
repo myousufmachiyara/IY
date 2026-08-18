@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\{Customer, Shipment, Vehicle};
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ShipmentController extends Controller
@@ -128,10 +129,6 @@ class ShipmentController extends Controller
 
         $shipment->update($data);
 
-        // Shipment's freight is authoritative once confirmed here — push it into
-        // each vehicle's Costing and recompute. FIXED: must pass $sellingPrice as
-        // the first argument to recalculate() — the old 2-arg call here would have
-        // silently corrupted the costing the first time freight was ever set.
         foreach ($shipment->vehicles as $vehicle) {
             if ($costing = $vehicle->costing) {
                 $costing->freight_charges = $data['freight_total'];
@@ -159,6 +156,49 @@ class ShipmentController extends Controller
         $shipment->update(['status' => 'arrived']);
         $shipment->vehicles()->update(['status' => 'arrived']);
         return back()->with('success', 'Shipment marked as arrived.');
+    }
+
+    /** Step back from dispatched to preparing — pure status rollback, no financial side effects to reverse. */
+    public function undoDispatch(Shipment $shipment)
+    {
+        abort_unless(auth()->user()->can('shipments.edit'), 403);
+        abort_unless($shipment->status === 'dispatched', 422, 'This shipment is not currently marked dispatched.');
+
+        $shipment->update(['status' => 'preparing']);
+        $shipment->vehicles()->update(['status' => 'invoiced']);
+
+        return back()->with('success', 'Shipment reverted to preparing.');
+    }
+
+    /** Step back from arrived to dispatched. */
+    public function undoArrive(Shipment $shipment)
+    {
+        abort_unless(auth()->user()->can('shipments.edit'), 403);
+        abort_unless($shipment->status === 'arrived', 422, 'This shipment is not currently marked arrived.');
+
+        $shipment->update(['status' => 'dispatched']);
+        $shipment->vehicles()->update(['status' => 'dispatched']);
+
+        return back()->with('success', 'Shipment reverted to dispatched.');
+    }
+
+    /**
+     * Fully cancel a shipment created by mistake. Only allowed while still
+     * 'preparing' — to cancel one that's already dispatched/arrived, undo it
+     * back to preparing first. Vehicles are detached and returned to invoiced,
+     * free to be added to a fresh shipment.
+     */
+    public function cancel(Shipment $shipment)
+    {
+        abort_unless(auth()->user()->can('shipments.delete'), 403);
+        abort_unless($shipment->status === 'preparing', 422, 'Only a shipment still in "preparing" status can be cancelled — undo dispatch/arrival first.');
+
+        DB::transaction(function () use ($shipment) {
+            $shipment->vehicles()->update(['shipment_id' => null, 'status' => 'invoiced']);
+            $shipment->delete();
+        });
+
+        return redirect()->route('shipments.index')->with('success', 'Shipment cancelled — vehicles returned to Invoiced status.');
     }
 
     private function eligibleVehicles(Customer $customer)
