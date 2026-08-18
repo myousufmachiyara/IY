@@ -114,7 +114,10 @@ class CustomerController extends Controller
         $data = $request->validate([
             'security_deposit' => ['required', 'integer', 'min:1'],
             'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
-            'evidence'          => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            // Required unless this customer already has evidence on record — otherwise
+            // a deposit can reach "pending" with zero evidence ever attached, exactly
+            // the gap that let 4 records through with a NULL evidence path.
+            'evidence'          => [$customer->security_deposit_evidence_path ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
 
         if ($request->hasFile('evidence')) {
@@ -127,7 +130,7 @@ class CustomerController extends Controller
         $customer->update([
             'security_deposit'         => $data['security_deposit'],
             'security_deposit_account' => $data['account'],
-            'security_deposit_status'  => 'pending', // resets to pending — a correction needs re-approval
+            'security_deposit_status'  => 'pending',
         ] + array_intersect_key($data, ['security_deposit_evidence_path' => true]));
 
         return back()->with('success', 'Deposit updated — pending approval again.');
