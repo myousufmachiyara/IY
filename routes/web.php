@@ -90,6 +90,9 @@ Route::middleware(['auth'])->group(function () {
     Route::put('shipments/{shipment}/schedule', [ShipmentController::class, 'setSchedule'])->middleware('permission:shipments.edit')->name('shipments.schedule');
     Route::post('shipments/{shipment}/dispatch', [ShipmentController::class, 'dispatch'])->middleware('permission:shipments.edit')->name('shipments.dispatch');
     Route::post('shipments/{shipment}/arrive',   [ShipmentController::class, 'arrive'])->middleware('permission:shipments.edit')->name('shipments.arrive');
+    Route::post("shipments/{shipment}/undo-dispatch", [ShipmentController::class, "undoDispatch"])->middleware("permission:shipments.edit")->name("shipments.undo_dispatch");
+    Route::post("shipments/{shipment}/undo-arrive", [ShipmentController::class, "undoArrive"])->middleware("permission:shipments.edit")->name("shipments.undo_arrive");
+    Route::post("shipments/{shipment}/cancel", [ShipmentController::class, "cancel"])->middleware("permission:shipments.delete")->name("shipments.cancel");
 
     Route::get('vehicles/{vehicle}/documents',  [DocumentController::class, 'index'])->middleware('permission:documents.index')->name('documents.index');
     Route::post('vehicles/{vehicle}/documents', [DocumentController::class, 'store'])->middleware('permission:documents.create')->name('documents.store');
