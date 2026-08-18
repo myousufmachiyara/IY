@@ -54,6 +54,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('bids/{bid}/undo-won', [BiddingResultController::class, 'undoWon'])->middleware('permission:bid_results.edit')->name('bids.undo_won');
     Route::post('bids/{bid}/undo-lost', [BiddingResultController::class, 'undoLost'])->middleware('permission:bid_results.edit')->name('bids.undo_lost');
     Route::put('bids/{bid}/assign-customer', [BidSheetController::class, 'assignCustomer'])->middleware('permission:bid_sheets.edit')->name('bids.assign_customer');
+    Route::get('bid-sheets/{bid_sheet}/edit', [BidSheetController::class, 'edit'])->middleware('permission:bid_sheets.edit')->name('bid-sheets.edit');
+    Route::put('bid-sheets/{bid_sheet}', [BidSheetController::class, 'update'])->middleware('permission:bid_sheets.edit')->name('bid-sheets.update');
+    Route::get('bids/{bid}/edit', [BidSheetController::class, 'editBid'])->middleware('permission:bid_sheets.edit')->name('bids.edit');
+    Route::put('bids/{bid}', [BidSheetController::class, 'updateBid'])->middleware('permission:bid_sheets.edit')->name('bids.update');
 
     Route::get('vehicles/{vehicle}/costing', [CostingController::class, 'show'])->middleware('permission:costings.show')->name('costings.show');
     Route::put('vehicles/{vehicle}/costing', [CostingController::class, 'updateCosting'])->middleware('permission:costings.edit')->name('costings.update');
