@@ -18,7 +18,7 @@
             <div class="card-body">
                 @if($isPrivileged)
                 <form method="GET" action="{{ route('results.index') }}" class="mb-3">
-                    <select name="agent_ids[]" class="form-control select2-js" multiple style="max-width:400px;" onchange="this.form.submit()">
+                    <select name="agent_ids[]" data-plugin-selecttwo class="form-control select2-js" multiple style="max-width:400px;" onchange="this.form.submit()">
                         @foreach($agents as $a)<option value="{{ $a->id }}" @selected(in_array($a->id, request('agent_ids', [])))>{{ $a->name }}</option>@endforeach
                     </select>
                 </form>
