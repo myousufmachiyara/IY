@@ -102,15 +102,24 @@
                     <div class="row form-group">
                         <div class="col-12 mb-2">
                             <label>Current Password</label>
-                            <input type="password" class="form-control" placeholder="Current Password" name="current_password" required>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="cp_current" placeholder="Current Password" name="current_password" required>
+                                <button type="button" class="btn btn-outline-secondary" onclick="toggleReveal('cp_current', this)"><i class="fa fa-eye"></i></button>
+                            </div>
                         </div>
                         <div class="col-12 mb-2">
                             <label>New Password</label>
-                            <input type="password" class="form-control" placeholder="New Password" minlength="8" name="new_password" required>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="cp_new" placeholder="New Password" minlength="8" name="new_password" required>
+                                <button type="button" class="btn btn-outline-secondary" onclick="toggleReveal('cp_new', this)"><i class="fa fa-eye"></i></button>
+                            </div>
                         </div>
                         <div class="col-12 mb-2">
                             <label>Confirm New Password</label>
-                            <input type="password" class="form-control" placeholder="Confirm New Password" minlength="8" name="new_password_confirmation" required>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="cp_confirm" placeholder="Confirm New Password" minlength="8" name="new_password_confirmation" required>
+                                <button type="button" class="btn btn-outline-secondary" onclick="toggleReveal('cp_confirm', this)"><i class="fa fa-eye"></i></button>
+                            </div>
                         </div>
                     </div>
                 </div>
