@@ -68,7 +68,10 @@ class VehicleCosting extends Model
             $this->buying_price + $this->vendor_commission_amount + $this->inland_charges +
             $this->auction_commission + $this->freight_charges + $this->misc_expenses;
 
-        $this->company_service_charge = self::serviceChargeFor($this->buying_price);
+        // company_service_charge is no longer force-recalculated here — it's now an
+        // editable input like the other cost fields. serviceChargeFor() is only used
+        // to seed the DEFAULT value the first time a costing row is created (see
+        // ensureCosting() / won()), or via the "use standard rate" reset link.
 
         // "Cost Price for Agent" — deliberately excludes vendor/auction commission.
         $this->sale_price =
@@ -78,10 +81,9 @@ class VehicleCosting extends Model
         $sellingPrice ??= $this->vehicle?->selling_price;
 
         if ($sellingPrice) {
-            $this->profit = $sellingPrice - $this->total_costing; // company gross margin at the ACTUAL selling price
+            $this->profit = $sellingPrice - $this->total_costing;
             $this->agent_commission_amount = (int) round(max($sellingPrice - $this->sale_price, 0) * ($agentCommissionPercent / 100));
         } else {
-            // No selling price yet — preview against the suggested cost price.
             $this->profit = $this->sale_price - $this->total_costing;
             $this->agent_commission_amount = 0;
         }

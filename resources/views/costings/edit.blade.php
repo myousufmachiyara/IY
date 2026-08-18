@@ -45,6 +45,13 @@
                                                 <input type="text" class="form-control" id="vendor_commission_amount_display" value="¥{{ number_format($costing->vendor_commission_amount) }}" disabled>
                                             </div>
                                             <div class="col-6 mb-2">
+                                                <label class="d-flex justify-content-between align-items-center">
+                                                    <span>Company Service Charge (¥)</span>
+                                                    <a href="#" class="small" onclick="resetServiceCharge(); return false;">use standard rate</a>
+                                                </label>
+                                                <input type="number" class="form-control calc-input" id="company_service_charge" name="company_service_charge" value="{{ old('company_service_charge', $costing->company_service_charge) }}" min="0" required>
+                                            </div>
+                                            <div class="col-6 mb-2">
                                                 <label>Inland Charges (¥)</label>
                                                 <input type="number" class="form-control calc-input" id="inland_charges" name="inland_charges" value="{{ old('inland_charges', $costing->inland_charges) }}" min="0" required>
                                             </div>
@@ -181,9 +188,16 @@ function serviceChargeFor(price) {
     return Math.round(price * 0.10);
 }
 
+function resetServiceCharge() {
+    const buyingPrice = {{ $vehicle->buying_price }};
+    document.getElementById('company_service_charge').value = serviceChargeFor(buyingPrice);
+    recalcCostBreakdown();
+}
+
 function recalcCostBreakdown() {
     const buyingPrice = {{ $vehicle->buying_price }};
     const vendorPct = parseFloat(document.getElementById('vendor_commission_percent')?.value) || 0;
+    const serviceCharge = parseFloat(document.getElementById('company_service_charge')?.value) || 0;
     const inland = parseFloat(document.getElementById('inland_charges')?.value) || 0;
     const auction = parseFloat(document.getElementById('auction_commission')?.value) || 0;
     const freight = parseFloat(document.getElementById('freight_charges')?.value) || 0;
@@ -191,7 +205,6 @@ function recalcCostBreakdown() {
 
     const vendorCommAmount = Math.round(buyingPrice * (vendorPct / 100));
     totalCosting = buyingPrice + vendorCommAmount + inland + auction + freight + misc;
-    const serviceCharge = serviceChargeFor(buyingPrice);
     costPriceForAgent = buyingPrice + serviceCharge + inland + freight + misc;
 
     document.getElementById('vendor_commission_amount_display').value = '¥' + formatYen(vendorCommAmount);

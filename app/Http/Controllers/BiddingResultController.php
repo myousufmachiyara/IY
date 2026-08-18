@@ -78,7 +78,11 @@ class BiddingResultController extends Controller
             // reads total_costing, which only exists once this row is created.
             $costing = VehicleCosting::firstOrCreate(
                 ['vehicle_id' => $vehicle->id],
-                ['buying_price' => $vehicle->buying_price, 'vendor_commission_percent' => $vehicle->vendor->commission_percent ?? 7]
+                [
+                    'buying_price'              => $vehicle->buying_price,
+                    'vendor_commission_percent' => $vehicle->vendor->commission_percent ?? 7,
+                    'company_service_charge'    => VehicleCosting::serviceChargeFor($vehicle->buying_price),
+                ]
             );
             $costing->recalculate(
                 $vehicle->selling_price,

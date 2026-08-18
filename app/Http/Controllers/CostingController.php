@@ -17,12 +17,13 @@ class CostingController extends Controller
         return view('costings.edit', compact('vehicle', 'costing'));
     }
 
-    public function updateCosting(Request $request, Vehicle $vehicle)
+    public function updateCosting(Request $request, Vehicle $vehicle, LedgerService $ledger)
     {
         abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may edit costing.');
 
         $data = $request->validate([
             'vendor_commission_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'company_service_charge'    => ['required', 'integer', 'min:0'],
             'inland_charges'            => ['required', 'integer', 'min:0'],
             'auction_commission'        => ['required', 'integer', 'min:0'],
             'freight_charges'           => ['required', 'integer', 'min:0'],
@@ -40,7 +41,28 @@ class CostingController extends Controller
             (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
         )->save();
 
-        return back()->with('success', 'Costing updated. Profit and agent earning recalculated.');
+        $ledger->adjustVendorPayable($vehicle);
+
+        return back()->with('success', 'Costing updated. Vendor payable synced with the new total costing.');
+    }
+
+    private function ensureCosting(Vehicle $vehicle): VehicleCosting
+    {
+        $costing = VehicleCosting::create([
+            'vehicle_id'                => $vehicle->id,
+            'buying_price'              => $vehicle->buying_price,
+            'vendor_commission_percent' => $vehicle->vendor->commission_percent ?? 7,
+            'company_service_charge'    => VehicleCosting::serviceChargeFor($vehicle->buying_price),
+        ]);
+
+        $costing->recalculate(
+            $vehicle->selling_price,
+            $vehicle->agent->sales_commission_percent ?? 15,
+            (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
+        );
+        $costing->save();
+
+        return $costing;
     }
 
     public function updateSellingPrice(Request $request, Vehicle $vehicle)
@@ -66,21 +88,4 @@ class CostingController extends Controller
         return back()->with('success', 'Selling price saved.');
     }
 
-    private function ensureCosting(Vehicle $vehicle): VehicleCosting
-    {
-        $costing = VehicleCosting::create([
-            'vehicle_id'                => $vehicle->id,
-            'buying_price'              => $vehicle->buying_price,
-            'vendor_commission_percent' => $vehicle->vendor->commission_percent ?? 7,
-        ]);
-
-        $costing->recalculate(
-            $vehicle->selling_price,
-            $vehicle->agent->sales_commission_percent ?? 15,
-            (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
-        );
-        $costing->save();
-
-        return $costing;
-    }
 }
