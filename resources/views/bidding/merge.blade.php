@@ -23,7 +23,7 @@
                 <form method="GET" action="{{ route('bids.index') }}" class="row g-2 mb-3">
                     <div class="col-md-4">
                         <label>Sales Agent(s)</label>
-                        <select name="agent_ids[]" class="form-control select2-js" multiple onchange="this.form.submit()">
+                        <select name="agent_ids[]" data-plugin-selecttwo class="form-control select2-js" multiple onchange="this.form.submit()">
                             @foreach($agents as $a)<option value="{{ $a->id }}" @selected(in_array($a->id, request('agent_ids', [])))>{{ $a->name }}</option>@endforeach
                         </select>
                     </div>
