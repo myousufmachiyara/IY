@@ -101,9 +101,13 @@
                                             <label>Selling Price (¥) <span class="text-danger">*</span></label>
                                             <input type="number" class="form-control" id="selling_price" name="selling_price"
                                                 value="{{ old('selling_price', $vehicle->selling_price ?? $costing->sale_price) }}"
-                                                min="{{ $costing->sale_price }}" required oninput="recalcAgentEarning()">
+                                                min="{{ auth()->user()->isSuperAdmin() ? 1 : $costing->sale_price }}" required oninput="recalcAgentEarning()">
+                                            @if(auth()->user()->isSuperAdmin())
+                                                <small class="text-muted d-block mb-2">Super Admin override: can be set below Cost Price (¥{{ number_format($costing->sale_price) }}) if needed.</small>
+                                            @else
+                                                <small class="text-muted d-block mb-2">NOTE: minimum is Cost Price (¥{{ number_format($costing->sale_price) }}).</small>
+                                            @endif
                                         </div>
-                                        <small class="text-muted d-block mb-2">NOTE: minimum is Cost Price (¥{{ number_format($costing->sale_price) }}).</small>
                                         <button type="submit" class="btn btn-primary w-100 mb-3">
                                             {{ $vehicle->selling_price ? 'Update Selling Price' : 'Save Selling Price' }}
                                         </button>

@@ -47,10 +47,12 @@ class CostingController extends Controller
     {
         $costing = $vehicle->costing ?: $this->ensureCosting($vehicle);
 
-        // Floor is the Cost Price for Agent, not the raw buying price — matches
-        // "NOTE: MINIMUM IS COST PRICE" from the spreadsheet.
+        // Floor is the Cost Price for Agent — except Super Admin, who may override
+        // and set a selling price below it (e.g. a deliberate loss-leader sale).
+        $minPrice = $request->user()->isSuperAdmin() ? 1 : $costing->sale_price;
+
         $data = $request->validate([
-            'selling_price' => ['required', 'integer', "min:{$costing->sale_price}"],
+            'selling_price' => ['required', 'integer', "min:{$minPrice}"],
         ]);
 
         $vehicle->update(['selling_price' => $data['selling_price']]);
