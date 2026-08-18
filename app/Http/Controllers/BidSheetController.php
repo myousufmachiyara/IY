@@ -60,13 +60,33 @@ class BidSheetController extends Controller
         return view('bidding.sheets.show', ['sheet' => $bidSheet, 'customers' => $customers]);
     }
 
+    /** Sheet-level metadata only (title, auction date) — not the same restriction as bid-row editing. */
+    public function edit(BidSheet $bidSheet)
+    {
+        return response()->json([
+            'id'           => $bidSheet->id,
+            'title'        => $bidSheet->title,
+            'auction_date' => optional($bidSheet->auction_date)->format('Y-m-d'),
+        ]);
+    }
+
     /**
-     * Deleting a sheet must never silently destroy bids that already have real
-     * financial consequences (a won bid can have a live Vehicle, vendor payable,
-     * invoice, and payments attached). Pending bids carry no such history and are
-     * safe to remove outright; won/lost bids are only detached from the sheet,
-     * mirroring the same rule destroyBid() already enforces on single deletes.
+     * Correcting an already-uploaded sheet's title/date is a fix to existing data,
+     * not a fresh commitment to bid tomorrow — so the "must be exactly tomorrow"
+     * rule from store() is intentionally NOT re-applied here.
      */
+    public function update(Request $request, BidSheet $bidSheet)
+    {
+        $data = $request->validate([
+            'title'        => ['required', 'string', 'max:255'],
+            'auction_date' => ['nullable', 'date'],
+        ]);
+
+        $bidSheet->update($data);
+
+        return back()->with('success', 'Bid sheet updated.');
+    }
+
     public function destroy(BidSheet $bidSheet)
     {
         DB::transaction(function () use ($bidSheet) {
@@ -90,6 +110,42 @@ class BidSheetController extends Controller
             $sheet->update(['rows_count' => $sheet->bids()->count()]);
         }
         return back()->with('success', 'Bid removed.');
+    }
+
+    /** Fetch a single pending bid's editable fields. */
+    public function editBid(Bid $bid)
+    {
+        abort_unless($bid->result === 'pending', 422, 'Only pending bids can be edited.');
+
+        return response()->json($bid->only([
+            'id', 'lot_no', 'auction_house', 'make', 'model', 'year', 'grade',
+            'fuel_type', 'color', 'engine', 'chassis_no', 'max_bid', 'priority',
+        ]));
+    }
+
+    /** Correct a pending bid row's details — locked the moment it's marked won or lost. */
+    public function updateBid(Request $request, Bid $bid)
+    {
+        abort_unless($bid->result === 'pending', 422, 'Only pending bids can be edited.');
+
+        $data = $request->validate([
+            'lot_no'        => ['nullable', 'string', 'max:60'],
+            'auction_house' => ['nullable', 'string', 'max:120'],
+            'make'          => ['nullable', 'string', 'max:120'],
+            'model'         => ['nullable', 'string', 'max:120'],
+            'year'          => ['nullable', 'string', 'max:10'],
+            'grade'         => ['nullable', 'string', 'max:60'],
+            'fuel_type'     => ['nullable', 'string', 'max:60'],
+            'color'         => ['nullable', 'string', 'max:60'],
+            'engine'        => ['nullable', 'string', 'max:60'],
+            'chassis_no'    => ['nullable', 'string', 'max:60'],
+            'max_bid'       => ['required', 'integer', 'min:0'],
+            'priority'      => ['nullable', 'integer', 'min:1', 'max:9'],
+        ]);
+
+        $bid->update($data);
+
+        return back()->with('success', "Lot {$bid->lot_no} updated.");
     }
 
     public function assignCustomer(Request $request, Bid $bid)

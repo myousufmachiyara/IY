@@ -21,12 +21,7 @@
             @endif
             @if ($errors->any())
                 <div class="alert alert-danger">
-                    <strong><i class="fa fa-exclamation-triangle"></i> Could not upload the bid sheet:</strong>
-                    <ul class="mb-0 mt-1">
-                        @foreach ($errors->all() as $e)
-                            <li>{{ $e }}</li>
-                        @endforeach
-                    </ul>
+                    <ul class="mb-0">@foreach ($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
                 </div>
             @endif
 
@@ -83,9 +78,14 @@
                                     <a href="{{ route('bid-sheets.show', $s) }}" class="text-secondary me-1" title="View">
                                         <i class="fa fa-eye"></i>
                                     </a>
+                                    @can('bid_sheets.edit')
+                                        <a href="#" class="text-primary me-1" title="Edit Sheet" onclick="editSheet({{ $s->id }})">
+                                            <i class="fa fa-edit"></i>
+                                        </a>
+                                    @endcan
                                     @can('bid_sheets.delete')
                                         <form action="{{ route('bid-sheets.destroy', $s) }}" method="POST" style="display:inline;"
-                                              onsubmit="return confirm('Delete this bid sheet? Its bids will remain but lose the sheet reference.');">
+                                              onsubmit="return confirm('Delete this bid sheet? Pending bids will be removed; won/lost bids will be kept but detached from this sheet.');">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="btn btn-link p-0 text-danger">
                                                 <i class="fa fa-trash-alt"></i>
@@ -103,7 +103,6 @@
             </div>
         </section>
 
-        {{-- ================= UPLOAD MODAL ================= --}}
         @can('bid_sheets.create')
         <div id="addModal" class="modal-block modal-block-primary mfp-hide">
             <section class="card">
@@ -130,14 +129,14 @@
                                     @endif
                                 </label>
                                 <input type="date" class="form-control @error('auction_date') is-invalid @enderror"
-                                    name="auction_date"
-                                    value="{{ old('auction_date', auth()->user()->can('dates.future') ? '' : now()->addDay()->toDateString()) }}"
-                                    @unless(auth()->user()->can('dates.future'))
-                                        min="{{ now()->addDay()->toDateString() }}"
-                                        max="{{ now()->addDay()->toDateString() }}"
-                                        readonly
-                                    @endunless
-                                    required>
+                                       name="auction_date"
+                                       value="{{ old('auction_date', auth()->user()->can('dates.future') ? '' : now()->addDay()->toDateString()) }}"
+                                       @unless(auth()->user()->can('dates.future'))
+                                           min="{{ now()->addDay()->toDateString() }}"
+                                           max="{{ now()->addDay()->toDateString() }}"
+                                           readonly
+                                       @endunless
+                                       required>
                                 @error('auction_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
                             <div class="col-lg-12 mb-2">
@@ -146,7 +145,7 @@
                                        name="file" accept=".xlsx,.xls,.csv" required>
                                 @error('file')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 <small class="text-muted">
-                                    Columns: lot_no, auction_house, auction_date, make, model, year, grade, chassis_no, max_bid, priority.
+                                    Columns: lot_no, auction_house, auction_date, make, model, year, grade, fuel_type, color, engine, chassis_no, max_bid, priority.
                                     <a href="{{ route('bid-sheets.template') }}">Download the template</a> to get the exact format.
                                 </small>
                             </div>
@@ -155,6 +154,35 @@
                     <footer class="card-footer">
                         <div class="col-md-12 text-end">
                             <button type="submit" class="btn btn-primary">Upload &amp; Import</button>
+                            <button type="button" class="btn btn-default modal-dismiss">Cancel</button>
+                        </div>
+                    </footer>
+                </form>
+            </section>
+        </div>
+        @endcan
+
+        @can('bid_sheets.edit')
+        <div id="editSheetModal" class="modal-block modal-block-primary mfp-hide">
+            <section class="card">
+                <form method="POST" id="editSheetForm" action="" onkeydown="return event.key != 'Enter';">
+                    @csrf @method('PUT')
+                    <header class="card-header"><h2 class="card-title">Edit Bid Sheet</h2></header>
+                    <div class="card-body">
+                        <div class="row form-group">
+                            <div class="col-lg-12 mb-2">
+                                <label>Title <span class="text-danger">*</span></label>
+                                <input type="text" id="edit_sheet_title" class="form-control" name="title" required>
+                            </div>
+                            <div class="col-lg-12 mb-2">
+                                <label>Auction Date</label>
+                                <input type="date" id="edit_sheet_date" class="form-control" name="auction_date">
+                            </div>
+                        </div>
+                    </div>
+                    <footer class="card-footer">
+                        <div class="col-md-12 text-end">
+                            <button type="submit" class="btn btn-primary">Save</button>
                             <button type="button" class="btn btn-default modal-dismiss">Cancel</button>
                         </div>
                     </footer>
@@ -171,6 +199,15 @@
             $.magnificPopup.open({ items: { src: '#addModal' }, type: 'inline' });
         });
     @endif
+
+    function editSheet(id) {
+        fetch('/bid-sheets/' + id + '/edit').then(r => r.json()).then(data => {
+            $('#editSheetForm').attr('action', '/bid-sheets/' + id);
+            $('#edit_sheet_title').val(data.title);
+            $('#edit_sheet_date').val(data.auction_date);
+            $.magnificPopup.open({ items: { src: '#editSheetModal' }, type: 'inline' });
+        }).catch(() => alert('Could not load bid sheet data.'));
+    }
 </script>
 
 @endsection
