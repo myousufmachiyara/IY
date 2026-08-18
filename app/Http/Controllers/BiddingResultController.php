@@ -74,8 +74,8 @@ class BiddingResultController extends Controller
 
             $bid->update(['result' => 'won', 'won_amount' => $data['buying_price'], 'vehicle_id' => $vehicle->id]);
 
-            $ledger->vendorPayable($vehicle->fresh());
-
+            // Costing must exist BEFORE the payable is posted — adjustVendorPayable()
+            // reads total_costing, which only exists once this row is created.
             $costing = VehicleCosting::firstOrCreate(
                 ['vehicle_id' => $vehicle->id],
                 ['buying_price' => $vehicle->buying_price, 'vendor_commission_percent' => $vehicle->vendor->commission_percent ?? 7]
@@ -85,6 +85,8 @@ class BiddingResultController extends Controller
                 $vehicle->agent->sales_commission_percent ?? 15,
                 (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
             )->save();
+
+            $ledger->adjustVendorPayable($vehicle->fresh());
         });
 
         return redirect()->route('costings.show', $bid->fresh()->vehicle_id)
@@ -95,7 +97,6 @@ class BiddingResultController extends Controller
     {
         $bid->update(['result' => 'lost']);
         $bid->vehicle?->update(['status' => 'lost']);
-
         return back()->with('success', 'Bid marked as lost.');
     }
 
