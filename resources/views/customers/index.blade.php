@@ -96,6 +96,10 @@
                                     <span class="badge bg-{{ $badgeClass }}">{{ $badgeLabel }}</span>
                                     @if($c->security_deposit_status === 'approved')
                                         <br><small class="text-muted">¥{{ number_format($c->security_deposit) }}</small>
+                                    @elseif($c->security_deposit_status === 'rejected' && $c->security_deposit_rejection_reason)
+                                        <br><small class="text-danger" title="{{ $c->security_deposit_rejection_reason }}">
+                                            {{ \Illuminate\Support\Str::limit($c->security_deposit_rejection_reason, 40) }}
+                                        </small>
                                     @endif
                                 </td>
                                 <td>
