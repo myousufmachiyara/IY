@@ -11,10 +11,10 @@ class Customer extends Model
     use ScopedToAgent;
 
     protected $fillable = [
-        'name', 'phone', 'email', 'country', 'postal_code', 'address',
-        'consignee_name', 'agent_id',
+        'customer_no', 'name', 'phone', 'email', 'country', 'postal_code', 'address',
+        'consignee_name', 'eori_vat_number', 'agent_id',
         'security_deposit', 'security_deposit_paid', 'security_deposit_refunded',
-        'security_deposit_status', 'security_deposit_account',
+        'security_deposit_status', 'security_deposit_account', 'security_deposit_evidence_path',
         'security_deposit_received_by', 'security_deposit_received_at',
         'security_deposit_approved_by', 'security_deposit_approved_at',
         'security_deposit_rejection_reason',
