@@ -204,7 +204,7 @@
         </footer>
         <script>
             $.fn.dataTable.defaults.lengthMenu = [[100,250,500,1000,-1],[100,250,500,1000,'All']];
-w
+
             function toggleReveal(inputId, btn) {
                 const input = document.getElementById(inputId);
                 input.type = input.type === 'password' ? 'text' : 'password';
