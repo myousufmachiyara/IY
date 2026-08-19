@@ -166,8 +166,8 @@
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Date <span class="text-danger">*</span></label>
-                                <input type="date" class="form-control" name="expense_date" value="{{ date('Y-m-d') }}"
-                                    @unless(auth()->user()->isSuperAdmin()) min="{{ date('Y-m-d') }}" max="{{ date('Y-m-d') }}" readonly @endunless required>
+                                <input type="date" id="edit_exp_date" class="form-control" name="expense_date" value="{{ date('Y-m-d') }}"
+                                    @unless(auth()->user()->isSuperAdmin()) readonly @endunless required>
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Paid From <span class="text-danger">*</span></label>
