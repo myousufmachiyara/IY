@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, MorphMany};
 
 class Expense extends Model
 {
@@ -23,6 +23,7 @@ class Expense extends Model
 
     public function account(): BelongsTo  { return $this->belongsTo(ChartOfAccount::class, 'paid_from_account_id'); }
     public function recorder(): BelongsTo { return $this->belongsTo(User::class, 'recorded_by'); }
+
     public function journalEntries(): MorphMany
     {
         return $this->morphMany(JournalEntry::class, 'reference');
