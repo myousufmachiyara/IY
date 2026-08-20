@@ -16,7 +16,7 @@
 @endphp
 
 {{-- ===================== OVERVIEW ===================== --}}
-<h6 class="text-muted text-uppercase small mt-2 mb-2">Overview</h6>
+<h6 class="card title text-uppercase mt-2 mb-2">Overview</h6>
 <div class="row">
     {!! statCard(auth()->user()->isSalesAgent() ? 'My Customers' : 'Total Customers', $stats['customers'], 'primary', route('customers.index'), false) !!}
     {!! statCard('Vehicles Bid', $stats['vehicles_bid'], 'tertiary', route('bids.index'), false) !!}
