@@ -75,7 +75,8 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->middleware('permission:invoices.delete')->name('invoices.destroy');
     Route::get('customers/{customer}/invoices/merge', [InvoiceController::class, 'mergeSelectForm'])->middleware('permission:invoices.print')->name('invoices.merge_select');
     Route::post('customers/{customer}/invoices/merge', [InvoiceController::class, 'mergePdf'])->middleware('permission:invoices.print')->name('invoices.merge_pdf');
-
+    Route::post('invoices/merge', [InvoiceController::class, 'mergeSelectedPdf'])->middleware('permission:invoices.print')->name('invoices.merge_selected');
+    
     Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.index')->name('payments.index');
     Route::post('payments', [PaymentController::class, 'store'])->middleware('permission:payments.create')->name('payments.store');
     Route::post('payments/{payment}/approve', [PaymentController::class, 'approve'])->middleware('permission:payments.edit')->name('payments.approve');

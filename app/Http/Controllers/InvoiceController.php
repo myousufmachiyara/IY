@@ -168,6 +168,25 @@ class InvoiceController extends Controller
         return view('invoices.merge_select', compact('customer', 'invoices'));
     }
 
+    /** Merge any selection of existing invoices into one PDF — not tied to a single customer. */
+    public function mergeSelectedPdf(Request $request)
+    {
+        $data = $request->validate([
+            'invoice_ids'   => ['required', 'array', 'min:1'],
+            'invoice_ids.*' => ['exists:invoices,id'],
+        ]);
+
+        $invoices = Invoice::whereIn('id', $data['invoice_ids'])
+            ->with('vehicle.bid', 'customer')
+            ->orderBy('issued_at')
+            ->get();
+
+        abort_if($invoices->isEmpty(), 422, 'No matching invoices found.');
+
+        return Pdf::loadView('invoices.merged', compact('invoices'))
+            ->download('IY-Merged-Invoices-' . now()->format('Y-m-d') . '.pdf');
+    }
+
     public function mergePdf(Request $request, Customer $customer)
     {
         $data = $request->validate([

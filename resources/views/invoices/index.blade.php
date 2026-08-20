@@ -56,10 +56,23 @@
                     </div>
                 </form>
 
+                @can('invoices.print')
+                <form method="POST" action="{{ route('invoices.merge_selected') }}" id="mergeForm">
+                    @csrf
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <button type="submit" class="btn btn-outline-primary btn-sm" onclick="return confirm('Download a merged PDF of the selected invoices?');">
+                            <i class="fa fa-file-pdf"></i> Merge Selected to PDF
+                        </button>
+                        <small class="text-muted">Check the boxes on any invoices below, then click here — each one prints in full on its own page, nothing is combined or summed.</small>
+                    </div>
+                </form>
+                @endcan
+
                 <div class="table-scroll">
                     <table class="table table-bordered table-striped mb-0" id="datatable-default">
                         <thead>
                             <tr>
+                                @can('invoices.print')<th style="width:40px;"><input type="checkbox" id="checkAll"></th>@endcan
                                 <th>Invoice #</th>
                                 <th>Customer</th>
                                 <th>Vehicle</th>
@@ -79,6 +92,9 @@
                                      ($inv->due_final && !$inv->isFullyPaid() && now()->gt($inv->due_final)));
                             @endphp
                             <tr class="{{ $overdue ? 'table-danger' : '' }}">
+                                @can('invoices.print')
+                                    <td><input type="checkbox" class="merge-check" name="invoice_ids[]" value="{{ $inv->id }}" form="mergeForm"></td>
+                                @endcan
                                 <td>
                                     <a href="{{ route('invoices.show', $inv) }}"><strong>{{ $inv->invoice_no }}</strong></a>
                                     @if($overdue)<i class="fa fa-exclamation-triangle text-danger ms-1" title="Overdue"></i>@endif
@@ -91,7 +107,6 @@
                                 <td class="fw-bold {{ $inv->balance() > 0 ? 'text-danger' : 'text-success' }}">¥{{ number_format($inv->balance()) }}</td>
                                 <td><span class="badge bg-{{ $statusColors[$inv->status] ?? 'secondary' }} text-uppercase">{{ $inv->status }}</span></td>
                                 <td class="text-nowrap">
-                                    {{-- replace with: --}}
                                     @can('invoices.delete')
                                         @if($inv->amount_paid == 0)
                                             <form action="{{ route('invoices.destroy', $inv) }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this invoice? This cannot be undone.');">
@@ -109,7 +124,7 @@
                                 </td>
                             </tr>
                             @empty
-                            <tr><td colspan="{{ $isPrivileged ? 9 : 8 }}" class="text-center text-muted py-4">No invoices match this filter.</td></tr>
+                            <tr><td colspan="{{ $isPrivileged ? 10 : 9 }}" class="text-center text-muted py-4">No invoices match this filter.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -118,4 +133,10 @@
         </section>
     </div>
 </div>
+
+<script>
+document.getElementById('checkAll')?.addEventListener('change', function () {
+    document.querySelectorAll('.merge-check').forEach(cb => cb.checked = this.checked);
+});
+</script>
 @endsection
