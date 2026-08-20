@@ -109,6 +109,8 @@
     <div class="bank-line">Swift/BIC: TRWIGB2LXXX</div>
     <div class="bank-line">Bank name and address: Wise Payments Limited, Worship Square, 65 Clifton Street, London, EC2A 4JE, United Kingdom</div>
 
+    <div class="page-break"></div>
+
     <div class="tier-intro">Auction Deposit: To participate in a bidding customer has to provide an auction security deposit as per the buying:</div>
     <table class="tier">
         <tr><td>0 – 1 million (¥)</td><td>¥100,000</td></tr>
