@@ -48,7 +48,6 @@ class InvoiceController extends Controller
         return redirect()->route('invoices.show', $invoice)->with('success', "Invoice {$invoice->invoice_no} generated.");
     }
 
-    /** #9 — bulk-generate invoices for every eligible won-but-uninvoiced vehicle belonging to one customer. */
     public function bulkCreateForm(Customer $customer)
     {
         $eligible = $customer->vehicles()
@@ -90,6 +89,63 @@ class InvoiceController extends Controller
         return redirect()->route('customers.show', $customer)->with('success', "{$created} invoice(s) generated.");
     }
 
+    public function mergeSelectForm(Customer $customer)
+    {
+        $invoices = Invoice::where('customer_id', $customer->id)
+            ->whereIn('status', ['issued', 'partial', 'paid'])
+            ->with('vehicle')->latest()->get();
+
+        abort_if($invoices->isEmpty(), 422, 'This customer has no issued invoices yet.');
+
+        return view('invoices.merge_select', compact('customer', 'invoices'));
+    }
+
+    /** Combine a single customer's selected invoices into one merged/combined invoice PDF. */
+    public function mergePdf(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'invoice_ids'   => ['required', 'array', 'min:1'],
+            'invoice_ids.*' => ['exists:invoices,id'],
+        ]);
+
+        $invoices = Invoice::whereIn('id', $data['invoice_ids'])
+            ->where('customer_id', $customer->id)
+            ->with('vehicle.bid', 'customer')
+            ->orderBy('issued_at')
+            ->get();
+
+        abort_if($invoices->isEmpty(), 422, 'No matching invoices found for this customer.');
+
+        $groups = [['customer' => $customer, 'invoices' => $invoices]];
+
+        return Pdf::loadView('invoices.merged', compact('groups'))
+            ->download('IY-Combined-Invoice-' . \Illuminate\Support\Str::slug($customer->name) . '.pdf');
+    }
+
+    /** Merge any selection of existing invoices into combined per-customer invoices — not tied to one customer. */
+    public function mergeSelectedPdf(Request $request)
+    {
+        $data = $request->validate([
+            'invoice_ids'   => ['required', 'array', 'min:1'],
+            'invoice_ids.*' => ['exists:invoices,id'],
+        ]);
+
+        $invoices = Invoice::whereIn('id', $data['invoice_ids'])
+            ->with('vehicle.bid', 'customer')
+            ->orderBy('issued_at')
+            ->get();
+
+        abort_if($invoices->isEmpty(), 422, 'No matching invoices found.');
+
+        $groups = $invoices->groupBy('customer_id')->map(fn ($group) => [
+            'customer' => $group->first()->customer,
+            'invoices' => $group,
+        ])->values();
+
+        return Pdf::loadView('invoices.merged', compact('groups'))
+            ->download('IY-Combined-Invoices-' . now()->format('Y-m-d') . '.pdf');
+    }
+
     public function show(Request $request, Invoice $invoice)
     {
         $invoice->load('vehicle.costing', 'vehicle.shipment', 'customer', 'payments.recorder', 'agent');
@@ -123,7 +179,6 @@ class InvoiceController extends Controller
         return back()->with('success', 'Invoice cancelled and receivable entry reversed.');
     }
 
-    /** #8 — hard delete a genuinely mistaken invoice. Only when nothing has been paid on it. */
     public function destroy(Invoice $invoice, LedgerService $ledger)
     {
         abort_unless(auth()->user()->canBackdate(), 403);
@@ -143,7 +198,7 @@ class InvoiceController extends Controller
 
     public function pdf(Invoice $invoice)
     {
-        $invoice->load('vehicle', 'customer', 'agent');
+        $invoice->load('vehicle.bid', 'customer', 'agent');
 
         return Pdf::loadView('invoices.print', [
             'type'         => 'cnf',
@@ -155,54 +210,5 @@ class InvoiceController extends Controller
             'total_label'  => '100% C&F AMOUNT',
             'amount'       => $invoice->total_payable,
         ])->download("{$invoice->invoice_no}.pdf");
-    }
-
-    public function mergeSelectForm(Customer $customer)
-    {
-        $invoices = Invoice::where('customer_id', $customer->id)
-            ->whereIn('status', ['issued', 'partial', 'paid'])
-            ->with('vehicle')->latest()->get();
-
-        abort_if($invoices->isEmpty(), 422, 'This customer has no issued invoices yet.');
-
-        return view('invoices.merge_select', compact('customer', 'invoices'));
-    }
-
-    /** Merge any selection of existing invoices into one PDF — not tied to a single customer. */
-    public function mergeSelectedPdf(Request $request)
-    {
-        $data = $request->validate([
-            'invoice_ids'   => ['required', 'array', 'min:1'],
-            'invoice_ids.*' => ['exists:invoices,id'],
-        ]);
-
-        $invoices = Invoice::whereIn('id', $data['invoice_ids'])
-            ->with('vehicle.bid', 'customer')
-            ->orderBy('issued_at')
-            ->get();
-
-        abort_if($invoices->isEmpty(), 422, 'No matching invoices found.');
-
-        return Pdf::loadView('invoices.merged', compact('invoices'))
-            ->download('IY-Merged-Invoices-' . now()->format('Y-m-d') . '.pdf');
-    }
-
-    public function mergePdf(Request $request, Customer $customer)
-    {
-        $data = $request->validate([
-            'invoice_ids'   => ['required', 'array', 'min:1'],
-            'invoice_ids.*' => ['exists:invoices,id'],
-        ]);
-
-        $invoices = Invoice::whereIn('id', $data['invoice_ids'])
-            ->where('customer_id', $customer->id)
-            ->with('vehicle', 'customer')
-            ->orderBy('issued_at')
-            ->get();
-
-        abort_if($invoices->isEmpty(), 422, 'No matching invoices found for this customer.');
-
-        return Pdf::loadView('invoices.merged', compact('invoices'))
-            ->download('IY-Merged-Invoices-' . \Illuminate\Support\Str::slug($customer->name) . '.pdf');
     }
 }
