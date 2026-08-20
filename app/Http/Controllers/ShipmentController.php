@@ -129,9 +129,12 @@ class ShipmentController extends Controller
 
         $shipment->update($data);
 
+        $vehicleCount = $shipment->vehicles()->count();
+        $perVehicleFreight = $vehicleCount > 0 ? (int) round($data['freight_total'] / $vehicleCount) : 0;
+
         foreach ($shipment->vehicles as $vehicle) {
             if ($costing = $vehicle->costing) {
-                $costing->freight_charges = $data['freight_total'];
+                $costing->freight_charges = $perVehicleFreight;
                 $costing->recalculate(
                     $vehicle->selling_price,
                     $vehicle->agent->sales_commission_percent ?? 15,
@@ -140,7 +143,7 @@ class ShipmentController extends Controller
             }
         }
 
-        return back()->with('success', 'Shipment date and freight saved.');
+        return back()->with('success', "Shipment saved. Freight of ¥{$data['freight_total']} split across {$vehicleCount} vehicle(s) — ¥{$perVehicleFreight} each.");
     }
 
     public function dispatch(Shipment $shipment)
@@ -151,10 +154,17 @@ class ShipmentController extends Controller
         return back()->with('success', 'Shipment marked as dispatched.');
     }
 
-    public function arrive(Shipment $shipment)
+    public function arrive(Request $request, Shipment $shipment)
     {
-        $shipment->update(['status' => 'arrived']);
+        $data = $request->validate(['arrived_at' => ['required', 'date']]);
+
+        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['arrived_at'])->isToday()) {
+            return back()->withErrors(['arrived_at' => 'Only Super Admin may set an arrival date other than today.']);
+        }
+
+        $shipment->update(['status' => 'arrived', 'arrived_at' => $data['arrived_at']]);
         $shipment->vehicles()->update(['status' => 'arrived']);
+
         return back()->with('success', 'Shipment marked as arrived.');
     }
 

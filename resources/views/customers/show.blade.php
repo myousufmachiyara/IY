@@ -29,6 +29,11 @@
                             <i class="fa fa-file-invoice"></i> Bulk Generate Invoices
                         </a>
                     @endcan
+                    @can('invoices.print')
+                        <a href="{{ route('invoices.merge_select', $customer) }}" class="btn btn-sm btn-outline-secondary mb-2">
+                            <i class="fa fa-file-pdf"></i> Merge Invoices to PDF
+                        </a>
+                    @endcan
                 </div>
             </header>
 

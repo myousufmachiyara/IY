@@ -5,7 +5,23 @@
 @section('content')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-<div><h2 class="text-dark"><strong id="currentDate"></strong></h2></div>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h2 class="text-dark mb-0"><strong id="currentDate"></strong></h2>
+    <form method="GET" action="{{ route('dashboard') }}" class="d-flex align-items-end gap-2">
+        <div>
+            <label class="small text-muted mb-1 d-block">From</label>
+            <input type="date" name="from" class="form-control form-control-sm" value="{{ $from->toDateString() }}">
+        </div>
+        <div>
+            <label class="small text-muted mb-1 d-block">To</label>
+            <input type="date" name="to" class="form-control form-control-sm" value="{{ $to->toDateString() }}">
+        </div>
+        <button class="btn btn-sm btn-primary">Filter</button>
+        @if(request()->anyFilled(['from', 'to']))
+            <a href="{{ route('dashboard') }}" class="btn btn-sm btn-light">Reset</a>
+        @endif
+    </form>
+</div>
 
 @php
     $blueDark = '#378ADD'; $blueLight = '#B5D4F4'; $blueMid = '#85B7EB'; $orange = '#f59e0b';
@@ -16,7 +32,9 @@
 @endphp
 
 {{-- ===================== OVERVIEW ===================== --}}
-<h3 class="card-title text-uppercase mt-2 mb-2">Overview</h3>
+<h3 class="card-title text-uppercase mt-2 mb-2">
+    Overview <small class="text-muted" style="text-transform:none;font-size:13px;">({{ $from->format('d M') }} – {{ $to->format('d M Y') }})</small>
+</h3>
 <div class="row">
     {!! statCard(auth()->user()->isSalesAgent() ? 'My Customers' : 'Total Customers', $stats['customers'], 'primary', route('customers.index'), false) !!}
     {!! statCard('Vehicles Bid', $stats['vehicles_bid'], 'tertiary', route('bids.index'), false) !!}
@@ -27,21 +45,21 @@
     {!! statCard('Customer Receivables', $stats['receivables'], 'danger', route('accounting.receivables')) !!}
     {!! statCard('Profit', $stats['profit'], 'success', route('accounting.profit_loss')) !!}
     @if($isPrivileged)
-        {!! statCard('Pending Approvals', $stats['pending_approvals'], 'warning', route('approvals.index'), false) !!}
+        {!! statCard('Pending Approvals (current)', $stats['pending_approvals'], 'warning', route('approvals.index'), false) !!}
         {!! statCard('Vendor Payable', $stats['vendor_payable'], 'tertiary', route('accounting.payables')) !!}
     @endif
 </div>
 
 {{-- ===================== FINANCIAL POSITION ===================== --}}
 @if($isPrivileged)
-<h3 class="card-title text-uppercase mt-2 mb-2">Financial Position</h3>
+<h3 class="card-title text-uppercase mt-2 mb-2">Financial Position <small class="text-muted" style="text-transform:none;font-size:13px;">(as of {{ $to->format('d M Y') }})</small></h3>
 <div class="row">
     {!! statCard('Cash & Bank Balance', $financial['cash_bank'], 'primary', route('accounting.cash_bank')) !!}
     {!! statCard('Customer Receivables', $financial['receivables'], 'tertiary', route('accounting.receivables')) !!}
     {!! statCard('Vendor Payables', $financial['payables'], 'success', route('accounting.payables')) !!}
 </div>
 <div class="row">
-    {!! statCard('Operating Expenses This Month', $financial['op_expenses_month'], 'danger', route('expenses.index')) !!}
+    {!! statCard('Operating Expenses (range)', $financial['op_expenses_month'], 'danger', route('expenses.index')) !!}
     {!! statCard('Customer Deposits Held', $financial['deposits_held'], 'success', route('customers.index', ['deposit_status' => 'approved'])) !!}
     <div class="col-12 col-md-3 mb-2">
         <section class="card card-featured-left card-featured-primary">
@@ -60,7 +78,7 @@
 <div class="row mt-2">
     <div class="col-12 col-lg-6 mb-3">
         <section class="card h-100">
-            <header class="card-header"><h3 class="card-title h6 mb-0">Action Centre</h3></header>
+            <header class="card-header"><h3 class="card-title h6 mb-0">Action Centre <small class="text-muted">(current)</small></h3></header>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
                     @foreach($actionCentre as $item)
@@ -77,7 +95,7 @@
     </div>
     <div class="col-12 col-lg-6 mb-3">
         <section class="card h-100">
-            <header class="card-header"><h3 class="card-title h6 mb-0">Vehicle Pipeline</h3></header>
+            <header class="card-header"><h3 class="card-title h6 mb-0">Vehicle Pipeline <small class="text-muted">(current)</small></h3></header>
             <div class="card-body"><div style="position:relative; height:260px;"><canvas id="pipelineChart"></canvas></div></div>
         </section>
     </div>
@@ -93,7 +111,7 @@
     </div>
     <div class="col-12 col-lg-6 mb-3">
         <section class="card">
-            <header class="card-header"><h3 class="card-title h6 mb-0">Shipment / Logistics Panel</h3></header>
+            <header class="card-header"><h3 class="card-title h6 mb-0">Shipment / Logistics Panel <small class="text-muted">(current)</small></h3></header>
             <div class="card-body"><div style="position:relative; height:220px;"><canvas id="logisticsChart"></canvas></div></div>
         </section>
     </div>
@@ -116,7 +134,7 @@
                     <tbody>
                         @forelse($topAuctionHouses as $r)
                         <tr><td>{{ $r['house'] }}</td><td class="text-end">{{ $r['bids'] }}</td><td class="text-end">{{ $r['won'] }}</td><td class="text-end">{{ $r['rate'] }}%</td></tr>
-                        @empty<tr><td colspan="4" class="text-center text-muted py-3">No bid data yet.</td></tr>@endforelse
+                        @empty<tr><td colspan="4" class="text-center text-muted py-3">No bid data in this range.</td></tr>@endforelse
                     </tbody>
                 </table>
             </div>
@@ -135,7 +153,7 @@
                     <tbody>
                         @forelse($topAgents as $a)
                         <tr><td>{{ $a['agent'] }}</td><td class="text-end">{{ $a['bids'] }}</td><td class="text-end">{{ $a['won'] }}</td><td class="text-end">{{ $a['rate'] }}%</td><td class="text-end">¥{{ number_format($a['sales']) }}</td><td class="text-end">¥{{ number_format($a['profit']) }}</td></tr>
-                        @empty<tr><td colspan="6" class="text-center text-muted py-3">No agent data yet.</td></tr>@endforelse
+                        @empty<tr><td colspan="6" class="text-center text-muted py-3">No agent data in this range.</td></tr>@endforelse
                     </tbody>
                 </table>
             </div>
@@ -193,7 +211,6 @@ const noGridX = { grid: { display: false }, border: { display: false } };
 const softGridY = { grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { precision: 0 } };
 function formatYen(n) { return '¥' + Math.round(n).toLocaleString('en-US'); }
 
-// Custom plugin: draws the value at the end of each horizontal bar.
 const barValuePlugin = {
     id: 'barValue',
     afterDatasetsDraw(chart) {

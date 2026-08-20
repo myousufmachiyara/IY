@@ -36,7 +36,7 @@ class PaymentController extends Controller
             'method'       => ['required', Rule::in(['cash', 'bank'])],
             'paid_at'      => ['required', 'date'],
             'reference'    => ['nullable', 'string', 'max:255'],
-            'attachment'   => [$autoApprove ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'attachment'   => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
 
         // #3 — only Super Admin may enter a payment date other than today. Accountant and
@@ -127,15 +127,25 @@ class PaymentController extends Controller
         );
 
         $data = $request->validate([
-            'amount'    => ['required', 'integer', 'min:1'],
-            'method'    => ['required', Rule::in(['cash', 'bank'])],
-            'paid_at'   => ['required', 'date'],
-            'reference' => ['nullable', 'string', 'max:255'],
+            'amount'     => ['required', 'integer', 'min:1'],
+            'method'     => ['required', Rule::in(['cash', 'bank'])],
+            'paid_at'    => ['required', 'date'],
+            'reference'  => ['nullable', 'string', 'max:255'],
+            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
 
         if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
             return back()->withErrors(['paid_at' => 'Only Super Admin may set a payment date other than today.'])->withInput();
         }
+
+        if ($request->hasFile('attachment')) {
+            abort_if($payment->status === 'approved', 422, 'Cannot replace the attachment on an already-approved payment.');
+            if ($payment->attachment_path) {
+                \Storage::disk('public')->delete($payment->attachment_path);
+            }
+            $data['attachment_path'] = $request->file('attachment')->store('payment_attachments', 'public');
+        }
+        unset($data['attachment']);
 
         DB::transaction(function () use ($payment, $data, $ledger) {
             $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;

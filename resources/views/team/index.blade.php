@@ -9,7 +9,13 @@
         <section class="card">
             @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
             @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
-
+            @if(session('reset_password'))
+                <div class="alert alert-warning">
+                    <strong>New password for {{ session('reset_password')['user'] }}:</strong>
+                    <code style="font-size:15px;">{{ session('reset_password')['password'] }}</code>
+                    <br><small>This is shown once and cannot be retrieved again — copy it now and share it securely.</small>
+                </div>
+            @endif
             <header class="card-header">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
                     <h2 class="card-title">Team Members</h2>
@@ -55,6 +61,12 @@
                                             <button type="submit" class="btn btn-link p-0 text-danger"><i class="fa fa-trash-alt"></i></button>
                                         </form>
                                     @endcan
+                                    @if(auth()->user()->isSuperAdmin())
+                                        <form action="{{ route('team.reset_password', $member) }}" method="POST" style="display:inline;" onsubmit="return confirm('Reset this user\'s password? A new one will be generated and shown once.');">
+                                            @csrf
+                                            <button type="submit" class="btn btn-link p-0 text-warning me-1" title="Reset Password"><i class="fa fa-key"></i></button>
+                                        </form>
+                                    @endif
                                 </td>
                             </tr>
                             @endforeach

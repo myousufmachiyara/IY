@@ -66,7 +66,12 @@
                                 </td>
                                 <td>¥{{ number_format($p->amount) }}</td>
                                 <td class="text-capitalize">{{ $p->method }}</td>
-                                <td><span class="badge bg-{{ $statusColors[$p->status] ?? 'secondary' }}">{{ ucfirst($p->status) }}</span></td>
+                                <td>
+                                    <span class="badge bg-{{ $statusColors[$p->status] ?? 'secondary' }}">{{ ucfirst($p->status) }}</span>
+                                    @if($p->status === 'rejected' && $p->rejection_reason)
+                                        <br><small class="text-danger" title="{{ $p->rejection_reason }}">{{ \Illuminate\Support\Str::limit($p->rejection_reason, 40) }}</small>
+                                    @endif
+                                </td>
                                 <td>
                                     @if($p->attachment_path)
                                         <a href="{{ \App\Services\PublicStorage::url($p->attachment_path) }}" target="_blank"><i class="fa fa-paperclip"></i> View</a>

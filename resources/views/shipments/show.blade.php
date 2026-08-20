@@ -113,11 +113,12 @@
 
                                 @elseif($shipment->status === 'dispatched')
                                     @can('shipments.edit')
-                                        <form action="{{ route('shipments.arrive', $shipment) }}" method="POST" onsubmit="return confirm('Mark this shipment as arrived?');">
+                                        <form action="{{ route('shipments.arrive', $shipment) }}" method="POST" onsubmit="return confirm('Mark this shipment as arrived?');" class="mb-2">
                                             @csrf
-                                            <button type="submit" class="btn btn-success w-100 mb-2">
-                                                <i class="fa fa-anchor"></i> Mark Arrived
-                                            </button>
+                                            <label class="small mb-1">Arrival Date</label>
+                                            <input type="date" name="arrived_at" class="form-control mb-2" value="{{ now()->toDateString() }}"
+                                                @unless(auth()->user()->isSuperAdmin()) readonly @endunless required>
+                                            <button type="submit" class="btn btn-success w-100"><i class="fa fa-anchor"></i> Mark Arrived</button>
                                         </form>
                                         <form action="{{ route('shipments.undo_dispatch', $shipment) }}" method="POST" onsubmit="return confirm('Undo dispatch? This reverts the shipment back to Preparing.');">
                                             @csrf

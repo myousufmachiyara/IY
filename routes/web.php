@@ -22,6 +22,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('files/{path}', [FileController::class, 'show'])->where('path', '.*')->name('files.show');
 
     Route::resource('team', UserController::class)->except('show')->middleware('permission:members');
+    Route::post('team/{team}/reset-password', [UserController::class, 'resetPassword'])->middleware('permission:members.edit')->name('team.reset_password');
     Route::resource('roles', RoleController::class)->except('show')->middleware('permission:roles');
 
     Route::resource('customers', CustomerController::class)->middleware('permission:customers');
@@ -72,6 +73,8 @@ Route::middleware(['auth'])->group(function () {
     Route::put('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->middleware('permission:invoices.edit')->name('invoices.settle');
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->middleware('permission:invoices.edit')->name('invoices.cancel');
     Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->middleware('permission:invoices.delete')->name('invoices.destroy');
+    Route::get('customers/{customer}/invoices/merge', [InvoiceController::class, 'mergeSelectForm'])->middleware('permission:invoices.print')->name('invoices.merge_select');
+    Route::post('customers/{customer}/invoices/merge', [InvoiceController::class, 'mergePdf'])->middleware('permission:invoices.print')->name('invoices.merge_pdf');
 
     Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.index')->name('payments.index');
     Route::post('payments', [PaymentController::class, 'store'])->middleware('permission:payments.create')->name('payments.store');

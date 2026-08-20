@@ -46,9 +46,11 @@
                         <tbody>
                             @forelse ($bids as $b)
                             <tr>
-                                @can('bid_results.edit')
-                                    <td>@if($b->customer_id)<input type="checkbox" name="bid_ids[]" value="{{ $b->id }}" form="bulkLostForm">@endif</td>
-                                @endcan
+                                <td>
+                                    @can('bid_results.edit')
+                                        <input type="checkbox" name="bid_ids[]" value="{{ $b->id }}" form="bulkLostForm">
+                                    @endcan
+                                </td>
                                 <td>{{ $b->lot_no ?? '—' }}</td>
                                 <td>@if($b->customer){{ $b->customer->name }}@else<span class="badge bg-warning text-dark">Unassigned</span>@endif</td>
                                 <td>{{ trim("{$b->year} {$b->make} {$b->model}") ?: '—' }}</td>

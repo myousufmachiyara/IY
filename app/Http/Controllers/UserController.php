@@ -77,4 +77,14 @@ class UserController extends Controller
 
         return $data;
     }
+
+    public function resetPassword(User $team)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Only Super Admin may reset a user\'s password.');
+
+        $newPassword = \Illuminate\Support\Str::random(10);
+        $team->update(['password' => $newPassword]);
+
+        return back()->with('reset_password', ['user' => $team->name, 'password' => $newPassword]);
+    }
 }
