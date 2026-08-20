@@ -77,6 +77,8 @@
 <div class="bank-line">Swift/BIC: TRWIGB2LXXX</div>
 <div class="bank-line">Bank name and address: Wise Payments Limited, Worship Square, 65 Clifton Street, London, EC2A 4JE, United Kingdom</div>
 
+<div class="page-break"></div>
+
 <div class="tier-intro">Auction Deposit: To participate in a bidding customer has to provide an auction security deposit as per the buying:</div>
 <table class="tier">
     <tr><td>0 – 1 million (¥)</td><td>¥100,000</td></tr>
@@ -92,8 +94,6 @@
     <tr><td>Above 5 million (¥)</td><td>70% C&amp;F AMOUNT</td></tr>
     <tr><td>Above 10 million (¥)</td><td>100% C&amp;F AMOUNT</td></tr>
 </table>
-
-<div class="page-break"></div>
 
 <ul class="terms">
     <li>If the customer has not paid the given initial payment, the company has the right to reserve the vehicle as company stock and resell it to any other customer, even at a loss; certain loss will be adjusted from the auction deposit, as it was taken for security purposes.</li>
