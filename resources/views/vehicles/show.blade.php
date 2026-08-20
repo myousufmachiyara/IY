@@ -75,6 +75,11 @@
                                         @if($vehicle->winning_screenshot_path)
                                             <a href="{{ \App\Services\PublicStorage::url($vehicle->winning_screenshot_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="fa fa-image"></i> View Winning Screenshot</a>
                                         @endif
+                                        @if($vehicle->customer->security_deposit_status === 'approved')
+                                            <a href="{{ route('vehicles.deposit_invoice_pdf', $vehicle) }}" class="btn btn-sm btn-outline-secondary">
+                                                <i class="fa fa-file-pdf"></i> Auction Deposit Invoice
+                                            </a>
+                                        @endif
                                     </div>
                                 </div>
 

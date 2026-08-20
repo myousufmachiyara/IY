@@ -144,6 +144,46 @@ class InvoiceController extends Controller
     public function pdf(Invoice $invoice)
     {
         $invoice->load('vehicle', 'customer', 'agent');
-        return Pdf::loadView('invoices.pdf', compact('invoice'))->download("{$invoice->invoice_no}.pdf");
+
+        return Pdf::loadView('invoices.print', [
+            'type'         => 'cnf',
+            'invoice_no'   => $invoice->invoice_no,
+            'date'         => optional($invoice->issued_at)->format('d/m/Y') ?? now()->format('d/m/Y'),
+            'customer'     => $invoice->customer,
+            'vehicle'      => $invoice->vehicle,
+            'amount_label' => '100% CNF PRICE',
+            'total_label'  => '100% C&F AMOUNT',
+            'amount'       => $invoice->total_payable,
+        ])->download("{$invoice->invoice_no}.pdf");
+    }
+
+    public function mergeSelectForm(Customer $customer)
+    {
+        $invoices = Invoice::where('customer_id', $customer->id)
+            ->whereIn('status', ['issued', 'partial', 'paid'])
+            ->with('vehicle')->latest()->get();
+
+        abort_if($invoices->isEmpty(), 422, 'This customer has no issued invoices yet.');
+
+        return view('invoices.merge_select', compact('customer', 'invoices'));
+    }
+
+    public function mergePdf(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'invoice_ids'   => ['required', 'array', 'min:1'],
+            'invoice_ids.*' => ['exists:invoices,id'],
+        ]);
+
+        $invoices = Invoice::whereIn('id', $data['invoice_ids'])
+            ->where('customer_id', $customer->id)
+            ->with('vehicle', 'customer')
+            ->orderBy('issued_at')
+            ->get();
+
+        abort_if($invoices->isEmpty(), 422, 'No matching invoices found for this customer.');
+
+        return Pdf::loadView('invoices.merged', compact('invoices'))
+            ->download('IY-Merged-Invoices-' . \Illuminate\Support\Str::slug($customer->name) . '.pdf');
     }
 }

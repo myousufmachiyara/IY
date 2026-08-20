@@ -60,31 +60,16 @@ class BidSheetController extends Controller
         return view('bidding.sheets.show', ['sheet' => $bidSheet, 'customers' => $customers]);
     }
 
-    /** Sheet-level metadata only (title, auction date) — not the same restriction as bid-row editing. */
     public function edit(BidSheet $bidSheet)
     {
-        return response()->json([
-            'id'           => $bidSheet->id,
-            'title'        => $bidSheet->title,
-            'auction_date' => optional($bidSheet->auction_date)->format('Y-m-d'),
-        ]);
+        return response()->json(['id' => $bidSheet->id, 'title' => $bidSheet->title]);
     }
 
-    /**
-     * Correcting an already-uploaded sheet's title/date is a fix to existing data,
-     * not a fresh commitment to bid tomorrow — so the "must be exactly tomorrow"
-     * rule from store() is intentionally NOT re-applied here.
-     */
     public function update(Request $request, BidSheet $bidSheet)
     {
-        $data = $request->validate([
-            'title'        => ['required', 'string', 'max:255'],
-            'auction_date' => ['nullable', 'date'],
-        ]);
-
+        $data = $request->validate(['title' => ['required', 'string', 'max:255']]);
         $bidSheet->update($data);
-
-        return back()->with('success', 'Bid sheet updated.');
+        return back()->with('success', 'Bid sheet title updated.');
     }
 
     public function destroy(BidSheet $bidSheet)
@@ -100,7 +85,6 @@ class BidSheetController extends Controller
 
     public function template() { return Excel::download(new BidTemplateExport, 'bid-sheet-template.xlsx'); }
 
-    /** Delete a single bid row; only while still pending, and only from within its sheet context. */
     public function destroyBid(Bid $bid)
     {
         abort_unless($bid->result === 'pending', 422, 'Only pending bids can be deleted.');
@@ -112,18 +96,15 @@ class BidSheetController extends Controller
         return back()->with('success', 'Bid removed.');
     }
 
-    /** Fetch a single pending bid's editable fields. */
     public function editBid(Bid $bid)
     {
         abort_unless($bid->result === 'pending', 422, 'Only pending bids can be edited.');
-
         return response()->json($bid->only([
             'id', 'lot_no', 'auction_house', 'make', 'model', 'year', 'grade',
             'fuel_type', 'color', 'engine', 'chassis_no', 'max_bid', 'priority',
         ]));
     }
 
-    /** Correct a pending bid row's details — locked the moment it's marked won or lost. */
     public function updateBid(Request $request, Bid $bid)
     {
         abort_unless($bid->result === 'pending', 422, 'Only pending bids can be edited.');
@@ -144,7 +125,6 @@ class BidSheetController extends Controller
         ]);
 
         $bid->update($data);
-
         return back()->with('success', "Lot {$bid->lot_no} updated.");
     }
 

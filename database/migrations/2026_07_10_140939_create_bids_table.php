@@ -22,6 +22,7 @@ return new class extends Migration {
             $table->string('model')->nullable();
             $table->string('year')->nullable();
             $table->string('grade')->nullable();
+            
             $table->string('chassis_no')->nullable();
             $table->unsignedBigInteger('max_bid')->default(0);
             $table->unsignedTinyInteger('priority')->nullable();

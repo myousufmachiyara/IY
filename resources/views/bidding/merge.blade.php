@@ -8,7 +8,8 @@
     $exportColumns = [
         'lot_no' => 'Lot', 'auction_house' => 'Auction House', 'auction_date' => 'Date',
         'agent' => 'Agent', 'customer' => 'Customer', 'make' => 'Make', 'model' => 'Model',
-        'year' => 'Year', 'chassis_no' => 'Chassis', 'max_bid' => 'Max Bid', 'priority' => 'Priority', 'result' => 'Result',
+        'year' => 'Year', 'fuel_type' => 'Fuel', 'color' => 'Color', 'engine' => 'Engine',
+        'chassis_no' => 'Chassis', 'max_bid' => 'Max Bid', 'priority' => 'Priority', 'result' => 'Result',
     ];
 @endphp
 
@@ -21,10 +22,12 @@
 
             <div class="card-body">
                 <form method="GET" action="{{ route('bids.index') }}" class="row g-2 mb-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label>Sales Agent(s)</label>
-                        <select name="agent_ids[]" data-plugin-selecttwo class="form-control select2-js" multiple onchange="this.form.submit()">
-                            @foreach($agents as $a)<option value="{{ $a->id }}" @selected(in_array($a->id, request('agent_ids', [])))>{{ $a->name }}</option>@endforeach
+                        <select name="agent_ids[]" class="form-control select2-js" multiple>
+                            @foreach($agents as $a)
+                                <option value="{{ $a->id }}" @selected(in_array($a->id, request('agent_ids', [])))>{{ $a->name }}</option>
+                            @endforeach
                         </select>
                     </div>
                     <div class="col-md-2">
@@ -36,9 +39,17 @@
                             <option value="lost" @selected(request('result')==='lost')>Lost</option>
                         </select>
                     </div>
-                    <div class="col-md-3"><label>From Date</label><input type="date" name="from" class="form-control" value="{{ request('from') }}"></div>
-                    <div class="col-md-3"><label>To Date</label><input type="date" name="to" class="form-control" value="{{ request('to') }}"></div>
-                    <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-secondary w-100">Filter</button></div>
+                    <div class="col-md-2">
+                        <label>From Date</label>
+                        <input type="date" name="from" class="form-control" value="{{ request('from') }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label>To Date</label>
+                        <input type="date" name="to" class="form-control" value="{{ request('to') }}">
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                        <button class="btn btn-outline-secondary">Filter</button>
+                    </div>
                 </form>
 
                 @can('merge_bids.print')
@@ -46,6 +57,7 @@
                     <input type="hidden" name="agent_id" value="{{ request('agent_id') }}">
                     <input type="hidden" name="from" value="{{ request('from') }}">
                     <input type="hidden" name="to" value="{{ request('to') }}">
+                    <input type="hidden" name="result" value="{{ request('result') }}">
 
                     <label class="fw-bold small text-uppercase mb-2 d-block">Columns to Export</label>
                     <div class="row">

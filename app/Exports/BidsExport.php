@@ -10,14 +10,14 @@ class BidsExport implements FromQuery, WithHeadings, WithMapping
     private const LABELS = [
         'lot_no' => 'Lot', 'auction_house' => 'Auction House', 'auction_date' => 'Date',
         'agent' => 'Agent', 'customer' => 'Customer', 'make' => 'Make', 'model' => 'Model',
-        'year' => 'Year', 'chassis_no' => 'Chassis', 'max_bid' => 'Max Bid (¥)',
-        'priority' => 'Priority', 'result' => 'Result',
+        'year' => 'Year', 'fuel_type' => 'Fuel', 'color' => 'Color', 'engine' => 'Engine',
+        'chassis_no' => 'Chassis', 'max_bid' => 'Max Bid (¥)', 'priority' => 'Priority', 'result' => 'Result',
     ];
 
     public function __construct(private array $filters = [], private array $columns = [])
     {
         if (empty($this->columns)) {
-            $this->columns = array_keys(self::LABELS); // default: every column
+            $this->columns = array_keys(self::LABELS);
         }
     }
 
@@ -40,20 +40,14 @@ class BidsExport implements FromQuery, WithHeadings, WithMapping
     public function map($bid): array
     {
         $all = [
-            'lot_no'        => $bid->lot_no,
-            'auction_house' => $bid->auction_house,
-            'auction_date'  => optional($bid->auction_date)->format('Y-m-d'),
-            'agent'         => $bid->agent?->name,
-            'customer'      => $bid->customer?->name,
-            'make'          => $bid->make,
-            'model'         => $bid->model,
-            'year'          => $bid->year,
-            'chassis_no'    => $bid->chassis_no,
-            'max_bid'       => $bid->max_bid,
-            'priority'      => $bid->priority,
-            'result'        => $bid->result,
+            'lot_no' => $bid->lot_no, 'auction_house' => $bid->auction_house,
+            'auction_date' => optional($bid->auction_date)->format('Y-m-d'),
+            'agent' => $bid->agent?->name, 'customer' => $bid->customer?->name,
+            'make' => $bid->make, 'model' => $bid->model, 'year' => $bid->year,
+            'fuel_type' => $bid->fuel_type, 'color' => $bid->color, 'engine' => $bid->engine,
+            'chassis_no' => $bid->chassis_no, 'max_bid' => $bid->max_bid,
+            'priority' => $bid->priority, 'result' => $bid->result,
         ];
-
         return array_map(fn ($c) => $all[$c] ?? '', $this->columns);
     }
 }

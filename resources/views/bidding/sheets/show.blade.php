@@ -140,10 +140,6 @@
                                     <label>Title <span class="text-danger">*</span></label>
                                     <input type="text" id="edit_sheet_title" class="form-control" name="title" required>
                                 </div>
-                                <div class="col-lg-12 mb-2">
-                                    <label>Auction Date</label>
-                                    <input type="date" id="edit_sheet_date" class="form-control" name="auction_date">
-                                </div>
                             </div>
                         </div>
                         <footer class="card-footer">
@@ -199,7 +195,6 @@ function editSheet(id) {
     fetch('/bid-sheets/' + id + '/edit').then(r => r.json()).then(data => {
         $('#editSheetForm').attr('action', '/bid-sheets/' + id);
         $('#edit_sheet_title').val(data.title);
-        $('#edit_sheet_date').val(data.auction_date);
         $.magnificPopup.open({ items: { src: '#editSheetModal' }, type: 'inline' });
     }).catch(() => alert('Could not load bid sheet data.'));
 }

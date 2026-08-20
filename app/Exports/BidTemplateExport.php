@@ -9,12 +9,12 @@ class BidTemplateExport implements FromArray, WithHeadings
     public function array(): array
     {
         return [
-            ['LOT123', 'USS Tokyo', '2026-08-01', 'Toyota', 'Prius', '2020', 'S Package', 'ZVW51-1234567', 1200000, 1],
+            ['LOT123', 'USS Tokyo', '2026-08-01', 'Toyota', 'Prius', '2020', 'S Package', 'Petrol', 'White', '1800cc', 'ZVW51-1234567', 1200000, 1],
         ];
     }
 
     public function headings(): array
     {
-        return ['lot_no', 'auction_house', 'auction_date', 'make', 'model', 'year', 'grade', 'chassis_no', 'max_bid', 'priority'];
+        return ['lot_no', 'auction_house', 'auction_date', 'make', 'model', 'year', 'grade', 'fuel_type', 'color', 'engine', 'chassis_no', 'max_bid', 'priority'];
     }
 }
