@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Customer, Vehicle};
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class VehicleController extends Controller
@@ -71,6 +72,36 @@ class VehicleController extends Controller
         abort_unless($vehicle->isWon() && ! $vehicle->invoice, 422, 'Not eligible for an invoice request.');
         $vehicle->update(['invoice_requested_at' => now()]);
         return back()->with('success', 'Invoice requested — accountant/admin will be notified.');
+    }
+
+    public function cancelInvoiceRequest(Request $request, Vehicle $vehicle)
+    {
+        abort_unless($request->user()->can('invoices.request') || $request->user()->canBackdate(), 403);
+        abort_unless($vehicle->invoice_requested_at, 422, 'No pending invoice request to cancel.');
+
+        $vehicle->update(['invoice_requested_at' => null]);
+
+        return back()->with('success', 'Invoice request cancelled.');
+    }
+
+    /** Printable receipt of the customer's already-approved security deposit, referencing this specific vehicle. */
+    public function depositInvoicePdf(Vehicle $vehicle)
+    {
+        $vehicle->load('customer');
+        abort_unless($vehicle->customer->security_deposit_status === 'approved', 422, "This customer's security deposit has not been approved yet.");
+
+        $ref = 'IY/DEP/' . str_pad($vehicle->id, 3, '0', STR_PAD_LEFT);
+
+        return Pdf::loadView('invoices.print', [
+            'type'         => 'auction',
+            'invoice_no'   => $ref,
+            'date'         => now()->format('d/m/Y'),
+            'customer'     => $vehicle->customer,
+            'vehicle'      => $vehicle,
+            'amount_label' => 'AUCTION DEPOSIT',
+            'total_label'  => 'AUCTION DEPOSIT',
+            'amount'       => $vehicle->customer->security_deposit,
+        ])->download("{$ref}.pdf");
     }
 
     private function rules(): array
