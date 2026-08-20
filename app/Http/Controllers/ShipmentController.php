@@ -117,6 +117,9 @@ class ShipmentController extends Controller
             $vehicle->invoice?->update(['due_final' => $dueFinal]);
         }
 
+        // Re-split freight across the (possibly changed) vehicle list so totals stay correct after edits.
+        $this->applyFreightSplit($shipment);
+
         return redirect()->route('shipments.show', $shipment)->with('success', 'Shipment updated.');
     }
 
@@ -129,8 +132,16 @@ class ShipmentController extends Controller
 
         $shipment->update($data);
 
+        $perVehicleFreight = $this->applyFreightSplit($shipment);
+
+        return back()->with('success', "Shipment saved. Freight of ¥{$data['freight_total']} split across {$shipment->vehicles()->count()} vehicle(s) — ¥{$perVehicleFreight} each.");
+    }
+
+    /** Divides shipments.freight_total evenly across every vehicle on this shipment and re-saves each costing. Returns the per-vehicle amount. */
+    private function applyFreightSplit(Shipment $shipment): int
+    {
         $vehicleCount = $shipment->vehicles()->count();
-        $perVehicleFreight = $vehicleCount > 0 ? (int) round($data['freight_total'] / $vehicleCount) : 0;
+        $perVehicleFreight = $vehicleCount > 0 ? (int) round($shipment->freight_total / $vehicleCount) : 0;
 
         foreach ($shipment->vehicles as $vehicle) {
             if ($costing = $vehicle->costing) {
@@ -143,7 +154,7 @@ class ShipmentController extends Controller
             }
         }
 
-        return back()->with('success', "Shipment saved. Freight of ¥{$data['freight_total']} split across {$vehicleCount} vehicle(s) — ¥{$perVehicleFreight} each.");
+        return $perVehicleFreight;
     }
 
     public function dispatch(Shipment $shipment)
@@ -168,7 +179,6 @@ class ShipmentController extends Controller
         return back()->with('success', 'Shipment marked as arrived.');
     }
 
-    /** Step back from dispatched to preparing — pure status rollback, no financial side effects to reverse. */
     public function undoDispatch(Shipment $shipment)
     {
         abort_unless(auth()->user()->can('shipments.edit'), 403);
@@ -180,7 +190,6 @@ class ShipmentController extends Controller
         return back()->with('success', 'Shipment reverted to preparing.');
     }
 
-    /** Step back from arrived to dispatched. */
     public function undoArrive(Shipment $shipment)
     {
         abort_unless(auth()->user()->can('shipments.edit'), 403);
@@ -192,12 +201,6 @@ class ShipmentController extends Controller
         return back()->with('success', 'Shipment reverted to dispatched.');
     }
 
-    /**
-     * Fully cancel a shipment created by mistake. Only allowed while still
-     * 'preparing' — to cancel one that's already dispatched/arrived, undo it
-     * back to preparing first. Vehicles are detached and returned to invoiced,
-     * free to be added to a fresh shipment.
-     */
     public function cancel(Shipment $shipment)
     {
         abort_unless(auth()->user()->can('shipments.delete'), 403);
