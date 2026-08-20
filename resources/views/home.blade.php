@@ -5,258 +5,256 @@
 @section('content')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-	<div>
-		<h2 class="text-dark"><strong id="currentDate"></strong></h2>
-	</div>
+<div><h2 class="text-dark"><strong id="currentDate"></strong></h2></div>
 
-	<div class="row">
-		@can('customers.index')
-		<div class="col-12 col-md-3 mb-2">
-			<section class="card card-featured-left card-featured-primary">
-				<div class="card-body">
-					<h3 class="text-dark"><strong>{{ auth()->user()->isSalesAgent() ? 'My Customers' : 'Total Customers' }}</strong></h3>
-					<h2 class="m-0 text-primary">{{ number_format($stats['customers']) }}</h2>
-					<div class="summary-footer"><a class="text-primary text-uppercase" href="{{ route('customers.index') }}">View Details</a></div>
-				</div>
-			</section>
-		</div>
-		@endcan
+@php
+    $blueDark = '#378ADD'; $blueLight = '#B5D4F4'; $blueMid = '#85B7EB'; $orange = '#f59e0b';
+    function statCard($label, $value, $color, $route, $isMoney = true) {
+        $v = $isMoney ? '¥' . number_format($value) : number_format($value);
+        return "<div class=\"col-12 col-md-3 mb-2\"><section class=\"card card-featured-left card-featured-{$color}\"><div class=\"card-body\"><h3 class=\"text-dark\"><strong>{$label}</strong></h3><h2 class=\"m-0 text-{$color}\">{$v}</h2><div class=\"summary-footer\"><a class=\"text-{$color} text-uppercase\" href=\"{$route}\">View Details</a></div></div></section></div>";
+    }
+@endphp
 
-		@can('vehicle_requirement.index')
-		<div class="col-12 col-md-3 mb-2">
-			<section class="card card-featured-left card-featured-tertiary">
-				<div class="card-body">
-					<h3 class="text-dark"><strong>Open Requirements</strong></h3>
-					<h2 class="m-0 text-tertiary">{{ number_format($stats['requirements']) }}</h2>
-					<div class="summary-footer"><a class="text-tertiary text-uppercase" href="{{ route('vehicles.index') }}">View Details</a></div>
-				</div>
-			</section>
-		</div>
-		@endcan
+{{-- ===================== OVERVIEW ===================== --}}
+<h6 class="text-muted text-uppercase small mt-2 mb-2">Overview</h6>
+<div class="row">
+    {!! statCard(auth()->user()->isSalesAgent() ? 'My Customers' : 'Total Customers', $stats['customers'], 'primary', route('customers.index'), false) !!}
+    {!! statCard('Vehicles Bid', $stats['vehicles_bid'], 'tertiary', route('bids.index'), false) !!}
+    {!! statCard('Vehicles Won', $stats['vehicles_won'], 'success', route('results.won'), false) !!}
+    {!! statCard('Sales', $stats['sales'], 'primary', route('invoices.index')) !!}
+</div>
+<div class="row">
+    {!! statCard('Customer Receivables', $stats['receivables'], 'danger', route('accounting.receivables')) !!}
+    {!! statCard('Profit', $stats['profit'], 'success', route('accounting.profit_loss')) !!}
+    @if($isPrivileged)
+        {!! statCard('Pending Approvals', $stats['pending_approvals'], 'warning', route('approvals.index'), false) !!}
+        {!! statCard('Vendor Payable', $stats['vendor_payable'], 'tertiary', route('accounting.payables')) !!}
+    @endif
+</div>
 
-		@can('bid_results.index')
-		<div class="col-12 col-md-3 mb-2">
-			<section class="card card-featured-left card-featured-warning">
-				<div class="card-body">
-					<h3 class="text-dark"><strong>Pending Bids</strong></h3>
-					<h2 class="m-0 text-warning">{{ number_format($stats['pending_bids']) }}</h2>
-					<div class="summary-footer"><a class="text-warning text-uppercase" href="{{ route('results.index') }}">View Details</a></div>
-				</div>
-			</section>
-		</div>
-		<div class="col-12 col-md-3 mb-2">
-			<section class="card card-featured-left card-featured-success">
-				<div class="card-body">
-					<h3 class="text-dark"><strong>Won This Month</strong></h3>
-					<h2 class="m-0 text-success">{{ number_format($stats['won_this_month']) }}</h2>
-					<div class="summary-footer"><a class="text-success text-uppercase" href="{{ route('results.won') }}">View Details</a></div>
-				</div>
-			</section>
-		</div>
-		@endcan
+{{-- ===================== FINANCIAL POSITION ===================== --}}
+@if($isPrivileged)
+<h6 class="text-muted text-uppercase small mt-3 mb-2">Financial Position</h6>
+<div class="row">
+    {!! statCard('Cash & Bank Balance', $financial['cash_bank'], 'primary', route('accounting.cash_bank')) !!}
+    {!! statCard('Customer Receivables', $financial['receivables'], 'tertiary', route('accounting.receivables')) !!}
+    {!! statCard('Vendor Payables', $financial['payables'], 'success', route('accounting.payables')) !!}
+</div>
+<div class="row">
+    {!! statCard('Operating Expenses This Month', $financial['op_expenses_month'], 'danger', route('expenses.index')) !!}
+    {!! statCard('Customer Deposits Held', $financial['deposits_held'], 'success', route('customers.index', ['deposit_status' => 'approved'])) !!}
+    <div class="col-12 col-md-3 mb-2">
+        <section class="card card-featured-left card-featured-primary">
+            <div class="card-body">
+                <h3 class="text-dark"><strong>Net Cash Exposure</strong>
+                    <i class="fa fa-info-circle text-muted" style="font-size:12px;" title="Cash + Expected Customer Collections − Vendor/Other Immediate Payables"></i>
+                </h3>
+                <h2 class="m-0 text-primary">¥{{ number_format($financial['net_cash_exposure']) }}</h2>
+                <div class="summary-footer"><a class="text-primary text-uppercase" href="{{ route('accounting.trial_balance') }}">View Details</a></div>
+            </div>
+        </section>
+    </div>
+</div>
 
-		@can('invoices.index')
-		<div class="col-12 col-md-3 mb-2">
-			<section class="card card-featured-left card-featured-danger">
-				<div class="card-body">
-					<h3 class="text-dark"><strong>Outstanding Balance</strong></h3>
-					<h2 class="m-0 text-danger">¥{{ number_format($stats['outstanding']) }}</h2>
-					<div class="summary-footer"><a class="text-danger text-uppercase" href="{{ route('invoices.index') }}">View Details</a></div>
-				</div>
-			</section>
-		</div>
-		<div class="col-12 col-md-3 mb-2">
-			<section class="card card-featured-left card-featured-danger">
-				<div class="card-body">
-					<h3 class="text-dark"><strong>Overdue Invoices</strong></h3>
-					<h2 class="m-0 text-danger">{{ number_format($stats['overdue_invoices']) }}</h2>
-					<div class="summary-footer"><a class="text-danger text-uppercase" href="{{ route('invoices.index') }}">View Details</a></div>
-				</div>
-			</section>
-		</div>
-		@endcan
+{{-- ===================== ACTION CENTRE + VEHICLE PIPELINE ===================== --}}
+<div class="row mt-2">
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card h-100">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Action Centre</h3></header>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    @foreach($actionCentre as $item)
+                    @php $dot = ['danger'=>'#e34948','warning'=>'#eda100','muted'=>'#c3c2b7'][$item['severity']]; @endphp
+                    <tr>
+                        <td style="width:20px;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{{ $dot }};"></span></td>
+                        <td>{{ $item['count'] }} {{ $item['label'] }}</td>
+                        <td class="text-end"><a href="{{ $item['route'] }}" class="small">View Details</a></td>
+                    </tr>
+                    @endforeach
+                </table>
+            </div>
+        </section>
+    </div>
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card h-100">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Vehicle Pipeline</h3></header>
+            <div class="card-body"><div style="position:relative; height:260px;"><canvas id="pipelineChart"></canvas></div></div>
+        </section>
+    </div>
+</div>
 
-		@if($isPrivileged)
-		<div class="col-12 col-md-3 mb-2">
-			<section class="card card-featured-left card-featured-warning">
-				<div class="card-body">
-					<h3 class="text-dark"><strong>Pending Deposit Approvals</strong></h3>
-					<h2 class="m-0 text-warning">{{ number_format($stats['pending_deposits']) }}</h2>
-					<div class="summary-footer"><a class="text-warning text-uppercase" href="{{ route('customers.index') }}">Review</a></div>
-				</div>
-			</section>
-		</div>
-		<div class="col-12 col-md-3 mb-2">
-			<section class="card card-featured-left card-featured-tertiary">
-				<div class="card-body">
-					<h3 class="text-dark"><strong>Vendor Payable</strong></h3>
-					<h2 class="m-0 text-tertiary">¥{{ number_format($stats['vendor_payable']) }}</h2>
-					<div class="summary-footer"><a class="text-tertiary text-uppercase" href="{{ route('accounting.payables') }}">View Details</a></div>
-				</div>
-			</section>
-		</div>
-		@endif
-	</div>
+{{-- ===================== REVENUE/PROFIT + SHIPMENT LOGISTICS ===================== --}}
+<div class="row">
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Revenue &amp; Profit</h3></header>
+            <div class="card-body"><div style="position:relative; height:220px;"><canvas id="revProfitChart"></canvas></div></div>
+        </section>
+    </div>
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Shipment / Logistics Panel</h3></header>
+            <div class="card-body"><div style="position:relative; height:220px;"><canvas id="logisticsChart"></canvas></div></div>
+        </section>
+    </div>
+</div>
 
-	{{-- ===================== CHARTS — everyone (auto-scoped to own data) ===================== --}}
-	<div class="row mt-2">
-		@can('invoices.index')
-		<div class="col-12 col-lg-6 mb-3">
-			<section class="card">
-				<header class="card-header"><h3 class="card-title h6 mb-0">Revenue — Last 6 Months</h3></header>
-				<div class="card-body"><div style="position:relative; height:260px;"><canvas id="revenueChart"></canvas></div></div>
-			</section>
-		</div>
-		@endcan
+{{-- ===================== AUCTION PERFORMANCE + TOP AUCTION HOUSES ===================== --}}
+<div class="row">
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Auction Performance</h3></header>
+            <div class="card-body"><div style="position:relative; height:220px;"><canvas id="auctionPerfChart"></canvas></div></div>
+        </section>
+    </div>
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Top Auction Houses</h3></header>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Auction House</th><th class="text-end">Bids</th><th class="text-end">Won</th><th class="text-end">Win Rate</th></tr></thead>
+                    <tbody>
+                        @forelse($topAuctionHouses as $r)
+                        <tr><td>{{ $r['house'] }}</td><td class="text-end">{{ $r['bids'] }}</td><td class="text-end">{{ $r['won'] }}</td><td class="text-end">{{ $r['rate'] }}%</td></tr>
+                        @empty<tr><td colspan="4" class="text-center text-muted py-3">No bid data yet.</td></tr>@endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
 
-		@can('bid_results.index')
-		<div class="col-12 col-lg-6 mb-3">
-			<section class="card">
-				<header class="card-header d-flex justify-content-between align-items-center">
-					<h3 class="card-title h6 mb-0">Bidding Funnel — Won vs Lost</h3>
-					<div class="d-flex gap-3" style="font-size:12px; color:#6b7280;">
-						<span class="d-flex align-items-center gap-1"><span style="width:8px;height:8px;border-radius:2px;background:#185FA5;display:inline-block;"></span> Won</span>
-						<span class="d-flex align-items-center gap-1"><span style="width:8px;height:8px;border-radius:2px;background:#B5D4F4;display:inline-block;"></span> Lost</span>
-					</div>
-				</header>
-				<div class="card-body"><div style="position:relative; height:260px;"><canvas id="biddingChart"></canvas></div></div>
-			</section>
-		</div>
-		@endcan
+{{-- ===================== TOP AGENTS + TOP CUSTOMERS ===================== --}}
+<div class="row">
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Top-Performing Agents</h3></header>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Agent</th><th class="text-end">Bids</th><th class="text-end">Won</th><th class="text-end">Win%</th><th class="text-end">Sales</th><th class="text-end">Profit</th></tr></thead>
+                    <tbody>
+                        @forelse($topAgents as $a)
+                        <tr><td>{{ $a['agent'] }}</td><td class="text-end">{{ $a['bids'] }}</td><td class="text-end">{{ $a['won'] }}</td><td class="text-end">{{ $a['rate'] }}%</td><td class="text-end">¥{{ number_format($a['sales']) }}</td><td class="text-end">¥{{ number_format($a['profit']) }}</td></tr>
+                        @empty<tr><td colspan="6" class="text-center text-muted py-3">No agent data yet.</td></tr>@endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Top Customers</h3></header>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Customer</th><th class="text-end">Vehicles</th><th class="text-end">Sales</th><th class="text-end">Profit</th><th class="text-end">Outstanding</th></tr></thead>
+                    <tbody>
+                        @forelse($topCustomers as $c)
+                        <tr><td>{{ $c['customer'] }}</td><td class="text-end">{{ $c['vehicles'] }}</td><td class="text-end">¥{{ number_format($c['sales']) }}</td><td class="text-end">¥{{ number_format($c['profit']) }}</td><td class="text-end">¥{{ number_format($c['outstanding']) }}</td></tr>
+                        @empty<tr><td colspan="5" class="text-center text-muted py-3">No customer data yet.</td></tr>@endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</div>
 
-		@can('invoices.index')
-		<div class="col-12 col-lg-4 mb-3">
-			<section class="card">
-				<header class="card-header"><h3 class="card-title h6 mb-0">Invoice Status</h3></header>
-				<div class="card-body">
-					<div class="d-flex align-items-center gap-3">
-						<div style="position:relative; height:150px; width:150px; flex-shrink:0;"><canvas id="invoiceStatusChart"></canvas></div>
-						<div style="font-size:13px;">
-							<p class="mb-1 text-muted" style="font-size:12px;">Total Invoices</p>
-							<p class="mb-3" style="font-size:26px; font-weight:600;">{{ $invoiceStatusChart['total'] }}</p>
-							@foreach($invoiceStatusChart['labels'] as $i => $label)
-								<p class="mb-1 d-flex align-items-center gap-2">
-									<span style="width:8px;height:8px;border-radius:2px;background:{{ ['#E6F1FB','#B5D4F4','#85B7EB','#378ADD','#c3c2b7'][$i] }};display:inline-block;"></span>
-									{{ $label }} <span class="text-muted">{{ $invoiceStatusChart['data'][$i] }}</span>
-								</p>
-							@endforeach
-						</div>
-					</div>
-				</div>
-			</section>
-		</div>
-		@endcan
+{{-- ===================== RECEIVABLES VS PAYABLE + VENDOR LEDGER ===================== --}}
+<div class="row">
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Receivables vs Payable</h3></header>
+            <div class="card-body"><div style="position:relative; height:220px;"><canvas id="recvPayChart"></canvas></div></div>
+        </section>
+    </div>
+    <div class="col-12 col-lg-6 mb-3">
+        <section class="card">
+            <header class="card-header"><h3 class="card-title h6 mb-0">Vendor Ledger</h3></header>
+            <div class="card-body"><div style="position:relative; height:220px;"><canvas id="vendorLedgerChart"></canvas></div></div>
+        </section>
+    </div>
+</div>
+@endif
 
-		{{-- ===================== CHARTS — Super Admin / Accountant only ===================== --}}
-		@if($isPrivileged)
-		<div class="col-12 col-lg-4 mb-3">
-			<section class="card">
-				<header class="card-header"><h3 class="card-title h6 mb-0">Top Agents — Vehicles Won</h3></header>
-				<div class="card-body"><div style="position:relative; height:220px;"><canvas id="agentChart"></canvas></div></div>
-			</section>
-		</div>
-		<div class="col-12 col-lg-4 mb-3">
-			<section class="card">
-				<header class="card-header"><h3 class="card-title h6 mb-0">Vendor Payable Exposure</h3></header>
-				<div class="card-body"><div style="position:relative; height:220px;"><canvas id="vendorChart"></canvas></div></div>
-			</section>
-		</div>
-		@endif
-	</div>
+<script>
+$(document).ready(function() {
+    const now = new Date();
+    const day = getDaySuffix(now.getDate());
+    document.getElementById('currentDate').innerText = `${now.toLocaleString('en-GB', { weekday: 'long' })}, ${day} ${now.toLocaleString('en-GB', { month: 'long' })} ${now.getFullYear()}`;
+});
+function getDaySuffix(day) {
+    if (day >= 11 && day <= 13) return day + 'th';
+    switch (day % 10) { case 1: return day+'st'; case 2: return day+'nd'; case 3: return day+'rd'; default: return day+'th'; }
+}
 
-	<script>
-		$(document).ready(function() {
-			const now = new Date();
-			const day = getDaySuffix(now.getDate());
-			document.getElementById('currentDate').innerText = `${now.toLocaleString('en-GB', { weekday: 'long' })}, ${day} ${now.toLocaleString('en-GB', { month: 'long' })} ${now.getFullYear()}`;
-		});
-		function getDaySuffix(day) {
-			if (day >= 11 && day <= 13) return day + 'th';
-			switch (day % 10) { case 1: return day+'st'; case 2: return day+'nd'; case 3: return day+'rd'; default: return day+'th'; }
-		}
+const blueDark = '#378ADD', blueLight = '#B5D4F4', blueMid = '#85B7EB', orange = '#f59e0b';
+Chart.defaults.font.family = "'Poppins', sans-serif";
+Chart.defaults.color = '#6b7280';
+const noGridX = { grid: { display: false }, border: { display: false } };
+const softGridY = { grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { precision: 0 } };
+function formatYen(n) { return '¥' + Math.round(n).toLocaleString('en-US'); }
 
-		// ── Option B: monochrome-blue two-tone bars, thick-ring donut with side
-		// panel (built directly in the Blade markup above, not here), pill bars.
-		const blueDark = '#378ADD', blueLight = '#B5D4F4', blueMid = '#85B7EB';
+// Custom plugin: draws the value at the end of each horizontal bar.
+const barValuePlugin = {
+    id: 'barValue',
+    afterDatasetsDraw(chart) {
+        if (!chart.config._showBarValues) return;
+        const { ctx } = chart;
+        chart.data.datasets.forEach((ds, i) => {
+            const meta = chart.getDatasetMeta(i);
+            meta.data.forEach((bar, idx) => {
+                const value = ds.data[idx];
+                ctx.save();
+                ctx.font = "600 11px 'Poppins', sans-serif";
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(chart.config._moneyLabels ? formatYen(value) : value, bar.x - 8, bar.y);
+                ctx.restore();
+            });
+        });
+    }
+};
+Chart.register(barValuePlugin);
 
-		Chart.defaults.font.family = "'Poppins', sans-serif";
-		Chart.defaults.color = '#6b7280';
-		Chart.defaults.plugins.tooltip.backgroundColor = '#fff';
-		Chart.defaults.plugins.tooltip.titleColor = '#222b36';
-		Chart.defaults.plugins.tooltip.bodyColor = '#222b36';
-		Chart.defaults.plugins.tooltip.borderColor = '#e5e7eb';
-		Chart.defaults.plugins.tooltip.borderWidth = 1;
-		Chart.defaults.plugins.tooltip.cornerRadius = 10;
-		Chart.defaults.plugins.tooltip.padding = 12;
+@if($isPrivileged)
+new Chart(document.getElementById('pipelineChart'), {
+    type: 'bar',
+    data: { labels: @json($pipeline['labels']), datasets: [{ data: @json($pipeline['data']), backgroundColor: blueDark, borderRadius: 6, borderSkipped: false }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: softGridY, y: noGridX } }
+});
 
-		const noGridX = { grid: { display: false }, border: { display: false } };
-		const softGridY = { grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { precision: 0 } };
+new Chart(document.getElementById('revProfitChart'), {
+    type: 'bar',
+    data: { labels: ['Revenue', 'Profit'], datasets: [{ data: [{{ $revenueProfit['revenue'] }}, {{ $revenueProfit['profit'] }}], backgroundColor: [blueDark, '#1baf7a'], borderRadius: 8, borderSkipped: false }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: noGridX, y: { ...softGridY, ticks: { ...softGridY.ticks, callback: v => '¥'+(v/1000000)+'M' } } } }
+});
 
-		@can('invoices.index')
-		new Chart(document.getElementById('revenueChart'), {
-			type: 'bar',
-			data: {
-				labels: @json($revenueChart['labels']),
-				datasets: [{
-					label: 'Revenue (¥)',
-					data: @json($revenueChart['data']),
-					backgroundColor: @json($revenueChart['labels']).map((_, i) => i % 2 === 0 ? blueDark : blueLight),
-					borderRadius: 6, borderSkipped: false,
-				}]
-			},
-			options: {
-				maintainAspectRatio: false,
-				plugins: { legend: { display: false } },
-				scales: { x: noGridX, y: { ...softGridY, ticks: { ...softGridY.ticks, callback: v => '¥' + (v/1000) + 'k' } } },
-				barPercentage: 0.55,
-			}
-		});
-		@endcan
+new Chart(document.getElementById('logisticsChart'), {
+    type: 'bar',
+    data: { labels: @json($shipLogistics['labels']), datasets: [{ data: @json($shipLogistics['data']), backgroundColor: orange, borderRadius: 6, borderSkipped: false }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: softGridY, y: noGridX } }
+});
 
-		@can('bid_results.index')
-		new Chart(document.getElementById('biddingChart'), {
-			type: 'bar',
-			data: {
-				labels: @json($biddingChart['labels']),
-				datasets: [
-					{ label: 'Won', data: @json($biddingChart['won']), backgroundColor: blueDark, borderRadius: 8, borderSkipped: false },
-					{ label: 'Lost', data: @json($biddingChart['lost']), backgroundColor: blueLight, borderRadius: 8, borderSkipped: false }
-				]
-			},
-			options: {
-				maintainAspectRatio: false,
-				scales: { x: noGridX, y: softGridY },
-				plugins: { legend: { display: false } },
-				barPercentage: 0.5, categoryPercentage: 0.6,
-			}
-		});
-		@endcan
+new Chart(document.getElementById('auctionPerfChart'), {
+    type: 'bar',
+    data: { labels: @json($auctionPerf['labels']), datasets: [{ data: @json($auctionPerf['data']), backgroundColor: [blueDark, '#1baf7a', '#e34948', orange], borderRadius: 6, borderSkipped: false }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: noGridX, y: softGridY } }
+});
 
-		@can('invoices.index')
-		new Chart(document.getElementById('invoiceStatusChart'), {
-			type: 'doughnut',
-			data: { labels: @json($invoiceStatusChart['labels']), datasets: [{ data: @json($invoiceStatusChart['data']), backgroundColor: ['#E6F1FB','#B5D4F4','#85B7EB','#378ADD','#c3c2b7'], borderWidth: 3, borderColor: '#fff' }] },
-			options: { maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } },
-		});
-		@endcan
+new Chart(document.getElementById('recvPayChart'), {
+    type: 'bar',
+    data: { labels: ['Receivable', 'Payable'], datasets: [{ data: [{{ $financial['receivables'] }}, {{ $financial['payables'] }}], backgroundColor: [blueDark, blueLight], borderRadius: 8, borderSkipped: false }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: noGridX, y: { ...softGridY, ticks: { ...softGridY.ticks, callback: v => '¥'+(v/1000000)+'M' } } } }
+});
 
-		@if($isPrivileged)
-		new Chart(document.getElementById('agentChart'), {
-			type: 'bar',
-			data: { labels: @json($agentChart['labels']), datasets: [{ label: 'Vehicles Won', data: @json($agentChart['data']), backgroundColor: blueDark, borderRadius: 20, borderSkipped: false }] },
-			options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: softGridY, y: noGridX }, barPercentage: 0.5 }
-		});
-
-		new Chart(document.getElementById('vendorChart'), {
-			type: 'bar',
-			data: { labels: @json($vendorChart['labels']), datasets: [{ label: 'Payable (¥)', data: @json($vendorChart['data']), backgroundColor: blueMid, borderRadius: 20, borderSkipped: false }] },
-			options: {
-				indexAxis: 'y', maintainAspectRatio: false,
-				plugins: { legend: { display: false } },
-				scales: { x: { ...softGridY, ticks: { callback: v => '¥' + (v/1000) + 'k' } }, y: noGridX },
-				barPercentage: 0.5,
-			}
-		});
-		@endif
-	</script>
+const vendorLedgerChart = new Chart(document.getElementById('vendorLedgerChart'), {
+    type: 'bar',
+    data: { labels: ['To Pay', 'Paid', 'Outstanding'], datasets: [{ data: [{{ $vendorLedger['to_pay'] }}, {{ $vendorLedger['paid'] }}, {{ $vendorLedger['outstanding'] }}], backgroundColor: [blueDark, blueMid, blueLight], borderRadius: 8, borderSkipped: false }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: noGridX } }
+});
+vendorLedgerChart.config._showBarValues = true;
+vendorLedgerChart.config._moneyLabels = true;
+vendorLedgerChart.update();
+@endif
+</script>
 @endsection
