@@ -1,5 +1,5 @@
 <div class="center">
-    <img src="{{ public_path('assets/img/invoice-logo.png') }}" class="logo">
+    <img src="{{ public_path('assets/img/iy-auto-trades-logo.png') }}" class="logo">
 </div>
 
 <table class="header-table">
