@@ -34,7 +34,7 @@
 
 {{-- ===================== FINANCIAL POSITION ===================== --}}
 @if($isPrivileged)
-<h6 class="text-muted text-uppercase small mt-3 mb-2">Financial Position</h6>
+<h3 class="card-title text-uppercase mt-2 mb-2">Financial Position</h3>
 <div class="row">
     {!! statCard('Cash & Bank Balance', $financial['cash_bank'], 'primary', route('accounting.cash_bank')) !!}
     {!! statCard('Customer Receivables', $financial['receivables'], 'tertiary', route('accounting.receivables')) !!}
