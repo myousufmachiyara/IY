@@ -37,6 +37,14 @@
     {{ $customer->country }} {{ $customer->postal_code }}
 </div>
 
+@php
+    // Fuel/Color/Engine are read LIVE from the bid record, not from Vehicle's own
+    // copy — the bid is the single source of truth for these fields, so any
+    // correction made on a bid (e.g. a backfill) is reflected on every invoice
+    // automatically, with nothing to keep in sync on the Vehicle side.
+    $bidDetails = $vehicle->bid;
+@endphp
+
 <table class="items">
     <thead>
         <tr>
@@ -49,10 +57,10 @@
             <td>1</td>
             <td>{{ $vehicle->make }}</td>
             <td>{{ $vehicle->model }}</td>
-            <td>{{ $vehicle->fuel_type ?? '—' }}</td>
-            <td>{{ $vehicle->color ?? '—' }}</td>
-            <td>{{ $vehicle->chassis_no ?? '—' }}</td>
-            <td>{{ $vehicle->engine ?? '—' }}</td>
+            <td>{{ $bidDetails->fuel_type ?? '—' }}</td>
+            <td>{{ $bidDetails->color ?? '—' }}</td>
+            <td>{{ $bidDetails->chassis_no ?? $vehicle->chassis_no ?? '—' }}</td>
+            <td>{{ $bidDetails->engine ?? '—' }}</td>
             <td>{{ $vehicle->year }}</td>
             <td>¥{{ number_format($amount) }}</td>
         </tr>
