@@ -62,7 +62,7 @@
                                         </form>
                                     @endcan
                                     @if(auth()->user()->isSuperAdmin())
-                                        <form action="{{ route('team.reset_password', $member) }}" method="POST" style="display:inline;" onsubmit="return confirm('Reset this user\'s password? A new one will be generated and shown once.');">
+                                        <form action="{{ route('team.reset_password', $u) }}" method="POST" style="display:inline;" onsubmit="return confirm('Reset this user\'s password? A new one will be generated and shown once.');">
                                             @csrf
                                             <button type="submit" class="btn btn-link p-0 text-warning me-1" title="Reset Password"><i class="fa fa-key"></i></button>
                                         </form>
