@@ -11,8 +11,14 @@
                 <a href="{{ route('customers.show', $customer) }}" class="btn btn-sm btn-default"><i class="fa fa-arrow-left"></i> Back to Customer</a>
             </header>
             <div class="card-body">
+                @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
                 <form method="POST" action="{{ route('invoices.bulk_store', $customer) }}">
                     @csrf
+                    <div class="mb-3" style="max-width:220px;">
+                        <label>Invoice Date <span class="text-danger">*</span></label>
+                        <input type="date" name="issued_date" class="form-control" value="{{ date('Y-m-d') }}"
+                            @unless(auth()->user()->isSuperAdmin()) readonly @endunless required>
+                    </div>
                     <div class="table-scroll mb-3">
                         <table class="table table-bordered table-striped mb-0">
                             <thead><tr><th style="width:40px;"><input type="checkbox" id="checkAll"></th><th>Vehicle</th><th>Buying Price</th><th>Sale Price</th></tr></thead>

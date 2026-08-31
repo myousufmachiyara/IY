@@ -4,6 +4,7 @@
             @csrf
             <header class="card-header"><h2 class="card-title">Record Deposit Received — <span id="receive_deposit_customer_name"></span></h2></header>
             <div class="card-body">
+                @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
                 <div class="row form-group">
                     <div class="col-lg-6 mb-2">
                         <label>Deposit Amount (¥) <span class="text-danger">*</span></label>
@@ -15,6 +16,11 @@
                             <option value="1000">Cash</option>
                             <option value="1010" selected>Bank</option>
                         </select>
+                    </div>
+                    <div class="col-lg-6 mb-2">
+                        <label>Received Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" name="received_date" value="{{ date('Y-m-d') }}"
+                            @unless(auth()->user()->isSuperAdmin()) readonly @endunless required>
                     </div>
                     <div class="col-lg-12 mb-2">
                         <label>Evidence (receipt / transfer screenshot) <span class="text-danger">*</span></label>
@@ -40,6 +46,7 @@
             @csrf @method('PUT')
             <header class="card-header"><h2 class="card-title">Edit Deposit</h2></header>
             <div class="card-body">
+                @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
                 <div class="row form-group">
                     <div class="col-lg-6 mb-2">
                         <label>Deposit Amount (¥) <span class="text-danger">*</span></label>
@@ -51,6 +58,11 @@
                             <option value="1000">Cash</option>
                             <option value="1010">Bank</option>
                         </select>
+                    </div>
+                    <div class="col-lg-6 mb-2">
+                        <label>Received Date <span class="text-danger">*</span></label>
+                        <input type="date" id="edit_dep_date" class="form-control" name="received_date"
+                            @unless(auth()->user()->isSuperAdmin()) readonly @endunless required>
                     </div>
                     <div class="col-lg-12 mb-2">
                         <label>Replace Evidence <small class="text-muted">(optional)</small></label>
@@ -101,6 +113,7 @@ function openEditDeposit(id) {
     fetch('/customers/' + id + '/deposit/edit').then(r => r.json()).then(data => {
         document.getElementById('editDepositForm').action = '/customers/' + id + '/deposit';
         document.getElementById('edit_dep_amount').value = data.security_deposit;
+        document.getElementById('edit_dep_date').value = data.security_deposit_received_at ? data.security_deposit_received_at.substring(0, 10) : '';
         $('#edit_dep_account').val(data.security_deposit_account).trigger('change');
         $.magnificPopup.open({ items: { src: '#editDepositModal' }, type: 'inline' });
     });

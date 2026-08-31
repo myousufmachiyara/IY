@@ -10,7 +10,6 @@ class VehicleController extends Controller
 {
     public function index(Request $request)
     {
-        // #1/#13 — Vehicles is a pure lead/CRM list; won/lost/etc. tracking lives entirely in Bidding Results.
         $vehicles = Vehicle::with('customer', 'agent')
             ->where('status', 'requirement')
             ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
@@ -26,8 +25,14 @@ class VehicleController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules());
+        $data = $request->validate($this->rules($request));
         $customer = Customer::findOrFail($data['customer_id']);
+
+        if (empty($data['requirement_date'])) {
+            $data['requirement_date'] = now()->toDateString();
+        } elseif (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['requirement_date'])->isToday()) {
+            return back()->withErrors(['requirement_date' => 'Only Super Admin may set a requirement date other than today.'])->withInput();
+        }
 
         Vehicle::create($data + [
             'agent_id'   => $customer->agent_id,
@@ -46,7 +51,14 @@ class VehicleController extends Controller
     public function update(Request $request, Vehicle $vehicle)
     {
         abort_if($vehicle->isWon(), 422, 'Won vehicles cannot have their requirement edited here — use Costing instead.');
-        $vehicle->update($request->validate($this->rules()));
+
+        $data = $request->validate($this->rules($request));
+
+        if (! empty($data['requirement_date']) && ! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['requirement_date'])->isToday()) {
+            return back()->withErrors(['requirement_date' => 'Only Super Admin may set a requirement date other than today.'])->withInput();
+        }
+
+        $vehicle->update($data);
         return back()->with('success', 'Vehicle updated.');
     }
 
@@ -84,7 +96,6 @@ class VehicleController extends Controller
         return back()->with('success', 'Invoice request cancelled.');
     }
 
-    /** Printable receipt of the customer's already-approved security deposit, referencing this specific vehicle. */
     public function depositInvoicePdf(Vehicle $vehicle)
     {
         $vehicle->load('customer');
@@ -104,15 +115,16 @@ class VehicleController extends Controller
         ])->download("{$ref}.pdf");
     }
 
-    private function rules(): array
+    private function rules(Request $request): array
     {
         return [
-            'customer_id' => ['required', 'exists:customers,id'],
-            'make'        => ['required', 'string', 'max:120'],
-            'model'       => ['required', 'string', 'max:120'],
-            'year'        => ['required', 'string', 'max:10'],
-            'grade'       => ['required', 'string', 'max:60'],
-            'budget'      => ['required', 'integer', 'min:1'],
+            'customer_id'      => ['required', 'exists:customers,id'],
+            'make'             => ['required', 'string', 'max:120'],
+            'model'            => ['required', 'string', 'max:120'],
+            'year'             => ['required', 'string', 'max:10'],
+            'grade'            => ['required', 'string', 'max:60'],
+            'budget'           => ['required', 'integer', 'min:1'],
+            'requirement_date' => ['nullable', 'date'],
         ];
     }
 }

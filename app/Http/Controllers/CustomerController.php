@@ -65,7 +65,7 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
-        $customer->load('agent', 'ports', 'depositReceivedBy', 'depositApprovedBy');
+        $customer->load('agent', 'ports', 'depositReceivedBy', 'depositApprovedBy', 'vehicles');
         return view('customers.show', compact('customer'));
     }
 
@@ -76,7 +76,7 @@ class CustomerController extends Controller
 
         return back()->with('success', 'Customer removed.');
     }
-    
+
     public function receiveDeposit(Request $request, Customer $customer)
     {
         abort_if($customer->security_deposit_status === 'approved', 422, 'Deposit already approved for this customer.');
@@ -85,7 +85,12 @@ class CustomerController extends Controller
             'security_deposit' => ['required', 'integer', 'min:1'],
             'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
             'evidence'          => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'received_date'     => ['required', 'date'],
         ]);
+
+        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['received_date'])->isToday()) {
+            return back()->withErrors(['received_date' => 'Only Super Admin may set a deposit-received date other than today.']);
+        }
 
         $customer->update([
             'security_deposit'                  => $data['security_deposit'],
@@ -93,18 +98,17 @@ class CustomerController extends Controller
             'security_deposit_evidence_path'    => $request->file('evidence')->store('deposit_evidence', 'public'),
             'security_deposit_status'           => 'pending',
             'security_deposit_received_by'      => $request->user()->id,
-            'security_deposit_received_at'      => now(),
+            'security_deposit_received_at'      => $data['received_date'],
             'security_deposit_rejection_reason' => null,
         ]);
 
         return back()->with('success', 'Deposit recorded as received — awaiting accountant approval.');
     }
 
-    /** #11 — agent can correct a not-yet-approved deposit. */
     public function editDeposit(Customer $customer)
     {
         abort_if($customer->security_deposit_status === 'approved', 422, 'Approved deposits cannot be edited.');
-        return response()->json($customer->only(['security_deposit', 'security_deposit_account']));
+        return response()->json($customer->only(['security_deposit', 'security_deposit_account', 'security_deposit_received_at']));
     }
 
     public function updateDeposit(Request $request, Customer $customer)
@@ -114,11 +118,13 @@ class CustomerController extends Controller
         $data = $request->validate([
             'security_deposit' => ['required', 'integer', 'min:1'],
             'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
-            // Required unless this customer already has evidence on record — otherwise
-            // a deposit can reach "pending" with zero evidence ever attached, exactly
-            // the gap that let 4 records through with a NULL evidence path.
             'evidence'          => [$customer->security_deposit_evidence_path ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'received_date'     => ['required', 'date'],
         ]);
+
+        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['received_date'])->isToday()) {
+            return back()->withErrors(['received_date' => 'Only Super Admin may set a deposit-received date other than today.']);
+        }
 
         if ($request->hasFile('evidence')) {
             if ($customer->security_deposit_evidence_path) {
@@ -128,9 +134,10 @@ class CustomerController extends Controller
         }
 
         $customer->update([
-            'security_deposit'         => $data['security_deposit'],
-            'security_deposit_account' => $data['account'],
-            'security_deposit_status'  => 'pending',
+            'security_deposit'             => $data['security_deposit'],
+            'security_deposit_account'     => $data['account'],
+            'security_deposit_received_at' => $data['received_date'],
+            'security_deposit_status'      => 'pending',
         ] + array_intersect_key($data, ['security_deposit_evidence_path' => true]));
 
         return back()->with('success', 'Deposit updated — pending approval again.');

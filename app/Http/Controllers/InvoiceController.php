@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Customer, Invoice, Vehicle};
+use App\Models\{Customer, Invoice, Payment, Vehicle};
 use App\Services\{InvoiceNumber, LedgerService};
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -100,7 +100,6 @@ class InvoiceController extends Controller
         return view('invoices.merge_select', compact('customer', 'invoices'));
     }
 
-    /** Combine a single customer's selected invoices into one merged/combined invoice PDF. */
     public function mergePdf(Request $request, Customer $customer)
     {
         $data = $request->validate([
@@ -122,7 +121,6 @@ class InvoiceController extends Controller
             ->download('IY-Combined-Invoice-' . \Illuminate\Support\Str::slug($customer->name) . '.pdf');
     }
 
-    /** Merge any selection of existing invoices into combined per-customer invoices — not tied to one customer. */
     public function mergeSelectedPdf(Request $request)
     {
         $data = $request->validate([
@@ -160,6 +158,49 @@ class InvoiceController extends Controller
         $invoice->settled_amount = $data['settled_amount'];
         $invoice->refreshTotals()->save();
         return back()->with('success', 'Settled amount updated.');
+    }
+
+    /**
+     * Offset the customer's approved security deposit against this invoice's
+     * outstanding balance. Applies min(deposit available, invoice balance) —
+     * never more than either side actually has. Per spec, consuming any amount
+     * of the deposit marks the customer's profile incomplete again, since the
+     * deposit is no longer sitting there as security for future bidding.
+     */
+    public function adjustDeposit(Request $request, Invoice $invoice, LedgerService $ledger)
+    {
+        abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may adjust a deposit against an invoice.');
+        abort_if($invoice->status === 'cancelled', 422, 'Cannot adjust a cancelled invoice.');
+
+        $customer = $invoice->customer;
+        abort_unless($customer->security_deposit_status === 'approved' && $customer->security_deposit > 0, 422, 'This customer has no approved deposit available to apply.');
+
+        $amount = min($customer->security_deposit, $invoice->balance());
+        abort_if($amount <= 0, 422, 'Nothing to adjust — either the invoice is fully paid or the deposit is exhausted.');
+
+        DB::transaction(function () use ($invoice, $customer, $amount, $ledger, $request) {
+            $ledger->applyDepositToInvoice($invoice, $amount);
+
+            Payment::create([
+                'customer_id' => $customer->id, 'invoice_id' => $invoice->id, 'vehicle_id' => $invoice->vehicle_id,
+                'amount' => $amount, 'method' => 'deposit',
+                'account_id' => $ledger->account(LedgerService::CUST_DEPOSIT)->id,
+                'paid_at' => now(), 'reference' => 'Applied from security deposit',
+                'is_backdated' => false, 'recorded_by' => $request->user()->id, 'status' => 'approved',
+                'approved_by' => $request->user()->id, 'approved_at' => now(),
+            ]);
+
+            $invoice->refreshTotals()->save();
+
+            $remaining = $customer->security_deposit - $amount;
+            $customer->update([
+                'security_deposit'        => $remaining,
+                'security_deposit_status' => $remaining > 0 ? 'approved' : 'none',
+                'profile_completed_at'    => null,
+            ]);
+        });
+
+        return back()->with('success', '¥' . number_format($amount) . ' applied from the security deposit. Customer profile is now incomplete — a fresh deposit will be required before further bidding.');
     }
 
     public function cancel(Invoice $invoice, LedgerService $ledger)

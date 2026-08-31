@@ -172,4 +172,12 @@ class LedgerService
             return $entry;
         });
     }
+
+    public function applyDepositToInvoice(Invoice $invoice, int $amount): JournalEntry
+    {
+        return $this->post(now()->toDateString(), "Security deposit applied to invoice {$invoice->invoice_no}", [
+            ['account' => self::CUST_DEPOSIT, 'debit'  => $amount, 'party' => $invoice->customer],
+            ['account' => self::AR,           'credit' => $amount, 'party' => $invoice->customer],
+        ], $invoice);
+    }
 }

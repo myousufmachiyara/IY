@@ -13,6 +13,10 @@
     ];
     [$badgeClass, $badgeLabel] = $depositBadges[$customer->security_deposit_status] ?? $depositBadges['none'];
     $canApprove = auth()->user()->canBackdate();
+    $vehicleStatusColors = [
+        'requirement' => 'secondary', 'bidding' => 'info', 'won' => 'success', 'lost' => 'danger',
+        'invoiced' => 'primary', 'dispatched' => 'warning', 'arrived' => 'warning', 'delivered' => 'success',
+    ];
 @endphp
 
 <div class="row">
@@ -112,6 +116,26 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <h6 class="text-muted text-uppercase small mt-4 mb-2">All Vehicles</h6>
+                <div class="table-scroll">
+                    <table class="table table-bordered table-striped mb-0">
+                        <thead><tr><th>Vehicle</th><th>Status</th><th>Buying Price</th><th>Selling Price</th><th>Won On</th></tr></thead>
+                        <tbody>
+                            @forelse($customer->vehicles as $v)
+                            <tr>
+                                <td><a href="{{ route('vehicles.show', $v) }}">{{ $v->label() }}</a>@if($v->grade)<br><small class="text-muted">{{ $v->grade }}</small>@endif</td>
+                                <td><span class="badge bg-{{ $vehicleStatusColors[$v->status] ?? 'secondary' }} text-uppercase">{{ $v->status }}</span></td>
+                                <td>{{ $v->buying_price ? '¥'.number_format($v->buying_price) : '—' }}</td>
+                                <td>{{ $v->selling_price ? '¥'.number_format($v->selling_price) : '—' }}</td>
+                                <td>{{ optional($v->won_at)->format('d-m-Y') ?? '—' }}</td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="5" class="text-center text-muted py-4">No vehicles recorded for this customer yet.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>

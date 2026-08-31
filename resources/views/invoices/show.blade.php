@@ -105,8 +105,7 @@
                                 <div class="progress mb-3" style="height:8px;">
                                     <div class="progress-bar bg-success" style="width: {{ min($invoice->paidPercent(), 100) }}%"></div>
                                 </div>
-
-                                <div class="d-flex gap-2">
+                                <div class="d-flex gap-2 flex-wrap">
                                     @can('payments.create')
                                         <button type="button" class="btn btn-sm btn-primary modal-with-form" href="#paymentModal">
                                             <i class="fa fa-plus"></i> Record Payment
@@ -116,8 +115,19 @@
                                         <button type="button" class="btn btn-sm btn-outline-secondary modal-with-form" href="#settleModal">
                                             <i class="fa fa-percentage"></i> Adjust Settled Amount
                                         </button>
+                                        @if($invoice->customer->security_deposit_status === 'approved' && $invoice->customer->security_deposit > 0 && $invoice->balance() > 0)
+                                            <form action="{{ route('invoices.adjust_deposit', $invoice) }}" method="POST" class="d-inline" onsubmit="return confirm('Apply ¥{{ number_format(min($invoice->customer->security_deposit, $invoice->balance())) }} from the security deposit toward this invoice? This will reduce the deposit and mark the customer\'s profile incomplete again.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fa fa-piggy-bank"></i> Adjust Payment by Deposit
+                                                </button>
+                                            </form>
+                                        @endif
                                     @endcan
                                 </div>
+                                @if($invoice->customer->security_deposit_status === 'approved' && $invoice->customer->security_deposit > 0)
+                                    <small class="text-muted d-block mt-2">Deposit available: ¥{{ number_format($invoice->customer->security_deposit) }}</small>
+                                @endif
                             </div>
                         </div>
                     </div>

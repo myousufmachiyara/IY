@@ -9,6 +9,8 @@
             'requirement' => 'secondary', 'bidding' => 'info', 'won' => 'success', 'lost' => 'danger',
             'invoiced' => 'primary', 'dispatched' => 'warning', 'arrived' => 'warning', 'delivered' => 'success',
         ];
+        $backRoute = $vehicle->isWon() ? route('results.won') : route('vehicles.index');
+        $backLabel = $vehicle->isWon() ? 'Back to Won Results' : 'Back to All Vehicles';
     @endphp
 
     <div class="row">
@@ -20,8 +22,8 @@
                         <span class="badge bg-{{ $statusColors[$vehicle->status] ?? 'secondary' }} text-uppercase ms-1">{{ $vehicle->status }}</span>
                     </h2>
                     <div>
-                        <a href="{{ route('vehicles.index') }}" class="btn btn-sm btn-default">
-                            <i class="fa fa-arrow-left"></i> Back to All Vehicles
+                        <a href="{{ $backRoute }}" class="btn btn-sm btn-default">
+                            <i class="fa fa-arrow-left"></i> {{ $backLabel }}
                         </a>
                         @can('vehicle_requirement.edit')
                             @if($vehicle->isWon())
@@ -37,6 +39,7 @@
                 <div class="card-body">
                     @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
                     @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
+                    @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
 
                     <div class="row">
                         <div class="col-md-6">
@@ -47,6 +50,7 @@
                                 <tr><th>Grade</th><td>{{ $vehicle->grade ?? '—' }}</td></tr>
                                 <tr><th>Chassis No.</th><td>{{ $vehicle->chassis_no ?? '—' }}</td></tr>
                                 <tr><th>Budget</th><td>¥{{ number_format($vehicle->budget) }}</td></tr>
+                                <tr><th>Requirement Date</th><td>{{ optional($vehicle->requirement_date)->format('d-m-Y') ?? $vehicle->created_at->format('d-m-Y') }}</td></tr>
                             </table>
 
                             <h6 class="text-muted text-uppercase small mb-2">Parties</h6>
@@ -93,28 +97,34 @@
                                     <div class="alert alert-info">
                                         <i class="fa fa-info-circle"></i> Costing complete — ready to invoice.
                                         @can('invoices.create')
-                                            <form action="{{ route('invoices.store', $vehicle) }}" method="POST" class="d-inline" onsubmit="return confirm('Generate the official invoice for this vehicle?');">
+                                            <form action="{{ route('invoices.store', $vehicle) }}" method="POST" class="d-inline-flex align-items-end gap-2 mt-2" onsubmit="return confirm('Generate the official invoice for this vehicle?');">
                                                 @csrf
-                                                <button class="btn btn-sm btn-primary ms-2">Generate Invoice</button>
+                                                <div>
+                                                    <label class="small mb-1 d-block">Invoice Date</label>
+                                                    <input type="date" name="issued_date" class="form-control form-control-sm" value="{{ date('Y-m-d') }}"
+                                                        @unless(auth()->user()->isSuperAdmin()) readonly @endunless required>
+                                                </div>
+                                                <button class="btn btn-sm btn-primary">Generate Invoice</button>
                                             </form>
                                         @else
                                             @if($vehicle->invoice_requested_at)
                                                 <span class="badge bg-info ms-2">Invoice requested {{ $vehicle->invoice_requested_at->diffForHumans() }}</span>
+                                                <form action="{{ route('vehicles.cancel_invoice_request', $vehicle) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Cancel this invoice request?');">
+                                                    @csrf<button class="btn btn-sm btn-outline-warning">Cancel Request</button>
+                                                </form>
                                             @else
                                                 <form action="{{ route('vehicles.request_invoice', $vehicle) }}" method="POST" class="d-inline"><button class="btn btn-sm btn-outline-primary ms-2">@csrf Request Invoice</button></form>
                                             @endif
                                         @endcan
                                     </div>
-                            @elseif(($vehicle->invoice->isHalfPaid() || auth()->user()->isSuperAdmin()) && !$vehicle->shipment)
-                                <div class="alert alert-success">
-                                    <i class="fa fa-check-circle"></i>
-                                    @if($vehicle->invoice->isHalfPaid())
-                                        50% or more paid — ready for shipment.
-                                    @else
-                                        Not yet 50% paid, but you can bypass this as Super Admin.
-                                    @endif
+                                @elseif(($vehicle->invoice->isHalfPaid() || auth()->user()->isSuperAdmin()) && !$vehicle->shipment)
                                     <div class="alert alert-success">
-                                        <i class="fa fa-check-circle"></i> Invoice fully paid — ready for shipment.
+                                        <i class="fa fa-check-circle"></i>
+                                        @if($vehicle->invoice->isHalfPaid())
+                                            50% or more paid — ready for shipment.
+                                        @else
+                                            Not yet 50% paid, but you can bypass this as Super Admin.
+                                        @endif
                                         @can('invoices.request')
                                             <a href="{{ route('shipments.create', $vehicle->customer) }}" class="alert-link ms-1">Prepare Shipment &rarr;</a>
                                         @endcan

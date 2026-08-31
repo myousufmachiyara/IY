@@ -11,6 +11,7 @@
         <section class="card">
             @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
             @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
+            @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
 
             <header class="card-header">
                 <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -44,7 +45,7 @@
                             <tr>
                                 <th>S.No</th><th>Vehicle</th><th>Customer</th>
                                 @if($isPrivileged)<th>Agent</th>@endif
-                                <th>Budget</th><th>Created</th><th>Action</th>
+                                <th>Budget</th><th>Requirement Date</th><th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -55,7 +56,7 @@
                                 <td><a href="{{ route('customers.show', $v->customer) }}">{{ $v->customer->name }}</a></td>
                                 @if($isPrivileged)<td>{{ $v->agent->name ?? '—' }}</td>@endif
                                 <td>¥{{ number_format($v->budget) }}</td>
-                                <td>{{ $v->created_at->format('d-m-Y') }}</td>
+                                <td>{{ optional($v->requirement_date)->format('d-m-Y') ?? $v->created_at->format('d-m-Y') }}</td>
                                 <td class="text-nowrap">
                                     <a href="{{ route('vehicles.show', $v) }}" class="text-secondary me-1"><i class="fa fa-eye"></i></a>
                                     @can('vehicle_requirement.edit')<a href="#" class="text-primary me-1" onclick="editVehicle({{ $v->id }})"><i class="fa fa-edit"></i></a>@endcan
@@ -93,6 +94,11 @@
                             <div class="col-lg-6 mb-2"><label>Year <span class="text-danger">*</span></label><input type="text" class="form-control" name="year" required></div>
                             <div class="col-lg-6 mb-2"><label>Grade <span class="text-danger">*</span></label><input type="text" class="form-control" name="grade" required></div>
                             <div class="col-lg-6 mb-2"><label>Budget (¥) <span class="text-danger">*</span></label><input type="number" class="form-control" name="budget" min="1" required></div>
+                            <div class="col-lg-6 mb-2">
+                                <label>Requirement Date</label>
+                                <input type="date" class="form-control" name="requirement_date" value="{{ date('Y-m-d') }}"
+                                    @unless(auth()->user()->isSuperAdmin()) readonly @endunless>
+                            </div>
                         </div>
                     </div>
                     <footer class="card-footer">
@@ -122,6 +128,11 @@
                             <div class="col-lg-6 mb-2"><label>Year <span class="text-danger">*</span></label><input type="text" id="edit_year" class="form-control" name="year" required></div>
                             <div class="col-lg-6 mb-2"><label>Grade <span class="text-danger">*</span></label><input type="text" id="edit_grade" class="form-control" name="grade" required></div>
                             <div class="col-lg-6 mb-2"><label>Budget (¥) <span class="text-danger">*</span></label><input type="number" id="edit_budget" class="form-control" name="budget" min="1" required></div>
+                            <div class="col-lg-6 mb-2">
+                                <label>Requirement Date</label>
+                                <input type="date" id="edit_requirement_date" class="form-control" name="requirement_date"
+                                    @unless(auth()->user()->isSuperAdmin()) readonly @endunless>
+                            </div>
                         </div>
                     </div>
                     <footer class="card-footer">
@@ -141,6 +152,7 @@ function editVehicle(id) {
         $('#edit_make').val(data.make); $('#edit_model').val(data.model);
         $('#edit_year').val(data.year); $('#edit_grade').val(data.grade);
         $('#edit_budget').val(data.budget);
+        $('#edit_requirement_date').val(data.requirement_date);
         $('#edit_customer_id').val(data.customer_id).trigger('change');
         $.magnificPopup.open({ items: { src: '#editModal' }, type: 'inline' });
     });

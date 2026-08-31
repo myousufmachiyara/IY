@@ -31,6 +31,7 @@
                                 <th>Vehicles</th>
                                 <th>Shipment Date</th>
                                 <th>Expected Arrival</th>
+                                <th>Arrival Date</th>
                                 <th>Freight Total</th>
                                 <th>Status</th>
                                 <th>Action</th>
@@ -44,6 +45,7 @@
                                 <td>{{ $s->vehicles->count() }}</td>
                                 <td>{{ optional($s->shipment_date)->format('d-m-Y') ?? '—' }}</td>
                                 <td>{{ optional($s->expected_arrival)->format('d-m-Y') ?? '—' }}</td>
+                                <td>{{ optional($s->arrived_at)->format('d-m-Y') ?? '—' }}</td>
                                 <td>¥{{ number_format($s->freight_total) }}</td>
                                 <td><span class="badge bg-{{ $statusColors[$s->status] ?? 'secondary' }} text-uppercase">{{ $s->status }}</span></td>
                                 <td class="text-nowrap">
@@ -60,7 +62,7 @@
                             </td>
                             </tr>
                             @empty
-                            <tr><td colspan="8" class="text-center text-muted py-4">No shipments yet.</td></tr>
+                            <tr><td colspan="9" class="text-center text-muted py-4">No shipments yet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
