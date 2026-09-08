@@ -12,12 +12,12 @@ class Customer extends Model
 
     protected $fillable = [
         'customer_no', 'name', 'phone', 'email', 'country', 'postal_code', 'address',
-        'consignee_name', 'eori_vat_number', 'agent_id',
+        'consignee_name', 'eori_vat_number', 'agent_id', 'account_date',
         'security_deposit', 'security_deposit_paid', 'security_deposit_refunded',
         'security_deposit_status', 'security_deposit_account', 'security_deposit_evidence_path',
         'security_deposit_received_by', 'security_deposit_received_at',
         'security_deposit_approved_by', 'security_deposit_approved_at',
-        'security_deposit_rejection_reason',
+        'security_deposit_rejection_reason', 'deposit_invoice_id',
         'profile_completed_at', 'status', 'created_by',
     ];
 
@@ -29,6 +29,7 @@ class Customer extends Model
             'security_deposit_refunded'    => 'boolean',
             'security_deposit_received_at' => 'datetime',
             'security_deposit_approved_at' => 'datetime',
+            'account_date'                 => 'date',
             'profile_completed_at'         => 'datetime',
         ];
     }
@@ -37,6 +38,7 @@ class Customer extends Model
     public function creator(): BelongsTo { return $this->belongsTo(User::class, 'created_by'); }
     public function depositReceivedBy(): BelongsTo { return $this->belongsTo(User::class, 'security_deposit_received_by'); }
     public function depositApprovedBy(): BelongsTo { return $this->belongsTo(User::class, 'security_deposit_approved_by'); }
+    public function depositInvoice(): BelongsTo { return $this->belongsTo(Invoice::class, 'deposit_invoice_id'); }
 
     public function ports(): BelongsToMany { return $this->belongsToMany(Port::class, 'customer_port'); }
 
@@ -49,10 +51,7 @@ class Customer extends Model
     public function totalPaid(): int { return (int) $this->payments()->where('status', 'approved')->sum('amount'); }
     public function balance(): int       { return $this->totalInvoiced() - $this->totalPaid(); }
 
-    public function scopeComplete($q) { return $q->whereNotNull('profile_completed_at'); }
-    public function scopeActive($q)   { return $q->where('status', 'active'); }
-    public function depositInvoice(): BelongsTo { return $this->belongsTo(Invoice::class, 'deposit_invoice_id'); }
-
+    /** Profile is complete once the deposit invoice is fully paid — the deposit-invoice workflow is the sole source of truth going forward. */
     public function isProfileComplete(): bool
     {
         return $this->depositInvoice && $this->depositInvoice->isFullyPaid();
@@ -62,4 +61,7 @@ class Customer extends Model
     {
         return $this->depositInvoice && $this->depositInvoice->isFullyPaid();
     }
+
+    public function scopeComplete($q) { return $q->whereNotNull('profile_completed_at'); }
+    public function scopeActive($q)   { return $q->where('status', 'active'); }
 }

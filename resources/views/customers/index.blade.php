@@ -93,13 +93,25 @@
                                 <td>{{ $c->country ?? '—' }}</td>
                                 @if($isPrivileged)<td>{{ $c->agent->name ?? '—' }}</td>@endif
                                 <td>
-                                    <span class="badge bg-{{ $badgeClass }}">{{ $badgeLabel }}</span>
-                                    @if($c->security_deposit_status === 'approved')
-                                        <br><small class="text-muted">¥{{ number_format($c->security_deposit) }}</small>
-                                    @elseif($c->security_deposit_status === 'rejected' && $c->security_deposit_rejection_reason)
-                                        <br><small class="text-danger" title="{{ $c->security_deposit_rejection_reason }}">
-                                            {{ \Illuminate\Support\Str::limit($c->security_deposit_rejection_reason, 40) }}
-                                        </small>
+                                    @if($c->deposit_invoice_id && $c->depositInvoice)
+                                        @if($c->depositInvoice->isFullyPaid())
+                                            <span class="badge bg-success">Paid</span>
+                                            <br><small class="text-muted">¥{{ number_format($c->depositInvoice->total_payable) }}</small>
+                                        @else
+                                            <span class="badge bg-warning text-dark">Awaiting Payment</span>
+                                            <br><small class="text-muted">Balance: ¥{{ number_format($c->depositInvoice->balance()) }}</small>
+                                        @endif
+                                    @elseif($c->security_deposit_status !== 'none')
+                                        <span class="badge bg-{{ $badgeClass }}">{{ $badgeLabel }}</span> <small class="text-muted">(legacy)</small>
+                                        @if($c->security_deposit_status === 'approved')
+                                            <br><small class="text-muted">¥{{ number_format($c->security_deposit) }}</small>
+                                        @elseif($c->security_deposit_status === 'rejected' && $c->security_deposit_rejection_reason)
+                                            <br><small class="text-danger" title="{{ $c->security_deposit_rejection_reason }}">
+                                                {{ \Illuminate\Support\Str::limit($c->security_deposit_rejection_reason, 40) }}
+                                            </small>
+                                        @endif
+                                    @else
+                                        <span class="badge bg-secondary">Not Invoiced</span>
                                     @endif
                                 </td>
                                 <td>
@@ -121,20 +133,32 @@
                                         </a>
                                     @endcan
 
-                                    @if(in_array($c->security_deposit_status, ['none', 'rejected']))
+                                    @if($c->deposit_invoice_id)
+                                        <a href="{{ route('invoices.show', $c->deposit_invoice_id) }}" class="text-info me-1" title="View Deposit Invoice">
+                                            <i class="fa fa-file-invoice"></i>
+                                        </a>
+                                    @elseif($c->security_deposit_status !== 'none')
+                                        @if(in_array($c->security_deposit_status, ['none', 'rejected']))
+                                            @can('customers.edit')
+                                                <a href="#" class="text-success me-1" title="Record Deposit Received" onclick="openReceiveDeposit({{ $c->id }}, '{{ $c->name }}')">
+                                                    <i class="fa fa-hand-holding-usd"></i>
+                                                </a>
+                                            @endcan
+                                        @elseif($c->security_deposit_status === 'pending' && $canApprove)
+                                            <form action="{{ route('customers.deposit.approve', $c) }}" method="POST" style="display:inline;" onsubmit="return confirm('Approve this deposit? This posts it to the ledger and completes the profile.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-link p-0 text-success me-1" title="Approve Deposit"><i class="fa fa-check-circle"></i></button>
+                                            </form>
+                                            <a href="#" class="text-danger me-1" title="Reject Deposit" onclick="openRejectDeposit({{ $c->id }}, '{{ $c->name }}')">
+                                                <i class="fa fa-times-circle"></i>
+                                            </a>
+                                        @endif
+                                    @else
                                         @can('customers.edit')
-                                            <a href="#" class="text-success me-1" title="Record Deposit Received" onclick="openReceiveDeposit({{ $c->id }}, '{{ $c->name }}')">
-                                                <i class="fa fa-hand-holding-usd"></i>
+                                            <a href="#" class="text-success me-1" title="Generate Deposit Invoice" onclick="openGenerateDepositInvoice({{ $c->id }}, '{{ $c->name }}')">
+                                                <i class="fa fa-file-invoice-dollar"></i>
                                             </a>
                                         @endcan
-                                    @elseif($c->security_deposit_status === 'pending' && $canApprove)
-                                        <form action="{{ route('customers.deposit.approve', $c) }}" method="POST" style="display:inline;" onsubmit="return confirm('Approve this deposit? This posts it to the ledger and completes the profile.');">
-                                            @csrf
-                                            <button type="submit" class="btn btn-link p-0 text-success me-1" title="Approve Deposit"><i class="fa fa-check-circle"></i></button>
-                                        </form>
-                                        <a href="#" class="text-danger me-1" title="Reject Deposit" onclick="openRejectDeposit({{ $c->id }}, '{{ $c->name }}')">
-                                            <i class="fa fa-times-circle"></i>
-                                        </a>
                                     @endif
 
                                     @can('customers.delete')
@@ -194,6 +218,11 @@
                                     <option value="active" selected>Active</option>
                                     <option value="inactive">Inactive</option>
                                 </select>
+                            </div>
+                            <div class="col-lg-6 mb-2">
+                                <label>Account Date</label>
+                                <input type="date" class="form-control" name="account_date" value="{{ date('Y-m-d') }}"
+                                    @unless(auth()->user()->isSuperAdmin()) readonly @endunless>
                             </div>
                             @if($isPrivileged)
                             <div class="col-lg-6 mb-2">
@@ -306,6 +335,39 @@
         </div>
         @endcan
 
+        {{-- ================= GENERATE DEPOSIT INVOICE MODAL ================= --}}
+        @can('customers.edit')
+        <div id="generateDepositInvoiceModal" class="modal-block modal-block-success mfp-hide">
+            <section class="card">
+                <form method="POST" id="generateDepositInvoiceForm" action="" onkeydown="return event.key != 'Enter';">
+                    @csrf
+                    <header class="card-header"><h2 class="card-title">Generate Deposit Invoice — <span id="gdi_customer_name"></span></h2></header>
+                    <div class="card-body">
+                        @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
+                        <div class="row form-group">
+                            <div class="col-lg-6 mb-2">
+                                <label>Deposit Amount (¥) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" name="amount" min="1" required>
+                            </div>
+                            <div class="col-lg-6 mb-2">
+                                <label>Invoice Date</label>
+                                <input type="date" class="form-control" name="invoice_date" value="{{ date('Y-m-d') }}"
+                                    @unless(auth()->user()->isSuperAdmin()) readonly @endunless>
+                            </div>
+                        </div>
+                        <p class="text-muted small mb-0">This creates an unpaid invoice for the deposit. Record the customer's payment against it (same as any invoice) to complete their profile.</p>
+                    </div>
+                    <footer class="card-footer">
+                        <div class="col-md-12 text-end">
+                            <button type="submit" class="btn btn-success">Generate Invoice</button>
+                            <button type="button" class="btn btn-default modal-dismiss">Cancel</button>
+                        </div>
+                    </footer>
+                </form>
+            </section>
+        </div>
+        @endcan
+
         @include('customers._deposit_modals')
     </div>
 </div>
@@ -333,6 +395,12 @@ function editCustomer(id) {
             console.error('Failed to load customer:', err);
             alert('Could not load customer data. Please try again.');
         });
+}
+
+function openGenerateDepositInvoice(id, name) {
+    document.getElementById('generateDepositInvoiceForm').action = '/customers/' + id + '/generate-deposit-invoice';
+    document.getElementById('gdi_customer_name').textContent = name;
+    $.magnificPopup.open({ items: { src: '#generateDepositInvoiceModal' }, type: 'inline' });
 }
 </script>
 

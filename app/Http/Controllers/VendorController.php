@@ -26,7 +26,9 @@ class VendorController extends Controller
         $data = $request->validate($this->rules());
         $data['created_by'] = $request->user()->id;
 
-        Vendor::create($data);
+        $vendor = Vendor::create($data);
+
+        app(\App\Services\LedgerService::class)->ensureVendorAccount($vendor);
 
         return back()->with('success', 'Vendor created.');
     }

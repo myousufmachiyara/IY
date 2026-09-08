@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Customer, Port, User};
-use App\Services\LedgerService;
+use App\Models\{Customer, Invoice, Port, User};
+use App\Services\{InvoiceNumber, LedgerService};
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
 {
     public function index(Request $request)
     {
-        $customers = Customer::with('agent', 'ports')->withCount('vehicles')
+        $customers = Customer::with('agent', 'ports', 'depositInvoice')->withCount('vehicles')
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->deposit_status, fn ($q) => $q->where('security_deposit_status', $request->deposit_status))
             ->when($request->agent_id, fn ($q) => $q->where('agent_id', $request->agent_id))
@@ -24,6 +25,28 @@ class CustomerController extends Controller
         return view('customers.index', compact('customers', 'agents', 'ports'));
     }
 
+    public function store(Request $request)
+    {
+        $data  = $request->validate($this->rules());
+        $ports = $data['ports'];
+        unset($data['ports']);
+
+        $data['agent_id']   = $this->resolveAgent($request);
+        $data['created_by'] = $request->user()->id;
+
+        if (empty($data['account_date'])) {
+            $data['account_date'] = now()->toDateString();
+        } elseif (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['account_date'])->isToday()) {
+            return back()->withErrors(['account_date' => 'Only Super Admin may set an account date other than today.'])->withInput();
+        }
+
+        $customer = Customer::create($data);
+        $customer->ports()->sync($ports);
+
+        app(LedgerService::class)->ensureCustomerAccount($customer);
+
+        return back()->with('success', 'Customer created. Generate their deposit invoice to begin completing the profile.');
+    }
 
     public function edit(Customer $customer)
     {
@@ -51,7 +74,7 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
-        $customer->load('agent', 'ports', 'depositReceivedBy', 'depositApprovedBy', 'vehicles');
+        $customer->load('agent', 'ports', 'depositReceivedBy', 'depositApprovedBy', 'depositInvoice', 'vehicles');
         return view('customers.show', compact('customer'));
     }
 
@@ -62,6 +85,47 @@ class CustomerController extends Controller
 
         return back()->with('success', 'Customer removed.');
     }
+
+    /** New workflow entry point — generates an unpaid invoice for the deposit; payment is recorded against it via the normal invoice payment flow. */
+    public function generateDepositInvoice(Request $request, Customer $customer, LedgerService $ledger)
+    {
+        abort_if($customer->deposit_invoice_id, 422, 'A deposit invoice already exists for this customer.');
+
+        $data = $request->validate([
+            'amount'       => ['required', 'integer', 'min:1'],
+            'invoice_date' => ['nullable', 'date'],
+        ]);
+
+        $date = $data['invoice_date'] ?? now()->toDateString();
+        if ($date !== now()->toDateString() && ! $request->user()->isSuperAdmin()) {
+            return back()->withErrors(['invoice_date' => 'Only Super Admin may set a date other than today.']);
+        }
+
+        $invoice = DB::transaction(function () use ($customer, $data, $date, $request, $ledger) {
+            $inv = Invoice::create([
+                'invoice_no'     => InvoiceNumber::next(),
+                'invoice_type'   => 'deposit',
+                'vehicle_id'     => null,
+                'customer_id'    => $customer->id,
+                'agent_id'       => $customer->agent_id,
+                'sale_price'     => $data['amount'],
+                'settled_amount' => 0,
+                'total_payable'  => $data['amount'],
+                'status'         => 'issued',
+                'issued_by'      => $request->user()->id,
+                'issued_at'      => $date,
+            ]);
+
+            $ledger->depositInvoiceReceivable($inv);
+            $customer->update(['deposit_invoice_id' => $inv->id]);
+
+            return $inv;
+        });
+
+        return redirect()->route('invoices.show', $invoice)->with('success', 'Deposit invoice generated — record the customer\'s payment against it to complete their profile.');
+    }
+
+    // ================= Legacy deposit flow — preserved untouched for customers who went through it before the invoice-first workflow existed =================
 
     public function receiveDeposit(Request $request, Customer $customer)
     {
@@ -162,29 +226,6 @@ class CustomerController extends Controller
 
         return back()->with('success', 'Deposit rejected — the agent can resubmit.');
     }
-    
-    public function store(Request $request)
-    {
-        $data  = $request->validate($this->rules());
-        $ports = $data['ports'];
-        unset($data['ports']);
-
-        $data['agent_id']   = $this->resolveAgent($request);
-        $data['created_by'] = $request->user()->id;
-
-        if (empty($data['account_date'])) {
-            $data['account_date'] = now()->toDateString();
-        } elseif (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['account_date'])->isToday()) {
-            return back()->withErrors(['account_date' => 'Only Super Admin may set an account date other than today.'])->withInput();
-        }
-
-        $customer = Customer::create($data);
-        $customer->ports()->sync($ports);
-
-        app(\App\Services\LedgerService::class)->ensureCustomerAccount($customer);
-
-        return back()->with('success', 'Customer created. Record their security deposit to complete the profile.');
-    }
 
     private function rules(): array
     {
@@ -217,43 +258,5 @@ class CustomerController extends Controller
         return $request->user()->can('customers.assign_any_agent')
             ? User::permission('scope.by_agent')->orderBy('name')->get()
             : collect();
-    }
-
-    public function generateDepositInvoice(Request $request, Customer $customer, LedgerService $ledger)
-    {
-        abort_if($customer->deposit_invoice_id, 422, 'A deposit invoice already exists for this customer.');
-
-        $data = $request->validate([
-            'amount'       => ['required', 'integer', 'min:1'],
-            'invoice_date' => ['nullable', 'date'],
-        ]);
-
-        $date = $data['invoice_date'] ?? now()->toDateString();
-        if ($date !== now()->toDateString() && ! $request->user()->isSuperAdmin()) {
-            return back()->withErrors(['invoice_date' => 'Only Super Admin may set a date other than today.']);
-        }
-
-        $invoice = DB::transaction(function () use ($customer, $data, $date, $request, $ledger) {
-            $inv = \App\Models\Invoice::create([
-                'invoice_no'     => \App\Services\InvoiceNumber::next(),
-                'invoice_type'   => 'deposit',
-                'vehicle_id'     => null,
-                'customer_id'    => $customer->id,
-                'agent_id'       => $customer->agent_id,
-                'sale_price'     => $data['amount'],
-                'settled_amount' => 0,
-                'total_payable'  => $data['amount'],
-                'status'         => 'issued',
-                'issued_by'      => $request->user()->id,
-                'issued_at'      => $date,
-            ]);
-
-            $ledger->depositInvoiceReceivable($inv);
-            $customer->update(['deposit_invoice_id' => $inv->id]);
-
-            return $inv;
-        });
-
-        return redirect()->route('invoices.show', $invoice)->with('success', 'Deposit invoice generated — record the customer\'s payment against it to complete their profile.');
     }
 }

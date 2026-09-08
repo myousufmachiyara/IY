@@ -9,9 +9,10 @@ use Illuminate\Validation\Rule;
 
 class AccountingController extends Controller
 {
+    /** System accounts only — customer/vendor sub-accounts are viewed via the Ledger drill-down, not this admin list. */
     public function chartOfAccounts()
     {
-        $accounts = ChartOfAccount::orderBy('code')->get()
+        $accounts = ChartOfAccount::whereNotIn('type', ['customer', 'vendor'])->orderBy('code')->get()
             ->map(fn ($a) => tap($a, fn ($a) => $a->current_balance = $a->balance()));
 
         return view('accounting.chart', compact('accounts'));
@@ -53,7 +54,7 @@ class AccountingController extends Controller
             ->get();
 
         $running = 0;
-        $debitNormal = in_array($account->type, ['asset', 'expense'], true);
+        $debitNormal = $account->isDebitNature();
         $lines = $lines->map(function ($l) use (&$running, $debitNormal) {
             $running += $debitNormal ? ($l->debit - $l->credit) : ($l->credit - $l->debit);
             $l->running_balance = $running;
@@ -118,13 +119,33 @@ class AccountingController extends Controller
         return view('accounting.profit_loss', compact('income', 'expense', 'totalIncome', 'totalExpense', 'netProfit', 'from', 'to'));
     }
 
+    /** Individual customer/vendor sub-accounts roll up into one control-account line each — not listed one-by-one. */
     public function trialBalance(Request $request)
     {
-        $rows = ChartOfAccount::orderBy('code')->get()->map(function ($a) {
+        $accounts = ChartOfAccount::orderBy('code')->get();
+        $customerSubs = $accounts->where('type', 'customer');
+        $vendorSubs   = $accounts->where('type', 'vendor');
+        $regular      = $accounts->whereNotIn('type', ['customer', 'vendor']);
+
+        $rows = $regular->map(function ($a) {
             $balance = $a->balance();
-            $debitNormal = in_array($a->type, ['asset', 'expense']);
+            $debitNormal = $a->isDebitNature();
             return ['account' => $a, 'debit' => $debitNormal ? max($balance, 0) : 0, 'credit' => !$debitNormal ? max($balance, 0) : 0];
-        })->filter(fn ($r) => $r['debit'] != 0 || $r['credit'] != 0);
+        })->filter(fn ($r) => $r['debit'] != 0 || $r['credit'] != 0)->values();
+
+        if ($customerSubs->isNotEmpty()) {
+            $total = $customerSubs->sum(fn ($a) => $a->balance());
+            if ($total != 0) {
+                $rows->push(['account' => (object) ['code' => LedgerService::AR, 'name' => "Accounts Receivable (Control — {$customerSubs->count()} customers)"], 'debit' => max($total, 0), 'credit' => 0]);
+            }
+        }
+
+        if ($vendorSubs->isNotEmpty()) {
+            $total = $vendorSubs->sum(fn ($a) => $a->balance());
+            if ($total != 0) {
+                $rows->push(['account' => (object) ['code' => LedgerService::AP_VENDOR, 'name' => "Accounts Payable (Control — {$vendorSubs->count()} vendors)"], 'debit' => 0, 'credit' => max($total, 0)]);
+            }
+        }
 
         return view('accounting.trial_balance', [
             'rows' => $rows, 'totalDebit' => $rows->sum('debit'), 'totalCredit' => $rows->sum('credit'),
@@ -137,13 +158,23 @@ class AccountingController extends Controller
         $liabilities = ChartOfAccount::type('liability')->get()->map(fn ($a) => ['account' => $a, 'amount' => $a->balance()]);
         $equity      = ChartOfAccount::type('equity')->get()->map(fn ($a) => ['account' => $a, 'amount' => $a->balance()]);
 
+        $customerSubs = ChartOfAccount::type('customer')->get();
+        $vendorSubs   = ChartOfAccount::type('vendor')->get();
+
+        if ($customerSubs->isNotEmpty()) {
+            $assets->push(['account' => (object) ['name' => "Accounts Receivable (Control — {$customerSubs->count()} customers)"], 'amount' => $customerSubs->sum(fn ($a) => $a->balance())]);
+        }
+        if ($vendorSubs->isNotEmpty()) {
+            $liabilities->push(['account' => (object) ['name' => "Accounts Payable (Control — {$vendorSubs->count()} vendors)"], 'amount' => $vendorSubs->sum(fn ($a) => $a->balance())]);
+        }
+
         $totalAssets      = $assets->sum('amount');
         $totalLiabilities = $liabilities->sum('amount');
         $totalEquityBase  = $equity->sum('amount');
 
         $income  = ChartOfAccount::type('income')->get()->sum(fn ($a) => $a->balance());
         $expense = ChartOfAccount::type('expense')->get()->sum(fn ($a) => $a->balance());
-        $netProfit = $income - $expense; // not yet formally closed into an equity account
+        $netProfit = $income - $expense;
 
         return view('accounting.balance_sheet', compact(
             'assets', 'liabilities', 'equity', 'totalAssets', 'totalLiabilities', 'totalEquityBase', 'netProfit'
