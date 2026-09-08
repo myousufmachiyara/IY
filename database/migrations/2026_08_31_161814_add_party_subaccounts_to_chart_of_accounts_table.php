@@ -1,0 +1,27 @@
+<?php
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        Schema::table('chart_of_accounts', function (Blueprint $table) {
+            if (! Schema::hasColumn('chart_of_accounts', 'account_code')) {
+                $table->string('account_code')->nullable()->after('code');
+            }
+            if (! Schema::hasColumn('chart_of_accounts', 'customer_id')) {
+                $table->foreignId('customer_id')->nullable()->after('parent_id')->constrained()->nullOnDelete();
+            }
+            if (! Schema::hasColumn('chart_of_accounts', 'vendor_id')) {
+                $table->foreignId('vendor_id')->nullable()->after('customer_id')->constrained()->nullOnDelete();
+            }
+        });
+    }
+    public function down(): void {
+        Schema::table('chart_of_accounts', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('customer_id');
+            $table->dropConstrainedForeignId('vendor_id');
+            $table->dropColumn('account_code');
+        });
+    }
+};

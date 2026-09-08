@@ -12,7 +12,7 @@ class PaymentController extends Controller
 {
     public function index(Request $request)
     {
-        $payments = Payment::with(['customer', 'invoice', 'vehicle', 'recorder', 'approver'])
+        $payments = Payment::with('customer', 'invoice', 'recorder')
             ->when($request->customer_id, fn ($q, $v) => $q->where('customer_id', $v))
             ->when($request->method, fn ($q, $v) => $q->where('method', $v))
             ->when($request->status, fn ($q, $v) => $q->where('status', $v))
@@ -26,51 +26,41 @@ class PaymentController extends Controller
 
     public function store(Request $request, LedgerService $ledger)
     {
-        $autoApprove = $request->user()->canBackdate(); // approval authority — unrelated to the date-entry rule below
+        $autoApprove = $request->user()->canBackdate();
 
         $data = $request->validate([
-            'customer_id'  => ['required', 'exists:customers,id'],
-            'invoice_id'   => ['nullable', 'exists:invoices,id'],
-            'vehicle_id'   => ['nullable', 'exists:vehicles,id'],
-            'amount'       => ['required', 'integer', 'min:1'],
-            'method'       => ['required', Rule::in(['cash', 'bank'])],
-            'paid_at'      => ['required', 'date'],
-            'reference'    => ['nullable', 'string', 'max:255'],
-            'attachment'   => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'customer_id' => ['required', 'exists:customers,id'],
+            'invoice_id'  => ['nullable', 'exists:invoices,id'],
+            'vehicle_id'  => ['nullable', 'exists:vehicles,id'],
+            'amount'      => ['required', 'integer', 'min:1'],
+            'method'      => ['required', Rule::in(['cash', 'bank'])],
+            'paid_at'     => ['required', 'date'],
+            'reference'   => ['nullable', 'string', 'max:255'],
+            'attachment'  => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
 
-        // #3 — only Super Admin may enter a payment date other than today. Accountant and
-        // sales agent are locked to today regardless of approval authority elsewhere.
         if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
             return back()->withErrors(['paid_at' => 'Only Super Admin may record a payment with a date other than today.'])->withInput();
         }
 
-        if (! empty($data['invoice_id'])) {
-            $invoice = Invoice::findOrFail($data['invoice_id']);
-            abort_unless($invoice->customer_id == $data['customer_id'], 422, 'Invoice does not belong to this customer.');
-            $data['vehicle_id'] = $data['vehicle_id'] ?: $invoice->vehicle_id;
-        }
+        $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
 
-        $backdated = \Carbon\Carbon::parse($data['paid_at'])->lt(today());
-
-        DB::transaction(function () use ($data, $backdated, $request, $ledger, $autoApprove) {
-            $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
-
+        DB::transaction(function () use ($data, $autoApprove, $request, $ledger, $account) {
             $payment = Payment::create([
-                'customer_id'     => $data['customer_id'],
-                'invoice_id'      => $data['invoice_id'] ?? null,
-                'vehicle_id'      => $data['vehicle_id'] ?? null,
-                'amount'          => $data['amount'],
-                'method'          => $data['method'],
-                'paid_at'         => $data['paid_at'],
-                'reference'       => $data['reference'] ?? null,
-                'attachment_path' => $request->hasFile('attachment') ? $request->file('attachment')->store('payment_attachments', 'public') : null,
-                'is_backdated'    => $backdated,
-                'account_id'      => $ledger->account($account)->id,
-                'recorded_by'     => $request->user()->id,
-                'status'          => $autoApprove ? 'approved' : 'pending',
-                'approved_by'     => $autoApprove ? $request->user()->id : null,
-                'approved_at'     => $autoApprove ? now() : null,
+                'customer_id'      => $data['customer_id'],
+                'invoice_id'       => $data['invoice_id'] ?? null,
+                'vehicle_id'       => $data['vehicle_id'] ?? null,
+                'amount'           => $data['amount'],
+                'method'           => $data['method'],
+                'account_id'       => $ledger->account($account)->id,
+                'paid_at'          => $data['paid_at'],
+                'reference'        => $data['reference'] ?? null,
+                'attachment_path'  => $request->file('attachment')->store('payment_attachments', 'public'),
+                'is_backdated'     => ! \Carbon\Carbon::parse($data['paid_at'])->isToday(),
+                'recorded_by'      => $request->user()->id,
+                'status'           => $autoApprove ? 'approved' : 'pending',
+                'approved_by'      => $autoApprove ? $request->user()->id : null,
+                'approved_at'      => $autoApprove ? now() : null,
             ]);
 
             if ($autoApprove) {
@@ -81,43 +71,57 @@ class PaymentController extends Controller
             }
         });
 
-        return back()->with('success', $autoApprove
-            ? 'Payment recorded.'
-            : 'Payment submitted — awaiting accountant approval before it counts toward the invoice balance.');
+        return back()->with('success', $autoApprove ? 'Payment recorded and posted.' : 'Payment submitted — awaiting approval.');
     }
 
     public function approve(Payment $payment, LedgerService $ledger)
     {
         abort_unless(auth()->user()->canBackdate(), 403);
-        abort_unless($payment->status === 'pending', 422, 'This payment is not awaiting approval.');
+        abort_unless($payment->status === 'pending', 422, 'This payment is not pending.');
 
         DB::transaction(function () use ($payment, $ledger) {
             $account = $payment->method === 'cash' ? LedgerService::CASH : LedgerService::BANK;
+            $ledger->customerPayment($payment, $account);
             $payment->update(['status' => 'approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
-            $ledger->customerPayment($payment->fresh(), $account);
             if ($payment->invoice_id) {
                 Invoice::find($payment->invoice_id)?->refreshTotals()->save();
             }
         });
 
-        return back()->with('success', 'Payment approved and posted to the ledger.');
+        return back()->with('success', 'Payment approved and posted.');
     }
 
+    /** Reject a pending payment with a required reason — visible on the invoice/payment list afterward. */
     public function reject(Request $request, Payment $payment)
     {
         abort_unless(auth()->user()->canBackdate(), 403);
-        abort_unless($payment->status === 'pending', 422, 'This payment is not awaiting approval.');
+        abort_unless($payment->status === 'pending', 422, 'This payment is not pending.');
 
         $data = $request->validate(['rejection_reason' => ['required', 'string', 'max:500']]);
         $payment->update(['status' => 'rejected', 'rejection_reason' => $data['rejection_reason']]);
 
-        return back()->with('success', 'Payment rejected — the agent can correct and resubmit.');
+        return back()->with('success', 'Payment rejected.');
     }
 
-    public function edit(Payment $payment)
+    public function undoApproval(Payment $payment, LedgerService $ledger)
     {
-        return response()->json($payment);
+        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Only Super Admin may undo an approved payment.');
+        abort_unless($payment->status === 'approved', 422, 'This payment is not currently approved.');
+
+        DB::transaction(function () use ($payment, $ledger) {
+            foreach ($payment->journalEntries as $entry) {
+                $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — payment #{$payment->id} approval undone");
+            }
+            $payment->update(['status' => 'pending', 'approved_by' => null, 'approved_at' => null]);
+            if ($payment->invoice_id) {
+                Invoice::find($payment->invoice_id)?->refreshTotals()->save();
+            }
+        });
+
+        return back()->with('success', 'Payment approval undone — reverted to pending.');
     }
+
+    public function edit(Payment $payment) { return response()->json($payment); }
 
     public function update(Request $request, Payment $payment, LedgerService $ledger)
     {
@@ -169,10 +173,7 @@ class PaymentController extends Controller
 
     public function destroy(Payment $payment, LedgerService $ledger)
     {
-        abort_if(
-            $payment->invoice?->vehicle?->documents()->where('is_final_clearance', true)->where('visible_to_customer', true)->exists(),
-            422, 'Payments cannot be changed after the final clearance document has been released.'
-        );
+        abort_unless(auth()->user()->canBackdate(), 403);
 
         DB::transaction(function () use ($payment, $ledger) {
             if ($payment->status === 'approved') {
@@ -181,9 +182,6 @@ class PaymentController extends Controller
                 }
             }
             $invoiceId = $payment->invoice_id;
-            if ($payment->attachment_path) {
-                \Storage::disk('public')->delete($payment->attachment_path);
-            }
             $payment->delete();
             if ($invoiceId) {
                 Invoice::find($invoiceId)?->refreshTotals()->save();
@@ -195,26 +193,7 @@ class PaymentController extends Controller
 
     public function customerLedger(Customer $customer)
     {
-        $customer->load(['invoices' => fn ($q) => $q->latest(), 'payments' => fn ($q) => $q->latest()->with('invoice', 'approver')]);
-        return view('payments.customer_ledger', compact('customer'));
-    }
-
-    /** Super Admin can revert an already-approved payment back to pending, reversing its ledger post. */
-    public function undoApproval(Payment $payment, LedgerService $ledger)
-    {
-        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Only Super Admin may undo an approved payment.');
-        abort_unless($payment->status === 'approved', 422, 'This payment is not currently approved.');
-
-        DB::transaction(function () use ($payment, $ledger) {
-            foreach ($payment->journalEntries as $entry) {
-                $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — payment #{$payment->id} approval undone");
-            }
-            $payment->update(['status' => 'pending', 'approved_by' => null, 'approved_at' => null]);
-            if ($payment->invoice_id) {
-                Invoice::find($payment->invoice_id)?->refreshTotals()->save();
-            }
-        });
-
-        return back()->with('success', 'Payment approval undone — reverted to pending.');
+        $payments = $customer->payments()->with('invoice', 'recorder')->latest('paid_at')->get();
+        return view('payments.customer_ledger', compact('customer', 'payments'));
     }
 }

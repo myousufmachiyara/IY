@@ -23,6 +23,19 @@ class VehicleController extends Controller
         return view('vehicles.index', compact('vehicles', 'customers'));
     }
 
+    public function sold(Request $request)
+    {
+        $vehicles = Vehicle::with('customer', 'agent', 'invoice')
+            ->whereIn('status', ['invoiced', 'dispatched', 'arrived', 'delivered'])
+            ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
+            ->when($request->from, fn ($q) => $q->whereDate('won_at', '>=', $request->from))
+            ->when($request->to, fn ($q) => $q->whereDate('won_at', '<=', $request->to))
+            ->latest('won_at')->get();
+
+        $customers = Customer::orderBy('name')->get();
+        return view('vehicles.sold', compact('vehicles', 'customers'));
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate($this->rules($request));

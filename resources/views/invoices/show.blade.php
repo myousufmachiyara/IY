@@ -161,6 +161,14 @@
                                         <form action="{{ route('payments.approve', $p) }}" method="POST" class="d-inline" onsubmit="return confirm('Approve this payment?');">
                                             @csrf<button class="btn btn-link p-0 text-success me-1" title="Approve"><i class="fa fa-check-circle"></i></button>
                                         </form>
+                                        <a href="#" class="text-danger me-1" title="Reject" onclick="openRejectPayment({{ $p->id }})"><i class="fa fa-times-circle"></i></a>
+                                    @elseif($p->status === 'rejected' && $p->rejection_reason)
+                                        <span class="text-danger small" title="{{ $p->rejection_reason }}"><i class="fa fa-info-circle"></i></span>
+                                    @endif
+                                    @if($p->method === 'deposit' && $p->status === 'approved' && auth()->user()->isSuperAdmin())
+                                        <form action="{{ route('payments.undo_deposit_adjustment', $p) }}" method="POST" class="d-inline" onsubmit="return confirm('Undo this deposit adjustment? The deposit and customer profile will be restored.');">
+                                            @csrf<button class="btn btn-link p-0 text-warning me-1" title="Undo Deposit Adjustment"><i class="fa fa-undo"></i></button>
+                                        </form>
                                     @endif
                                     @can('payments.edit')
                                         <a href="#" class="text-primary me-1" title="Edit" onclick="editPayment({{ $p->id }}, {{ $p->amount }}, '{{ $p->method }}', '{{ $p->paid_at->format('Y-m-d') }}', '{{ $p->reference }}')"><i class="fa fa-edit"></i></a>
@@ -284,7 +292,30 @@
             </section>
         </div>
         @endcan
-
+        <div id="rejectPaymentModal" class="modal-block modal-block-danger mfp-hide">
+            <section class="card">
+                <form method="POST" id="rejectPaymentForm" action="" onkeydown="return event.key != 'Enter';">
+                    @csrf
+                    <header class="card-header"><h2 class="card-title">Reject Payment</h2></header>
+                    <div class="card-body">
+                        <label>Reason <span class="text-danger">*</span></label>
+                        <textarea class="form-control" name="rejection_reason" rows="3" required></textarea>
+                    </div>
+                    <footer class="card-footer">
+                        <div class="col-md-12 text-end">
+                            <button type="submit" class="btn btn-danger">Reject</button>
+                            <button type="button" class="btn btn-default modal-dismiss">Cancel</button>
+                        </div>
+                    </footer>
+                </form>
+            </section>
+        </div>
+        <script>
+        function openRejectPayment(id) {
+            document.getElementById('rejectPaymentForm').action = '/payments/' + id + '/reject';
+            $.magnificPopup.open({ items: { src: '#rejectPaymentModal' }, type: 'inline' });
+        }
+        </script>
         @include('payments._edit_modal')
     </div>
 </div>

@@ -48,6 +48,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('results', [BiddingResultController::class, 'index'])->middleware('permission:bid_results.index')->name('results.index');
     Route::get('results/won', [BiddingResultController::class, 'wonList'])->middleware('permission:bid_results.index')->name('results.won');
+    Route::get("vehicles-sold", [VehicleController::class, "sold"])->middleware("permission:vehicle_requirement.index")->name("vehicles.sold");
     Route::get('results/lost', [BiddingResultController::class, 'lostList'])->middleware('permission:bid_results.index')->name('results.lost');
     Route::post('results/bulk-lost', [BiddingResultController::class, 'bulkLost'])->middleware('permission:bid_results.edit')->name('results.bulk_lost');
     Route::post('bids/{bid}/won',  [BiddingResultController::class, 'won'])->middleware('permission:bid_results.edit')->name('bids.won');
@@ -131,7 +132,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('bid-won',       [ReportController::class, 'bidWon'])->middleware('permission:reports.bid_won')->name('bid_won');
         Route::get('customer-wise', [ReportController::class, 'customerWise'])->middleware('permission:reports.customer_wise')->name('customer_wise');
     });
-
+    
+    Route::post("customers/{customer}/generate-deposit-invoice", [CustomerController::class, "generateDepositInvoice"])->middleware("permission:customers.edit")->name("customers.generate_deposit_invoice");
     Route::get('system/logs', [LogViewerController::class, 'index'])->middleware('permission:system.logs')->name('system.logs');
     Route::get('system/logs/{file}/download', [LogViewerController::class, 'download'])->middleware('permission:system.logs')->name('system.logs.download');
 });

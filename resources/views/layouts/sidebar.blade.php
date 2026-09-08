@@ -120,15 +120,38 @@
           </li>
           @endcan
 
+{{-- find: --}}
           {{-- Invoices --}}
           @can('invoices.index')
           <li class="{{ request()->routeIs('invoices.*') ? 'active' : '' }}">
             <a class="nav-link" href="{{ route('invoices.index') }}">
               <i class="fa fa-file-invoice-dollar"></i>
-              <span>Invoices</span>
+              <span>Invoices / Sold Vehicles</span>
             </a>
           </li>
           @endcan
+
+          {{-- Invoices / Sold Vehicles --}}
+          @if(auth()->user()->can('invoices.index') || auth()->user()->can('vehicle_requirement.index'))
+          <li class="nav-parent {{ request()->routeIs('invoices.*') || request()->routeIs('vehicles.sold') ? 'nav-expanded nav-active' : '' }}">
+            <a class="nav-link" href="#">
+              <i class="fa fa-file-invoice-dollar"></i>
+              <span>Sales</span>
+            </a>
+            <ul class="nav nav-children">
+              @can('invoices.index')
+                <li class="{{ request()->routeIs('invoices.*') ? 'active' : '' }}">
+                  <a class="nav-link" href="{{ route('invoices.index') }}">Sale Invoices</a>
+                </li>
+              @endcan
+              @can('vehicle_requirement.index')
+                <li class="{{ request()->routeIs('vehicles.sold') ? 'active' : '' }}">
+                  <a class="nav-link" href="{{ route('vehicles.sold') }}">Sold Vehicles</a>
+                </li>
+              @endcan
+            </ul>
+          </li>
+          @endif
 
           {{-- Shipments --}}
           @can('shipments.index')

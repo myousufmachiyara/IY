@@ -16,8 +16,7 @@
                     @csrf
                     <div class="mb-3" style="max-width:220px;">
                         <label>Invoice Date <span class="text-danger">*</span></label>
-                        <input type="date" name="issued_date" class="form-control" value="{{ date('Y-m-d') }}"
-                            @unless(auth()->user()->isSuperAdmin()) readonly @endunless required>
+                        <p class="text-muted small">Each invoice is dated to its own vehicle's won date automatically.</p>
                     </div>
                     <div class="table-scroll mb-3">
                         <table class="table table-bordered table-striped mb-0">

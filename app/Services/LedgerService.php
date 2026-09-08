@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{ChartOfAccount, Customer, Expense, Invoice, JournalEntry, JournalLine, Payment, Vehicle, VendorPayment};
+use App\Models\{ChartOfAccount, Customer, Expense, Invoice, JournalEntry, JournalLine, Payment, Vehicle, Vendor, VendorPayment};
 use Illuminate\Support\Facades\{Auth, DB};
 use InvalidArgumentException;
 
@@ -18,6 +18,44 @@ class LedgerService
     public function account(string $code): ChartOfAccount
     {
         return $this->cache[$code] ??= ChartOfAccount::where('code', $code)->firstOrFail();
+    }
+
+    /**
+     * Every customer gets their own real sub-account under Accounts Receivable —
+     * not a shared control account with party tagging. Idempotent: safe to call
+     * on every posting, only creates the row the first time.
+     */
+    public function ensureCustomerAccount(Customer $customer): ChartOfAccount
+    {
+        return ChartOfAccount::firstOrCreate(
+            ['customer_id' => $customer->id],
+            [
+                'code'         => self::AR . '-' . $customer->id,
+                'account_code' => self::AR . '-' . $customer->id,
+                'name'         => 'Receivable — ' . $customer->name,
+                'type'         => 'customer',
+                'parent_id'    => $this->account(self::AR)->id,
+                'is_system'    => false,
+                'is_active'    => true,
+            ]
+        );
+    }
+
+    /** Same idea, for vendors under Accounts Payable. */
+    public function ensureVendorAccount(Vendor $vendor): ChartOfAccount
+    {
+        return ChartOfAccount::firstOrCreate(
+            ['vendor_id' => $vendor->id],
+            [
+                'code'         => self::AP_VENDOR . '-' . $vendor->id,
+                'account_code' => self::AP_VENDOR . '-' . $vendor->id,
+                'name'         => 'Payable — ' . $vendor->name,
+                'type'         => 'vendor',
+                'parent_id'    => $this->account(self::AP_VENDOR)->id,
+                'is_system'    => false,
+                'is_active'    => true,
+            ]
+        );
     }
 
     public function post(string $date, string $description, array $lines, ?object $reference = null, bool $backdated = false): JournalEntry
@@ -42,8 +80,9 @@ class LedgerService
 
             foreach ($lines as $l) {
                 $party = $l['party'] ?? null;
+                $accountId = $l['account_id'] ?? $this->account($l['account'])->id;
                 $entry->lines()->create([
-                    'account_id' => $this->account($l['account'])->id,
+                    'account_id' => $accountId,
                     'debit'      => $l['debit'] ?? 0,
                     'credit'     => $l['credit'] ?? 0,
                     'party_type' => $party?->getMorphClass(),
@@ -69,25 +108,17 @@ class LedgerService
         ], $c);
     }
 
-    /**
-     * Post (or top-up) the vendor payable for a vehicle so it always matches the
-     * CURRENT total costing (buying price + vendor commission + inland + auction +
-     * freight + misc) — not just the raw buying price. Safe to call repeatedly:
-     * only the DIFFERENCE between what's already posted and what should now be
-     * posted gets entered, so calling this after every costing edit keeps the
-     * ledger exactly in sync without ever reversing or double-posting.
-     */
     public function adjustVendorPayable(Vehicle $vehicle): ?JournalEntry
     {
         $vehicle->loadMissing('costing', 'vendor');
         $targetPayable = $vehicle->costing?->total_costing ?? $vehicle->buying_price;
 
-        $apAccount = $this->account(self::AP_VENDOR);
+        $vendorAccount = $this->ensureVendorAccount($vehicle->vendor);
 
         $currentlyPosted = (int) JournalLine::whereHas('entry', fn ($q) => $q
                 ->where('reference_type', $vehicle->getMorphClass())
                 ->where('reference_id', $vehicle->id))
-            ->where('account_id', $apAccount->id)
+            ->where('account_id', $vendorAccount->id)
             ->get()
             ->sum(fn ($l) => $l->credit - $l->debit);
 
@@ -100,38 +131,64 @@ class LedgerService
         if ($delta > 0) {
             return $this->post(now()->toDateString(), "Vendor payable — {$vehicle->label()} (total costing)", [
                 ['account' => self::COST_VEHICLES, 'debit'  => $delta],
-                ['account' => self::AP_VENDOR,      'credit' => $delta, 'party' => $vehicle->vendor],
+                ['account_id' => $vendorAccount->id, 'credit' => $delta, 'party' => $vehicle->vendor],
             ], $vehicle);
         }
 
         $delta = abs($delta);
         return $this->post(now()->toDateString(), "Vendor payable correction — {$vehicle->label()} (total costing decreased)", [
-            ['account' => self::AP_VENDOR,      'debit'  => $delta, 'party' => $vehicle->vendor],
+            ['account_id' => $vendorAccount->id, 'debit'  => $delta, 'party' => $vehicle->vendor],
             ['account' => self::COST_VEHICLES, 'credit' => $delta],
         ], $vehicle);
     }
 
     public function invoiceReceivable(Invoice $inv): JournalEntry
     {
+        $customerAccount = $this->ensureCustomerAccount($inv->customer);
+
         return $this->post(today()->toDateString(), "Invoice {$inv->invoice_no} — {$inv->customer->name}", [
-            ['account' => self::AR,           'debit'  => $inv->total_payable, 'party' => $inv->customer],
-            ['account' => self::SALES_INCOME, 'credit' => $inv->total_payable],
+            ['account_id' => $customerAccount->id, 'debit'  => $inv->total_payable, 'party' => $inv->customer],
+            ['account' => self::SALES_INCOME,       'credit' => $inv->total_payable],
+        ], $inv);
+    }
+
+    public function depositInvoiceReceivable(Invoice $inv): JournalEntry
+    {
+        $customerAccount = $this->ensureCustomerAccount($inv->customer);
+
+        return $this->post(today()->toDateString(), "Deposit invoice {$inv->invoice_no} — {$inv->customer->name}", [
+            ['account_id' => $customerAccount->id, 'debit'  => $inv->total_payable, 'party' => $inv->customer],
+            ['account' => self::CUST_DEPOSIT,       'credit' => $inv->total_payable, 'party' => $inv->customer],
         ], $inv);
     }
 
     public function customerPayment(Payment $p, string $cashAccount = self::BANK): JournalEntry
     {
+        $customerAccount = $this->ensureCustomerAccount($p->customer);
+
         return $this->post($p->paid_at->toDateString(), "Payment received — {$p->customer->name}", [
-            ['account' => $cashAccount, 'debit'  => $p->amount],
-            ['account' => self::AR,     'credit' => $p->amount, 'party' => $p->customer],
+            ['account' => $cashAccount,          'debit'  => $p->amount],
+            ['account_id' => $customerAccount->id, 'credit' => $p->amount, 'party' => $p->customer],
         ], $p, $p->is_backdated);
+    }
+
+    public function applyDepositToInvoice(Invoice $invoice, int $amount): JournalEntry
+    {
+        $customerAccount = $this->ensureCustomerAccount($invoice->customer);
+
+        return $this->post(now()->toDateString(), "Security deposit applied to invoice {$invoice->invoice_no}", [
+            ['account' => self::CUST_DEPOSIT,       'debit'  => $amount, 'party' => $invoice->customer],
+            ['account_id' => $customerAccount->id,  'credit' => $amount, 'party' => $invoice->customer],
+        ], $invoice);
     }
 
     public function vendorPayment(VendorPayment $vp, string $cashAccount = self::BANK): JournalEntry
     {
+        $vendorAccount = $this->ensureVendorAccount($vp->vendor);
+
         return $this->post($vp->paid_at->toDateString(), "Vendor payment — vehicle #{$vp->vehicle_id}", [
-            ['account' => self::AP_VENDOR, 'debit'  => $vp->amount, 'party' => $vp->vendor],
-            ['account' => $cashAccount,    'credit' => $vp->amount],
+            ['account_id' => $vendorAccount->id, 'debit'  => $vp->amount, 'party' => $vp->vendor],
+            ['account' => $cashAccount,          'credit' => $vp->amount],
         ], $vp, $vp->is_backdated);
     }
 
@@ -171,13 +228,5 @@ class LedgerService
 
             return $entry;
         });
-    }
-
-    public function applyDepositToInvoice(Invoice $invoice, int $amount): JournalEntry
-    {
-        return $this->post(now()->toDateString(), "Security deposit applied to invoice {$invoice->invoice_no}", [
-            ['account' => self::CUST_DEPOSIT, 'debit'  => $amount, 'party' => $invoice->customer],
-            ['account' => self::AR,           'credit' => $amount, 'party' => $invoice->customer],
-        ], $invoice);
     }
 }

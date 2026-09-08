@@ -24,30 +24,6 @@ class InvoiceController extends Controller
         return view('invoices.index', compact('invoices'));
     }
 
-    public function store(Request $request, Vehicle $vehicle, LedgerService $ledger)
-    {
-        abort_unless($vehicle->isWon(), 422, 'Vehicle is not won yet.');
-        abort_if($vehicle->invoice, 422, 'An invoice already exists for this vehicle.');
-
-        $salePrice = $vehicle->selling_price ?: $vehicle->costing?->sale_price;
-        abort_unless($salePrice, 422, 'Set a selling price before invoicing.');
-
-        $invoice = DB::transaction(function () use ($vehicle, $salePrice, $request, $ledger) {
-            $inv = Invoice::create([
-                'invoice_no' => InvoiceNumber::next(), 'vehicle_id' => $vehicle->id,
-                'customer_id' => $vehicle->customer_id, 'agent_id' => $vehicle->agent_id,
-                'sale_price' => $salePrice, 'settled_amount' => 0, 'total_payable' => $salePrice,
-                'status' => 'issued', 'issued_by' => $request->user()->id, 'issued_at' => now(),
-                'due_first' => now()->addDays(15)->toDateString(),
-            ]);
-            $vehicle->update(['status' => 'invoiced']);
-            $ledger->invoiceReceivable($inv);
-            return $inv;
-        });
-
-        return redirect()->route('invoices.show', $invoice)->with('success', "Invoice {$invoice->invoice_no} generated.");
-    }
-
     public function bulkCreateForm(Customer $customer)
     {
         $eligible = $customer->vehicles()
@@ -58,6 +34,36 @@ class InvoiceController extends Controller
         abort_if($eligible->isEmpty(), 422, 'This customer has no vehicles eligible for invoicing.');
 
         return view('invoices.bulk_create', compact('customer', 'eligible'));
+    }
+
+    public function store(Request $request, Vehicle $vehicle, LedgerService $ledger)
+    {
+        abort_unless($vehicle->isWon(), 422, 'Vehicle is not won yet.');
+        abort_if($vehicle->invoice, 422, 'An invoice already exists for this vehicle.');
+
+        $salePrice = $vehicle->selling_price ?: $vehicle->costing?->sale_price;
+        abort_unless($salePrice, 422, 'Set a selling price before invoicing.');
+
+        $issuedDate = optional($vehicle->won_at)->toDateString() ?? now()->toDateString();
+        $data = $request->validate(['issued_date' => ['nullable', 'date']]);
+        if (! empty($data['issued_date']) && $request->user()->isSuperAdmin()) {
+            $issuedDate = $data['issued_date'];
+        }
+
+        $invoice = DB::transaction(function () use ($vehicle, $salePrice, $issuedDate, $request, $ledger) {
+            $inv = Invoice::create([
+                'invoice_no' => InvoiceNumber::next(), 'vehicle_id' => $vehicle->id,
+                'customer_id' => $vehicle->customer_id, 'agent_id' => $vehicle->agent_id,
+                'sale_price' => $salePrice, 'settled_amount' => 0, 'total_payable' => $salePrice,
+                'status' => 'issued', 'issued_by' => $request->user()->id, 'issued_at' => $issuedDate,
+                'due_first' => now()->addDays(15)->toDateString(),
+            ]);
+            $vehicle->update(['status' => 'invoiced']);
+            $ledger->invoiceReceivable($inv);
+            return $inv;
+        });
+
+        return redirect()->route('invoices.show', $invoice)->with('success', "Invoice {$invoice->invoice_no} generated — dated to the won date.");
     }
 
     public function bulkStore(Request $request, Customer $customer, LedgerService $ledger)
@@ -73,11 +79,13 @@ class InvoiceController extends Controller
                 $salePrice = $vehicle->selling_price ?: $vehicle->costing?->sale_price;
                 if (! $salePrice) continue;
 
+                $issuedDate = optional($vehicle->won_at)->toDateString() ?? now()->toDateString();
+
                 $inv = Invoice::create([
                     'invoice_no' => InvoiceNumber::next(), 'vehicle_id' => $vehicle->id,
                     'customer_id' => $vehicle->customer_id, 'agent_id' => $vehicle->agent_id,
                     'sale_price' => $salePrice, 'settled_amount' => 0, 'total_payable' => $salePrice,
-                    'status' => 'issued', 'issued_by' => $request->user()->id, 'issued_at' => now(),
+                    'status' => 'issued', 'issued_by' => $request->user()->id, 'issued_at' => $issuedDate,
                     'due_first' => now()->addDays(15)->toDateString(),
                 ]);
                 $vehicle->update(['status' => 'invoiced']);
@@ -86,7 +94,7 @@ class InvoiceController extends Controller
             }
         });
 
-        return redirect()->route('customers.show', $customer)->with('success', "{$created} invoice(s) generated.");
+        return redirect()->route('customers.show', $customer)->with('success', "{$created} invoice(s) generated — each dated to its own won date.");
     }
 
     public function mergeSelectForm(Customer $customer)
@@ -173,7 +181,7 @@ class InvoiceController extends Controller
         abort_if($invoice->status === 'cancelled', 422, 'Cannot adjust a cancelled invoice.');
 
         $customer = $invoice->customer;
-        abort_unless($customer->security_deposit_status === 'approved' && $customer->security_deposit > 0, 422, 'This customer has no approved deposit available to apply.');
+        abort_unless($customer->deposit_invoice_id && $customer->security_deposit > 0, 422, 'This customer has no available deposit to apply.');
 
         $amount = min($customer->security_deposit, $invoice->balance());
         abort_if($amount <= 0, 422, 'Nothing to adjust — either the invoice is fully paid or the deposit is exhausted.');
@@ -203,6 +211,35 @@ class InvoiceController extends Controller
         return back()->with('success', '¥' . number_format($amount) . ' applied from the security deposit. Customer profile is now incomplete — a fresh deposit will be required before further bidding.');
     }
 
+    public function undoDepositAdjustment(Payment $payment, LedgerService $ledger)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Only Super Admin may undo a deposit adjustment.');
+        abort_unless($payment->method === 'deposit', 422, 'This is not a deposit adjustment payment.');
+        abort_unless($payment->status === 'approved', 422, 'This adjustment is not currently active.');
+
+        DB::transaction(function () use ($payment, $ledger) {
+            $customer = $payment->customer;
+            $amount = $payment->amount;
+            $invoice = $payment->invoice;
+
+            foreach ($payment->journalEntries as $entry) {
+                $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — deposit adjustment #{$payment->id} undone");
+            }
+            $payment->delete();
+
+            if ($invoice) {
+                $invoice->refreshTotals()->save();
+            }
+            $customer->update([
+                'security_deposit'        => $customer->security_deposit + $amount,
+                'security_deposit_status' => 'approved',
+                'profile_completed_at'    => now(),
+            ]);
+        });
+
+        return back()->with('success', 'Deposit adjustment undone — deposit and profile restored.');
+    }
+    
     public function cancel(Invoice $invoice, LedgerService $ledger)
     {
         abort_unless(auth()->user()->canBackdate(), 403);

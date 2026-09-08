@@ -35,7 +35,10 @@
                 <div class="row mb-3">
                     <div class="col-md-3"><strong>Method:</strong> {{ $shipment->method }}</div>
                     <div class="col-md-3"><strong>Expected Arrival:</strong> {{ optional($shipment->expected_arrival)->format('d-m-Y') ?? '—' }}</div>
+                    <div class="col-md-3"><strong>Arrival Date:</strong> {{ optional($shipment->arrived_at)->format('d-m-Y') ?? '—' }}</div>
                     <div class="col-md-3"><strong>Container #:</strong> {{ $shipment->container_no ?? '—' }}</div>
+                </div>
+                <div class="row mb-3">
                     <div class="col-md-3"><strong>BL #:</strong> {{ $shipment->bl_no ?? '—' }}</div>
                 </div>
                 <div class="row mb-3">

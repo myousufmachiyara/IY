@@ -45,20 +45,21 @@ class Customer extends Model
     public function payments(): HasMany  { return $this->hasMany(Payment::class); }
     public function shipments(): HasMany { return $this->hasMany(Shipment::class); }
 
-    public function isProfileComplete(): bool
-    {
-        return ! is_null($this->profile_completed_at);
-    }
-
-    public function canCompleteProfile(): bool
-    {
-        return $this->security_deposit_status === 'approved';
-    }
-
     public function totalInvoiced(): int { return (int) $this->invoices()->sum('total_payable'); }
     public function totalPaid(): int { return (int) $this->payments()->where('status', 'approved')->sum('amount'); }
     public function balance(): int       { return $this->totalInvoiced() - $this->totalPaid(); }
 
     public function scopeComplete($q) { return $q->whereNotNull('profile_completed_at'); }
     public function scopeActive($q)   { return $q->where('status', 'active'); }
+    public function depositInvoice(): BelongsTo { return $this->belongsTo(Invoice::class, 'deposit_invoice_id'); }
+
+    public function isProfileComplete(): bool
+    {
+        return $this->depositInvoice && $this->depositInvoice->isFullyPaid();
+    }
+
+    public function canCompleteProfile(): bool
+    {
+        return $this->depositInvoice && $this->depositInvoice->isFullyPaid();
+    }
 }

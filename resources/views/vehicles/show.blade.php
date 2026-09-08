@@ -97,13 +97,14 @@
                                     <div class="alert alert-info">
                                         <i class="fa fa-info-circle"></i> Costing complete — ready to invoice.
                                         @can('invoices.create')
-                                            <form action="{{ route('invoices.store', $vehicle) }}" method="POST" class="d-inline-flex align-items-end gap-2 mt-2" onsubmit="return confirm('Generate the official invoice for this vehicle?');">
+                                            <form action="{{ route('invoices.store', $vehicle) }}" method="POST" class="d-inline-flex align-items-end gap-2 mt-2" onsubmit="return confirm('Generate the official invoice for this vehicle? It will be dated to the won date ({{ optional($vehicle->won_at)->format('d-m-Y') }}).');">
                                                 @csrf
-                                                <div>
-                                                    <label class="small mb-1 d-block">Invoice Date</label>
-                                                    <input type="date" name="issued_date" class="form-control form-control-sm" value="{{ date('Y-m-d') }}"
-                                                        @unless(auth()->user()->isSuperAdmin()) readonly @endunless required>
-                                                </div>
+                                                @if(auth()->user()->isSuperAdmin())
+                                                    <div>
+                                                        <label class="small mb-1 d-block">Invoice Date <small class="text-muted">(optional)</small></label>
+                                                        <input type="date" name="issued_date" class="form-control form-control-sm" placeholder="Won date">
+                                                    </div>
+                                                @endif
                                                 <button class="btn btn-sm btn-primary">Generate Invoice</button>
                                             </form>
                                         @else
