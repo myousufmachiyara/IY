@@ -278,14 +278,16 @@ class InvoiceController extends Controller
     {
         $invoice->load('vehicle.bid', 'customer', 'agent');
 
+        $isDeposit = $invoice->invoice_type === 'deposit';
+
         return Pdf::loadView('invoices.print', [
-            'type'         => 'cnf',
+            'type'         => $isDeposit ? 'auction' : 'cnf',
             'invoice_no'   => $invoice->invoice_no,
             'date'         => optional($invoice->issued_at)->format('d/m/Y') ?? now()->format('d/m/Y'),
             'customer'     => $invoice->customer,
             'vehicle'      => $invoice->vehicle,
-            'amount_label' => '100% CNF PRICE',
-            'total_label'  => '100% C&F AMOUNT',
+            'amount_label' => $isDeposit ? 'AUCTION DEPOSIT' : '100% CNF PRICE',
+            'total_label'  => $isDeposit ? 'AUCTION DEPOSIT' : '100% C&F AMOUNT',
             'amount'       => $invoice->total_payable,
         ])->download("{$invoice->invoice_no}.pdf");
     }

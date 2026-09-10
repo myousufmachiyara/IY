@@ -38,11 +38,11 @@
 </div>
 
 @php
-    // Fuel/Color/Engine are read LIVE from the bid record, not from Vehicle's own
-    // copy — the bid is the single source of truth for these fields, so any
-    // correction made on a bid (e.g. a backfill) is reflected on every invoice
-    // automatically, with nothing to keep in sync on the Vehicle side.
-    $bidDetails = $vehicle->bid;
+    // Null-safe — a deposit invoice has no vehicle_id yet at this stage, so
+    // $vehicle itself is null here. Without ?->, this line would throw
+    // "Attempt to read property 'bid' on null" the moment a deposit invoice
+    // PDF is generated, before the page even renders.
+    $bidDetails = $vehicle?->bid;
 @endphp
 
 <table class="items">
@@ -55,18 +55,14 @@
     <tbody>
         <tr>
             <td>1</td>
-            <td>{{ $vehicle->make }}</td>
-            <td>{{ $vehicle->model }}</td>
+            <td>{{ $vehicle->make ?? '—' }}</td>
+            <td>{{ $vehicle->model ?? '—' }}</td>
             <td>{{ $bidDetails->fuel_type ?? '—' }}</td>
             <td>{{ $bidDetails->color ?? '—' }}</td>
             <td>{{ $bidDetails->chassis_no ?? $vehicle->chassis_no ?? '—' }}</td>
             <td>{{ $bidDetails->engine ?? '—' }}</td>
-            <td>{{ $vehicle->year }}</td>
+            <td>{{ $vehicle->year ?? '—' }}</td>
             <td>¥{{ number_format($amount) }}</td>
-        </tr>
-        <tr>
-            <td colspan="8" class="total-label">{{ $total_label }}</td>
-            <td class="total-value">¥{{ number_format($amount) }}</td>
         </tr>
     </tbody>
 </table>
