@@ -26,26 +26,87 @@ class DatabaseSeeder extends Seeder
         }
 
         // ── Permissions: module.action ──────────────────────────────────────
+        //
+        // Action set per module follows the "IY Auto Trades — Create/Edit Role
+        // Permission Screen" spec: most modules get all six actions, but a few
+        // are intentionally narrower (the spec shows "—" for the columns that
+        // don't apply to them). $fullActionModules keeps the moduleOrder used
+        // by RoleController::moduleMatrix() in sync with this list.
 
-        $modules = [
+        $fullActionModules = [
             'members', 'roles', 'customers', 'vehicle_requirement', 'vendors',
-            'bid_sheets', 'merge_bids', 'bid_results', 'invoices', 'shipments',
-            'payments', 'vendor_payments', 'expenses', 'pending_approvals',
-            'accounting', 'costings', 'documents',
+            'bid_sheets', 'merge_bids', 'bid_results', 'costings', 'invoices',
+            'payments', 'vendor_payments', 'expenses', 'shipments', 'documents',
         ];
+
+        // Pending Approvals is a read-only queue — actual approve/reject authority
+        // lives in the special permissions below (payments.approve, etc.), not here.
+        $viewOnlyModules = ['pending_approvals'];
+
+        // Accounting gets a blanket "can open the module" permission plus export;
+        // its sensitive statements (Receivables, Payables, Financial Reports) are
+        // gated separately below via reports.* rather than accounting.create/edit.
+        $viewAndPrintModules = ['accounting'];
 
         $actions = ['index', 'show', 'create', 'edit', 'delete', 'print'];
 
-        foreach ($modules as $module) {
+        foreach ($fullActionModules as $module) {
             foreach ($actions as $action) {
                 Permission::firstOrCreate(['name' => "$module.$action"]);
             }
         }
-        foreach (['agent_wise', 'vendor_wise', 'bid_wise', 'bid_won', 'customer_wise'] as $report) {
+        foreach ($viewOnlyModules as $module) {
+            foreach (['index', 'show'] as $action) {
+                Permission::firstOrCreate(['name' => "$module.$action"]);
+            }
+        }
+        foreach ($viewAndPrintModules as $module) {
+            foreach (['index', 'show', 'print'] as $action) {
+                Permission::firstOrCreate(['name' => "$module.$action"]);
+            }
+        }
+
+        // Drop any create/edit/delete (and, for pending_approvals, print) rows a
+        // previous seed run created for the narrower modules above, so the Role
+        // screen never shows a checkbox that has no route behind it.
+        Permission::where('name', 'like', 'pending_approvals.%')
+            ->whereNotIn('name', ['pending_approvals.index', 'pending_approvals.show'])
+            ->delete();
+        Permission::where('name', 'like', 'accounting.%')
+            ->whereNotIn('name', ['accounting.index', 'accounting.show', 'accounting.print'])
+            ->delete();
+
+        // ── Report Access permissions ───────────────────────────────────────
+
+        foreach ([
+            'agent_wise', 'vendor_wise', 'bid_wise', 'bid_won', 'customer_wise',
+            'agent_profitability', 'auction_house_performance',
+            'vehicle_profitability', 'customer_profitability',
+            'shipment', 'receivables', 'payables', 'financial_reports',
+        ] as $report) {
             Permission::firstOrCreate(['name' => "reports.$report"]);
         }
 
-        foreach (['data.view_all', 'scope.by_agent', 'finance.backdate', 'customers.assign_any_agent', 'system.logs', 'invoices.request', 'dates.future'] as $name) {
+        // ── Special / business-logic permissions ────────────────────────────
+        //
+        // These aren't plain CRUD — each gates one specific approval, reversal,
+        // or scoping decision that the Role screen's "Data Scope & Business
+        // Permissions" section lists as its own checkbox with its own note.
+
+        foreach ([
+            // data scope
+            'data.view_all', 'scope.by_agent', 'customers.assign_any_agent',
+            // dates
+            'finance.backdate', 'dates.future',
+            // approvals
+            'payments.approve', 'customers.approve_deposit',
+            // reversals — void with reason, never a hard delete
+            'payments.reverse', 'vendor_payments.reverse',
+            // sensitive financial edits
+            'costings.edit_costs', 'invoices.adjust_settled_amount',
+            // misc, pre-existing
+            'system.logs', 'invoices.request',
+        ] as $name) {
             Permission::firstOrCreate(['name' => $name]);
         }
 

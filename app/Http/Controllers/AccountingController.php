@@ -180,4 +180,174 @@ class AccountingController extends Controller
             'assets', 'liabilities', 'equity', 'totalAssets', 'totalLiabilities', 'totalEquityBase', 'netProfit'
         ));
     }
+
+    public function printVoucher(JournalEntry $journalEntry)
+    {
+        $journalEntry->load('lines.account', 'creator');
+
+        return Pdf::loadView('accounting.voucher_print', compact('journalEntry'))
+            ->download("{$journalEntry->entry_no}.pdf");
+    }
+
+    /** General Ledger restricted to one customer or vendor's own sub-account — the real payoff of Phase 1's per-party accounts. */
+public function partyLedger(Request $request)
+{
+    $type = $request->party_type === 'vendor' ? 'vendor' : 'customer';
+    $accounts = ChartOfAccount::where('type', $type)->orderBy('name')->get();
+
+    $selected = null;
+    $lines = collect();
+
+    if ($request->account_id) {
+        $selected = ChartOfAccount::findOrFail($request->account_id);
+        abort_unless($selected->type === $type, 422, 'Selected account does not match the chosen party type.');
+
+        $lines = JournalLine::with('entry')
+            ->where('account_id', $selected->id)
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+            ->when($request->from, fn ($q, $v) => $q->whereDate('journal_entries.date', '>=', $v))
+            ->when($request->to, fn ($q, $v) => $q->whereDate('journal_entries.date', '<=', $v))
+            ->orderBy('journal_entries.date')
+            ->select('journal_lines.*')
+            ->get();
+
+        $running = 0;
+        $lines = $lines->map(function ($l) use (&$running) {
+            $running += $l->debit - $l->credit; // customer/vendor sub-accounts are always debit-normal here (receivable) — vendor payable shown as negative naturally
+            $l->running_balance = $running;
+            return $l;
+        });
+    }
+
+    return view('accounting.party_ledger', compact('accounts', 'selected', 'lines', 'type'));
+}
+
+/** Outstanding invoices bucketed by days overdue. */
+public function receivablesAging()
+{
+    $rows = Invoice::whereIn('status', ['issued', 'partial'])
+        ->with('customer')->get()
+        ->filter(fn ($i) => $i->balance() > 0)
+        ->map(function ($i) {
+            $dueDate = $i->due_final ?? $i->due_first ?? $i->issued_at;
+            $daysOverdue = $dueDate ? now()->diffInDays($dueDate, false) * -1 : 0;
+            return [
+                'invoice'      => $i,
+                'balance'      => $i->balance(),
+                'days_overdue' => max($daysOverdue, 0),
+                'bucket'       => match (true) {
+                    $daysOverdue <= 0   => 'current',
+                    $daysOverdue <= 30  => '0_30',
+                    $daysOverdue <= 60  => '31_60',
+                    $daysOverdue <= 90  => '61_90',
+                    default             => 'over_90',
+                },
+            ];
+        });
+
+    $buckets = [
+        'current' => $rows->where('bucket', 'current')->sum('balance'),
+        '0_30'    => $rows->where('bucket', '0_30')->sum('balance'),
+        '31_60'   => $rows->where('bucket', '31_60')->sum('balance'),
+        '61_90'   => $rows->where('bucket', '61_90')->sum('balance'),
+        'over_90' => $rows->where('bucket', 'over_90')->sum('balance'),
+    ];
+
+    return view('accounting.receivables_aging', compact('rows', 'buckets'));
+}
+
+/** Cash Book — Cash account transactions only, separate from Bank. */
+public function cashBook(Request $request)
+{
+    return $this->singleAccountBook($request, self::class === self::class ? LedgerService::CASH : LedgerService::CASH, 'Cash Book', 'accounting.cash_book');
+}
+
+/** Bank Book — Bank account transactions only, separate from Cash. */
+public function bankBook(Request $request)
+{
+    return $this->singleAccountBook($request, LedgerService::BANK, 'Bank Book', 'accounting.bank_book');
+}
+
+private function singleAccountBook(Request $request, string $code, string $title, string $view)
+{
+    $account = ChartOfAccount::where('code', $code)->firstOrFail();
+
+    $lines = JournalLine::with('entry')
+        ->where('account_id', $account->id)
+        ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+        ->when($request->from, fn ($q, $v) => $q->whereDate('journal_entries.date', '>=', $v))
+        ->when($request->to, fn ($q, $v) => $q->whereDate('journal_entries.date', '<=', $v))
+        ->orderBy('journal_entries.date')
+        ->select('journal_lines.*')
+        ->get();
+
+    $running = 0;
+    $lines = $lines->map(function ($l) use (&$running) {
+        $running += $l->debit - $l->credit;
+        $l->running_balance = $running;
+        return $l;
+    });
+
+    return view($view, compact('account', 'lines', 'title'));
+}
+
+/** Chronological listing of every voucher — a Day Book, distinct from the per-account Ledger view. */
+public function dayBook(Request $request)
+{
+    $entries = JournalEntry::with('lines.account')
+        ->when($request->from, fn ($q, $v) => $q->whereDate('date', '>=', $v))
+        ->when($request->to, fn ($q, $v) => $q->whereDate('date', '<=', $v))
+        ->when($request->voucher_type, fn ($q, $v) => $q->where('voucher_type', $v))
+        ->orderBy('date')->orderBy('id')
+        ->get();
+
+    $voucherTypes = JournalEntry::VOUCHER_TYPES;
+
+    return view('accounting.day_book', compact('entries', 'voucherTypes'));
+}
+
+/** Expense breakdown by category, with month-over-month comparison. */
+public function expenseAnalysis(Request $request)
+{
+    $from = $request->from ?? now()->startOfYear()->toDateString();
+    $to   = $request->to   ?? now()->toDateString();
+
+    $byCategory = Expense::whereBetween('expense_date', [$from, $to])
+        ->selectRaw('category, SUM(amount) as total, COUNT(*) as count')
+        ->groupBy('category')->orderByDesc('total')->get();
+
+    $totalExpense = $byCategory->sum('total');
+
+    $byMonth = Expense::whereBetween('expense_date', [$from, $to])
+        ->selectRaw("DATE_FORMAT(expense_date, '%Y-%m') as month, category, SUM(amount) as total")
+        ->groupBy('month', 'category')->orderBy('month')->get()
+        ->groupBy('month');
+
+    return view('accounting.expense_analysis', compact('byCategory', 'totalExpense', 'byMonth', 'from', 'to'));
+}
+
+/** Simple direct Cash Flow Statement — actual cash/bank movements grouped as Operating/Financing, based on voucher type. */
+public function cashFlow(Request $request)
+{
+    $from = $request->from ?? now()->startOfMonth()->toDateString();
+    $to   = $request->to   ?? now()->toDateString();
+
+    $cashAccountIds = ChartOfAccount::whereIn('code', [LedgerService::CASH, LedgerService::BANK])->pluck('id');
+
+    $lines = JournalLine::with('entry')
+        ->whereIn('account_id', $cashAccountIds)
+        ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+        ->whereDate('journal_entries.date', '>=', $from)
+        ->whereDate('journal_entries.date', '<=', $to)
+        ->select('journal_lines.*', 'journal_entries.voucher_type', 'journal_entries.description', 'journal_entries.date')
+        ->get();
+
+    $operatingIn  = $lines->whereIn('voucher_type', ['receipt', 'deposit_receipt'])->sum('debit');
+    $operatingOut = $lines->whereIn('voucher_type', ['payment', 'expense'])->sum('credit');
+    $openingBalance = ChartOfAccount::whereIn('code', [LedgerService::CASH, LedgerService::BANK])->get()->sum(fn ($a) => $a->opening_balance);
+    $netChange = $lines->sum('debit') - $lines->sum('credit');
+    $closingBalance = $openingBalance + $netChange;
+
+    return view('accounting.cash_flow', compact('lines', 'operatingIn', 'operatingOut', 'netChange', 'openingBalance', 'closingBalance', 'from', 'to'));
+}
 }

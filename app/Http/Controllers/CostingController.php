@@ -19,7 +19,11 @@ class CostingController extends Controller
 
     public function updateCosting(Request $request, Vehicle $vehicle, LedgerService $ledger)
     {
-        abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may edit costing.');
+        // The right-hand, company-cost side of the Costing screen — vendor
+        // commission, service charge, inland, auction, freight, misc — needs
+        // its own permission, separate from the plain costings.edit that the
+        // route already requires.
+        abort_unless($request->user()->canEditVehicleCosts(), 403, 'You do not have permission to edit vehicle costing.');
 
         $data = $request->validate([
             'vendor_commission_percent' => ['required', 'numeric', 'min:0', 'max:100'],

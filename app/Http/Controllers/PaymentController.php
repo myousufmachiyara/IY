@@ -26,7 +26,10 @@ class PaymentController extends Controller
 
     public function store(Request $request, LedgerService $ledger)
     {
-        $autoApprove = $request->user()->canBackdate();
+        // A recorder who also holds approval authority gets their own entry
+        // auto-posted; everyone else's payment lands as 'pending' for a
+        // payments.approve holder to review.
+        $autoApprove = $request->user()->canApprovePayments();
 
         $data = $request->validate([
             'customer_id' => ['required', 'exists:customers,id'],
@@ -39,8 +42,8 @@ class PaymentController extends Controller
             'attachment'  => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
 
-        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
-            return back()->withErrors(['paid_at' => 'Only Super Admin may record a payment with a date other than today.'])->withInput();
+        if (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
+            return back()->withErrors(['paid_at' => 'You do not have permission to record a payment with a date other than today.'])->withInput();
         }
 
         $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
@@ -76,7 +79,7 @@ class PaymentController extends Controller
 
     public function approve(Payment $payment, LedgerService $ledger)
     {
-        abort_unless(auth()->user()->canBackdate(), 403);
+        abort_unless(auth()->user()->canApprovePayments(), 403);
         abort_unless($payment->status === 'pending', 422, 'This payment is not pending.');
 
         DB::transaction(function () use ($payment, $ledger) {
@@ -94,7 +97,7 @@ class PaymentController extends Controller
     /** Reject a pending payment with a required reason — visible on the invoice/payment list afterward. */
     public function reject(Request $request, Payment $payment)
     {
-        abort_unless(auth()->user()->canBackdate(), 403);
+        abort_unless(auth()->user()->canApprovePayments(), 403);
         abort_unless($payment->status === 'pending', 422, 'This payment is not pending.');
 
         $data = $request->validate(['rejection_reason' => ['required', 'string', 'max:500']]);
@@ -105,7 +108,7 @@ class PaymentController extends Controller
 
     public function undoApproval(Payment $payment, LedgerService $ledger)
     {
-        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Only Super Admin may undo an approved payment.');
+        abort_unless(auth()->user()->canReversePayments(), 403, 'You do not have permission to reverse an approved payment.');
         abort_unless($payment->status === 'approved', 422, 'This payment is not currently approved.');
 
         DB::transaction(function () use ($payment, $ledger) {
@@ -138,8 +141,8 @@ class PaymentController extends Controller
             'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
 
-        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
-            return back()->withErrors(['paid_at' => 'Only Super Admin may set a payment date other than today.'])->withInput();
+        if (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
+            return back()->withErrors(['paid_at' => 'You do not have permission to set a payment date other than today.'])->withInput();
         }
 
         if ($request->hasFile('attachment')) {
@@ -150,6 +153,10 @@ class PaymentController extends Controller
             $data['attachment_path'] = $request->file('attachment')->store('payment_attachments', 'public');
         }
         unset($data['attachment']);
+
+        if ($payment->status === 'approved') {
+            abort_unless(auth()->user()->canReversePayments(), 403, 'Correcting an already-approved payment reverses and reposts its ledger entry — you need the "Reverse/Void Customer Payment" permission for that.');
+        }
 
         DB::transaction(function () use ($payment, $data, $ledger) {
             $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
@@ -173,7 +180,12 @@ class PaymentController extends Controller
 
     public function destroy(Payment $payment, LedgerService $ledger)
     {
-        abort_unless(auth()->user()->canBackdate(), 403);
+        // Deleting an approved (posted) payment reverses its ledger entry, so it
+        // needs the same permission as an explicit reversal — not just the plain
+        // payments.delete permission already enforced by the route.
+        if ($payment->status === 'approved') {
+            abort_unless(auth()->user()->canReversePayments(), 403, 'Only a holder of "Reverse/Void Customer Payment" may delete an approved payment.');
+        }
 
         DB::transaction(function () use ($payment, $ledger) {
             if ($payment->status === 'approved') {

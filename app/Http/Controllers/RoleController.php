@@ -8,21 +8,94 @@ use Spatie\Permission\Models\{Role, Permission};
 
 class RoleController extends Controller
 {
+    /**
+     * Order (and set) of modules shown on the main permission grid — mirrors the
+     * "IY Auto Trades — Create/Edit Role Permission Screen" spec row-for-row.
+     * Audit Log is intentionally not included yet (no activity-log backend exists
+     * in this codebase to gate) — add it here once that feature lands.
+     */
     private array $moduleOrder = [
         'members', 'roles', 'customers', 'vehicle_requirement', 'vendors',
-        'bid_sheets', 'merge_bids', 'bid_results', 'invoices', 'shipments',
-        'payments', 'vendor_payments', 'expenses', 'pending_approvals',
-        'accounting', 'costings', 'documents',
+        'bid_sheets', 'merge_bids', 'bid_results', 'costings', 'invoices',
+        'payments', 'vendor_payments', 'expenses', 'shipments', 'documents',
+        'pending_approvals', 'accounting',
     ];
 
+    /**
+     * Non-CRUD checkboxes shown below the module grid and the Report Access
+     * section — approvals, reversals, sensitive edits, and data-scope switches.
+     * Grouped here in the same order as the spec's "Data Scope & Business
+     * Permissions" panel; the two data-scope entries (scope.by_agent /
+     * data.view_all) behave as mutually exclusive in the create/edit blade.
+     */
     private array $specialPermissions = [
-        'data.view_all'              => 'See all data across every agent — bypasses the scoping below entirely.',
-        'scope.by_agent'             => 'Scope customers, vehicles, and bids to this user as the owning Sales Agent. Also reveals sales commission fields on the Team form.',
-        'finance.backdate'           => 'Allow approving customer deposits and payments, plus recording back-dated payments/expenses.',
-        'customers.assign_any_agent' => 'Allow assigning a customer or vehicle to any agent, not just themselves.',
-        'system.logs'                => 'View and download raw application error logs — technical/debugging access only.',
-        'invoices.request'           => 'Allow a Sales Agent to request an invoice for a won vehicle, without granting full invoice creation rights.',
-        'dates.future'               => 'Removes the "auction date must be tomorrow or later" restriction on Bid Sheet uploads — holder may enter any date.',
+        // data scope — pick at most one (enforced client-side as radio-style via
+        // the 'scope_group' flag); leaving both unchecked restricts the holder to
+        // their own records (see App\Models\Scopes\AgentScope)
+        'scope.by_agent' => [
+            'label' => 'Scope: Own Records Only (Sales Agent)',
+            'description' => 'Scope customers, vehicles, and bids to this user as the owning Sales Agent. Also reveals sales commission fields on the Team form.',
+            'scope_group' => true,
+        ],
+        'data.view_all' => [
+            'label' => 'Scope: All Records',
+            'description' => 'See all data across every agent — bypasses the scoping above entirely.',
+            'scope_group' => true,
+        ],
+        'customers.assign_any_agent' => [
+            'label' => 'Assign Customers/Vehicles to Any Agent',
+            'description' => 'Allow assigning a customer or vehicle to any agent, not just themselves.',
+        ],
+
+        // approvals
+        'payments.approve' => [
+            'label' => 'Approve Customer Payments',
+            'description' => 'Approve or reject payments recorded against customer invoices.',
+        ],
+        'customers.approve_deposit' => [
+            'label' => 'Approve Security Deposits',
+            'description' => 'Approve or reject customer security deposits before they become confirmed funds.',
+        ],
+
+        // reversals — void with reason, never a hard delete
+        'payments.reverse' => [
+            'label' => 'Reverse/Void Customer Payment',
+            'description' => 'Reverse an approved customer payment (undo approval) with an audit trail; never hard-deletes it.',
+        ],
+        'vendor_payments.reverse' => [
+            'label' => 'Reverse/Void Vendor Payment',
+            'description' => 'Reverse a posted vendor payment while retaining its history.',
+        ],
+
+        // sensitive financial edits
+        'costings.edit_costs' => [
+            'label' => 'Edit Vehicle Costing',
+            'description' => 'Change vendor commission, service charge, inland, auction, freight and miscellaneous vehicle costs (the company-cost side of the Costing screen).',
+        ],
+        'invoices.adjust_settled_amount' => [
+            'label' => 'Adjust Settled Amount',
+            'description' => 'Make an authorised adjustment to an invoice\'s settled amount after issue; maintain audit trail.',
+        ],
+
+        // dates
+        'finance.backdate' => [
+            'label' => 'Finance Backdate',
+            'description' => 'Allow recording payments, vendor payments, deposits and expenses with a date other than today.',
+        ],
+        'dates.future' => [
+            'label' => 'Allow Future Auction Dates',
+            'description' => 'Removes the "auction date must be tomorrow or later" restriction on Bid Sheet uploads — holder may enter any date.',
+        ],
+
+        // misc
+        'invoices.request' => [
+            'label' => 'Request Invoice (Sales Agent)',
+            'description' => 'Allow a Sales Agent to request an invoice for a won vehicle, without granting full invoice creation rights.',
+        ],
+        'system.logs' => [
+            'label' => 'View System Logs',
+            'description' => 'View and download raw application error logs — technical/debugging access only.',
+        ],
     ];
 
     public function index()

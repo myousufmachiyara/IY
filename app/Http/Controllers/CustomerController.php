@@ -36,8 +36,8 @@ class CustomerController extends Controller
 
         if (empty($data['account_date'])) {
             $data['account_date'] = now()->toDateString();
-        } elseif (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['account_date'])->isToday()) {
-            return back()->withErrors(['account_date' => 'Only Super Admin may set an account date other than today.'])->withInput();
+        } elseif (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['account_date'])->isToday()) {
+            return back()->withErrors(['account_date' => 'You do not have permission to set an account date other than today.'])->withInput();
         }
 
         $customer = Customer::create($data);
@@ -97,8 +97,8 @@ class CustomerController extends Controller
         ]);
 
         $date = $data['invoice_date'] ?? now()->toDateString();
-        if ($date !== now()->toDateString() && ! $request->user()->isSuperAdmin()) {
-            return back()->withErrors(['invoice_date' => 'Only Super Admin may set a date other than today.']);
+        if ($date !== now()->toDateString() && ! $request->user()->canBackdate()) {
+            return back()->withErrors(['invoice_date' => 'You do not have permission to set a date other than today.']);
         }
 
         $invoice = DB::transaction(function () use ($customer, $data, $date, $request, $ledger) {
@@ -138,8 +138,8 @@ class CustomerController extends Controller
             'received_date'     => ['required', 'date'],
         ]);
 
-        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['received_date'])->isToday()) {
-            return back()->withErrors(['received_date' => 'Only Super Admin may set a deposit-received date other than today.']);
+        if (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['received_date'])->isToday()) {
+            return back()->withErrors(['received_date' => 'You do not have permission to set a deposit-received date other than today.']);
         }
 
         $customer->update([
@@ -172,8 +172,8 @@ class CustomerController extends Controller
             'received_date'     => ['required', 'date'],
         ]);
 
-        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['received_date'])->isToday()) {
-            return back()->withErrors(['received_date' => 'Only Super Admin may set a deposit-received date other than today.']);
+        if (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['received_date'])->isToday()) {
+            return back()->withErrors(['received_date' => 'You do not have permission to set a deposit-received date other than today.']);
         }
 
         if ($request->hasFile('evidence')) {
@@ -195,7 +195,7 @@ class CustomerController extends Controller
 
     public function approveDeposit(Customer $customer, LedgerService $ledger)
     {
-        abort_unless(request()->user()->canBackdate(), 403, 'Only accountant or super admin may approve deposits.');
+        abort_unless(request()->user()->canApproveDeposits(), 403, 'You do not have permission to approve deposits.');
         abort_unless($customer->security_deposit_status === 'pending', 422, 'No pending deposit to approve.');
         abort_unless($customer->security_deposit_evidence_path, 422, 'Cannot approve — no evidence attached to this deposit. Edit the deposit and attach a file first.');
 
@@ -214,7 +214,7 @@ class CustomerController extends Controller
 
     public function rejectDeposit(Request $request, Customer $customer)
     {
-        abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may reject deposits.');
+        abort_unless($request->user()->canApproveDeposits(), 403, 'You do not have permission to reject deposits.');
         abort_unless($customer->security_deposit_status === 'pending', 422, 'No pending deposit to reject.');
 
         $data = $request->validate(['security_deposit_rejection_reason' => ['required', 'string', 'max:500']]);

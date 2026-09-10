@@ -20,11 +20,6 @@ class LedgerService
         return $this->cache[$code] ??= ChartOfAccount::where('code', $code)->firstOrFail();
     }
 
-    /**
-     * Every customer gets their own real sub-account under Accounts Receivable —
-     * not a shared control account with party tagging. Idempotent: safe to call
-     * on every posting, only creates the row the first time.
-     */
     public function ensureCustomerAccount(Customer $customer): ChartOfAccount
     {
         return ChartOfAccount::firstOrCreate(
@@ -41,7 +36,6 @@ class LedgerService
         );
     }
 
-    /** Same idea, for vendors under Accounts Payable. */
     public function ensureVendorAccount(Vendor $vendor): ChartOfAccount
     {
         return ChartOfAccount::firstOrCreate(
@@ -58,7 +52,7 @@ class LedgerService
         );
     }
 
-    public function post(string $date, string $description, array $lines, ?object $reference = null, bool $backdated = false): JournalEntry
+    public function post(string $date, string $description, array $lines, ?object $reference = null, bool $backdated = false, string $voucherType = 'journal'): JournalEntry
     {
         $debit  = array_sum(array_column($lines, 'debit'));
         $credit = array_sum(array_column($lines, 'credit'));
@@ -67,9 +61,10 @@ class LedgerService
             throw new InvalidArgumentException("Unbalanced journal entry: debit {$debit} ≠ credit {$credit}");
         }
 
-        return DB::transaction(function () use ($date, $description, $lines, $reference, $backdated) {
+        return DB::transaction(function () use ($date, $description, $lines, $reference, $backdated, $voucherType) {
             $entry = JournalEntry::create([
                 'entry_no'       => $this->nextNo(),
+                'voucher_type'   => $voucherType,
                 'date'           => $date,
                 'description'    => $description,
                 'reference_type' => $reference?->getMorphClass(),
@@ -105,7 +100,7 @@ class LedgerService
         return $this->post(today()->toDateString(), "Security deposit received — {$c->name}", [
             ['account' => $cashAccount,        'debit'  => $c->security_deposit],
             ['account' => self::CUST_DEPOSIT,  'credit' => $c->security_deposit, 'party' => $c],
-        ], $c);
+        ], $c, false, 'deposit_receipt');
     }
 
     public function adjustVendorPayable(Vehicle $vehicle): ?JournalEntry
@@ -132,14 +127,14 @@ class LedgerService
             return $this->post(now()->toDateString(), "Vendor payable — {$vehicle->label()} (total costing)", [
                 ['account' => self::COST_VEHICLES, 'debit'  => $delta],
                 ['account_id' => $vendorAccount->id, 'credit' => $delta, 'party' => $vehicle->vendor],
-            ], $vehicle);
+            ], $vehicle, false, 'payable');
         }
 
         $delta = abs($delta);
         return $this->post(now()->toDateString(), "Vendor payable correction — {$vehicle->label()} (total costing decreased)", [
             ['account_id' => $vendorAccount->id, 'debit'  => $delta, 'party' => $vehicle->vendor],
             ['account' => self::COST_VEHICLES, 'credit' => $delta],
-        ], $vehicle);
+        ], $vehicle, false, 'payable');
     }
 
     public function invoiceReceivable(Invoice $inv): JournalEntry
@@ -149,7 +144,7 @@ class LedgerService
         return $this->post(today()->toDateString(), "Invoice {$inv->invoice_no} — {$inv->customer->name}", [
             ['account_id' => $customerAccount->id, 'debit'  => $inv->total_payable, 'party' => $inv->customer],
             ['account' => self::SALES_INCOME,       'credit' => $inv->total_payable],
-        ], $inv);
+        ], $inv, false, 'sale_invoice');
     }
 
     public function depositInvoiceReceivable(Invoice $inv): JournalEntry
@@ -159,7 +154,7 @@ class LedgerService
         return $this->post(today()->toDateString(), "Deposit invoice {$inv->invoice_no} — {$inv->customer->name}", [
             ['account_id' => $customerAccount->id, 'debit'  => $inv->total_payable, 'party' => $inv->customer],
             ['account' => self::CUST_DEPOSIT,       'credit' => $inv->total_payable, 'party' => $inv->customer],
-        ], $inv);
+        ], $inv, false, 'deposit_invoice');
     }
 
     public function customerPayment(Payment $p, string $cashAccount = self::BANK): JournalEntry
@@ -169,7 +164,7 @@ class LedgerService
         return $this->post($p->paid_at->toDateString(), "Payment received — {$p->customer->name}", [
             ['account' => $cashAccount,          'debit'  => $p->amount],
             ['account_id' => $customerAccount->id, 'credit' => $p->amount, 'party' => $p->customer],
-        ], $p, $p->is_backdated);
+        ], $p, $p->is_backdated, 'receipt');
     }
 
     public function applyDepositToInvoice(Invoice $invoice, int $amount): JournalEntry
@@ -179,7 +174,7 @@ class LedgerService
         return $this->post(now()->toDateString(), "Security deposit applied to invoice {$invoice->invoice_no}", [
             ['account' => self::CUST_DEPOSIT,       'debit'  => $amount, 'party' => $invoice->customer],
             ['account_id' => $customerAccount->id,  'credit' => $amount, 'party' => $invoice->customer],
-        ], $invoice);
+        ], $invoice, false, 'deposit_adjustment');
     }
 
     public function vendorPayment(VendorPayment $vp, string $cashAccount = self::BANK): JournalEntry
@@ -189,7 +184,7 @@ class LedgerService
         return $this->post($vp->paid_at->toDateString(), "Vendor payment — vehicle #{$vp->vehicle_id}", [
             ['account_id' => $vendorAccount->id, 'debit'  => $vp->amount, 'party' => $vp->vendor],
             ['account' => $cashAccount,          'credit' => $vp->amount],
-        ], $vp, $vp->is_backdated);
+        ], $vp, $vp->is_backdated, 'payment');
     }
 
     public function expense(Expense $e, string $cashAccount = self::BANK): JournalEntry
@@ -199,7 +194,7 @@ class LedgerService
         return $this->post($e->expense_date->toDateString(), "Expense: {$e->category}", [
             ['account' => $account,     'debit'  => $e->amount],
             ['account' => $cashAccount, 'credit' => $e->amount],
-        ], $e, $e->is_backdated);
+        ], $e, $e->is_backdated, 'expense');
     }
 
     public function reverseEntry(JournalEntry $original, string $date, ?string $description = null): JournalEntry
@@ -207,6 +202,7 @@ class LedgerService
         return DB::transaction(function () use ($original, $date, $description) {
             $entry = JournalEntry::create([
                 'entry_no'       => $this->nextNo(),
+                'voucher_type'   => 'reversal',
                 'date'           => $date,
                 'description'    => $description ?? "Reversal of {$original->entry_no}",
                 'reference_type' => $original->reference_type,

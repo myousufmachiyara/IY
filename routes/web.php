@@ -29,8 +29,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('customers/{customer}/deposit/receive', [CustomerController::class, 'receiveDeposit'])->middleware('permission:customers.edit')->name('customers.deposit.receive');
     Route::get('customers/{customer}/deposit/edit', [CustomerController::class, 'editDeposit'])->middleware('permission:customers.edit')->name('customers.deposit.edit');
     Route::put('customers/{customer}/deposit', [CustomerController::class, 'updateDeposit'])->middleware('permission:customers.edit')->name('customers.deposit.update');
-    Route::post('customers/{customer}/deposit/approve', [CustomerController::class, 'approveDeposit'])->middleware('permission:customers.edit')->name('customers.deposit.approve');
-    Route::post('customers/{customer}/deposit/reject',  [CustomerController::class, 'rejectDeposit'])->middleware('permission:customers.edit')->name('customers.deposit.reject');
+    Route::post('customers/{customer}/deposit/approve', [CustomerController::class, 'approveDeposit'])->middleware('permission:customers.approve_deposit')->name('customers.deposit.approve');
+    Route::post('customers/{customer}/deposit/reject',  [CustomerController::class, 'rejectDeposit'])->middleware('permission:customers.approve_deposit')->name('customers.deposit.reject');
 
     Route::resource('vendors', VendorController::class)->except('show')->middleware('permission:vendors');
     Route::resource('vehicles', VehicleController::class)->middleware('permission:vehicle_requirement');
@@ -62,7 +62,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('bids/{bid}', [BidSheetController::class, 'updateBid'])->middleware('permission:bid_sheets.edit')->name('bids.update');
 
     Route::get('vehicles/{vehicle}/costing', [CostingController::class, 'show'])->middleware('permission:costings.show')->name('costings.show');
-    Route::put('vehicles/{vehicle}/costing', [CostingController::class, 'updateCosting'])->middleware('permission:costings.edit')->name('costings.update');
+    Route::put('vehicles/{vehicle}/costing', [CostingController::class, 'updateCosting'])->middleware(['permission:costings.edit', 'permission:costings.edit_costs'])->name('costings.update');
     Route::put('vehicles/{vehicle}/selling-price', [CostingController::class, 'updateSellingPrice'])->middleware('permission:costings.edit')->name('costings.selling');
 
     Route::get('invoices', [InvoiceController::class, 'index'])->middleware('permission:invoices.index')->name('invoices.index');
@@ -71,7 +71,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('customers/{customer}/invoices/bulk', [InvoiceController::class, 'bulkStore'])->middleware('permission:invoices.create')->name('invoices.bulk_store');
     Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->middleware('permission:invoices.show')->name('invoices.show');
     Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->middleware('permission:invoices.print')->name('invoices.pdf');
-    Route::put('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->middleware('permission:invoices.edit')->name('invoices.settle');
+    Route::put('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->middleware('permission:invoices.adjust_settled_amount')->name('invoices.settle');
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->middleware('permission:invoices.edit')->name('invoices.cancel');
     Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->middleware('permission:invoices.delete')->name('invoices.destroy');
     Route::get('customers/{customer}/invoices/merge', [InvoiceController::class, 'mergeSelectForm'])->middleware('permission:invoices.print')->name('invoices.merge_select');
@@ -81,9 +81,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('vehicles/{vehicle}/deposit-invoice/pdf', [VehicleController::class, 'depositInvoicePdf'])->middleware('permission:vehicle_requirement.print')->name('vehicles.deposit_invoice_pdf');
     Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.index')->name('payments.index');
     Route::post('payments', [PaymentController::class, 'store'])->middleware('permission:payments.create')->name('payments.store');
-    Route::post('payments/{payment}/approve', [PaymentController::class, 'approve'])->middleware('permission:payments.edit')->name('payments.approve');
-    Route::post('payments/{payment}/reject', [PaymentController::class, 'reject'])->middleware('permission:payments.edit')->name('payments.reject');
-    Route::post('payments/{payment}/undo-approval', [PaymentController::class, 'undoApproval'])->middleware('permission:payments.edit')->name('payments.undo_approval');
+    Route::post('payments/{payment}/approve', [PaymentController::class, 'approve'])->middleware('permission:payments.approve')->name('payments.approve');
+    Route::post('payments/{payment}/reject', [PaymentController::class, 'reject'])->middleware('permission:payments.approve')->name('payments.reject');
+    Route::post('payments/{payment}/undo-approval', [PaymentController::class, 'undoApproval'])->middleware('permission:payments.reverse')->name('payments.undo_approval');
     Route::get('payments/{payment}/edit', [PaymentController::class, 'edit'])->middleware('permission:payments.edit')->name('payments.edit');
     Route::put('payments/{payment}', [PaymentController::class, 'update'])->middleware('permission:payments.edit')->name('payments.update');
     Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->middleware('permission:payments.delete')->name('payments.destroy');
@@ -108,9 +108,16 @@ Route::middleware(['auth'])->group(function () {
     Route::put('documents/{document}', [DocumentController::class, 'update'])->middleware('permission:documents.edit')->name('documents.update');
     Route::delete('documents/{document}', [DocumentController::class, 'destroy'])->middleware('permission:documents.delete')->name('documents.destroy');
 
-    Route::resource('vendor-payments', VendorPaymentController::class)->only(['index', 'store', 'edit', 'update', 'destroy'])->middleware('permission:vendor_payments');
+    Route::resource('vendor-payments', VendorPaymentController::class)->only(['index', 'store', 'edit'])->middleware('permission:vendor_payments');
+    // Editing/deleting a vendor payment always reverses a posted ledger entry, so these two
+    // also require the "Reverse/Void Vendor Payment" special permission (enforced again in
+    // the controller as the source of truth — this just gives a clean 403 before it gets there).
+    Route::put('vendor-payments/{vendor_payment}', [VendorPaymentController::class, 'update'])->middleware(['permission:vendor_payments.edit', 'permission:vendor_payments.reverse'])->name('vendor-payments.update');
+    Route::delete('vendor-payments/{vendor_payment}', [VendorPaymentController::class, 'destroy'])->middleware(['permission:vendor_payments.delete', 'permission:vendor_payments.reverse'])->name('vendor-payments.destroy');
     Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'edit', 'update', 'destroy'])->middleware('permission:expenses');
 
+    // General accounting screens (chart of accounts, journal, ledger, cash/bank book) —
+    // the module's own View/View Detail/Export permissions are enough for these.
     Route::middleware('permission:accounting.index')->prefix('accounting')->name('accounting.')->group(function () {
         Route::get('chart',       [AccountingController::class, 'chartOfAccounts'])->name('chart');
         Route::post('chart',      [AccountingController::class, 'storeAccount'])->name('chart.store');
@@ -118,11 +125,17 @@ Route::middleware(['auth'])->group(function () {
         Route::get('journal',     [AccountingController::class, 'journal'])->name('journal');
         Route::get('ledger/{account}', [AccountingController::class, 'ledger'])->name('ledger');
         Route::get('cash-bank',   [AccountingController::class, 'cashBankBook'])->name('cash_bank');
-        Route::get('trial-balance', [AccountingController::class, 'trialBalance'])->name('trial_balance');
-        Route::get('balance-sheet', [AccountingController::class, 'balanceSheet'])->name('balance_sheet');
-        Route::get('receivables', [AccountingController::class, 'receivables'])->name('receivables');
-        Route::get('payables',    [AccountingController::class, 'payables'])->name('payables');
-        Route::get('profit-loss', [AccountingController::class, 'profitLoss'])->name('profit_loss');
+    });
+
+    // Sensitive financial statements — gated by their own Report Access permissions
+    // instead of the blanket accounting.index, per the Role Permission screen's note
+    // that "sensitive accounting actions are controlled separately below".
+    Route::prefix('accounting')->name('accounting.')->group(function () {
+        Route::get('receivables',   [AccountingController::class, 'receivables'])->middleware('permission:reports.receivables')->name('receivables');
+        Route::get('payables',      [AccountingController::class, 'payables'])->middleware('permission:reports.payables')->name('payables');
+        Route::get('trial-balance', [AccountingController::class, 'trialBalance'])->middleware('permission:reports.financial_reports')->name('trial_balance');
+        Route::get('balance-sheet', [AccountingController::class, 'balanceSheet'])->middleware('permission:reports.financial_reports')->name('balance_sheet');
+        Route::get('profit-loss',   [AccountingController::class, 'profitLoss'])->middleware('permission:reports.financial_reports')->name('profit_loss');
     });
 
     Route::prefix('reports')->name('reports.')->group(function () {
@@ -131,6 +144,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('bid-wise',      [ReportController::class, 'bidWise'])->middleware('permission:reports.bid_wise')->name('bid_wise');
         Route::get('bid-won',       [ReportController::class, 'bidWon'])->middleware('permission:reports.bid_won')->name('bid_won');
         Route::get('customer-wise', [ReportController::class, 'customerWise'])->middleware('permission:reports.customer_wise')->name('customer_wise');
+        Route::get('agent-profitability',        [ReportController::class, 'agentProfitability'])->middleware('permission:reports.agent_profitability')->name('agent_profitability');
+        Route::get('customer-profitability',     [ReportController::class, 'customerProfitability'])->middleware('permission:reports.customer_profitability')->name('customer_profitability');
+        Route::get('vehicle-profitability',      [ReportController::class, 'vehicleProfitability'])->middleware('permission:reports.vehicle_profitability')->name('vehicle_profitability');
+        Route::get('auction-house-performance',  [ReportController::class, 'auctionHousePerformance'])->middleware('permission:reports.auction_house_performance')->name('auction_house_performance');
+        Route::get('shipment',                   [ReportController::class, 'shipmentReport'])->middleware('permission:reports.shipment')->name('shipment');
     });
     
     Route::post("customers/{customer}/generate-deposit-invoice", [CustomerController::class, "generateDepositInvoice"])->middleware("permission:customers.edit")->name("customers.generate_deposit_invoice");

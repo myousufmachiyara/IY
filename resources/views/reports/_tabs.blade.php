@@ -16,5 +16,20 @@
         @can('reports.customer_wise')
             <li class="nav-item"><a class="nav-link {{ $active === 'customer_wise' ? 'active' : '' }}" href="{{ route('reports.customer_wise') }}">Customer-wise</a></li>
         @endcan
+        @can('reports.agent_profitability')
+            <li class="nav-item"><a class="nav-link {{ $active === 'agent_profitability' ? 'active' : '' }}" href="{{ route('reports.agent_profitability') }}">Agent Profitability</a></li>
+        @endcan
+        @can('reports.customer_profitability')
+            <li class="nav-item"><a class="nav-link {{ $active === 'customer_profitability' ? 'active' : '' }}" href="{{ route('reports.customer_profitability') }}">Customer Profitability</a></li>
+        @endcan
+        @can('reports.vehicle_profitability')
+            <li class="nav-item"><a class="nav-link {{ $active === 'vehicle_profitability' ? 'active' : '' }}" href="{{ route('reports.vehicle_profitability') }}">Vehicle Profitability</a></li>
+        @endcan
+        @can('reports.auction_house_performance')
+            <li class="nav-item"><a class="nav-link {{ $active === 'auction_house_performance' ? 'active' : '' }}" href="{{ route('reports.auction_house_performance') }}">Auction House Performance</a></li>
+        @endcan
+        @can('reports.shipment')
+            <li class="nav-item"><a class="nav-link {{ $active === 'shipment' ? 'active' : '' }}" href="{{ route('reports.shipment') }}">Shipment</a></li>
+        @endcan
     </ul>
 </div>

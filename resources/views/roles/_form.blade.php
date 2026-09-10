@@ -9,7 +9,7 @@
     <input type="text" class="form-control" name="name" value="{{ old('name', $role->name) }}" style="max-width:400px;" required>
 </div>
 
-<h6 class="text-muted text-uppercase small mt-4 mb-2">Module Permissions</h6>
+<h2 class="card-title">Module Permissions</h2>
 <div class="table-responsive mb-4">
     <table class="table table-bordered table-sm align-middle mb-0">
         <thead class="table-light">
@@ -39,7 +39,7 @@
     </table>
 </div>
 
-<h6 class="text-muted text-uppercase small mb-2">Report Access</h6>
+<h2 class="card-title">Report Access</h2>
 <div class="row mb-4">
     @foreach($reportPermissions as $perm)
     <div class="col-md-3 mb-2">
@@ -51,15 +51,38 @@
     @endforeach
 </div>
 
-<h6 class="text-muted text-uppercase small mb-2">Special / Business-Logic Permissions</h6>
+@php
+    // scope.by_agent / data.view_all render as a small radio-style pair — spec
+    // calls for "choose ONE of Own / All" (Team has no backing model yet).
+    $scopePermissions   = collect($specialPermissions)->filter(fn ($p) => $p['scope_group'] ?? false);
+    $businessPermissions = collect($specialPermissions)->reject(fn ($p) => $p['scope_group'] ?? false);
+@endphp
+
+<h2 class="card-title">Data Scope</h2>
+<p class="small text-muted mb-2">Choose at most one. Leaving both unchecked restricts this role to its own records.</p>
 <div class="row mb-4">
-    @foreach($specialPermissions as $name => $description)
+    @foreach($scopePermissions as $name => $meta)
         @php $perm = \Spatie\Permission\Models\Permission::where('name', $name)->first(); @endphp
         @if($perm)
         <div class="col-md-6 mb-2">
             <div class="form-check">
+                <input type="checkbox" class="form-check-input data-scope-radio" name="permissions[]" value="{{ $perm->id }}" id="perm_{{ $perm->id }}" {{ in_array($perm->id, $assigned) ? 'checked' : '' }}>
+                <label class="form-check-label" for="perm_{{ $perm->id }}">{{ $meta['label'] }}<br><small class="text-muted">{{ $meta['description'] }}</small></label>
+            </div>
+        </div>
+        @endif
+    @endforeach
+</div>
+
+<h2 class="card-title">Business Permissions</h2>
+<div class="row mb-4">
+    @foreach($businessPermissions as $name => $meta)
+        @php $perm = \Spatie\Permission\Models\Permission::where('name', $name)->first(); @endphp
+        @if($perm)
+        <div class="col-md-4 mb-2">
+            <div class="form-check">
                 <input type="checkbox" class="form-check-input" name="permissions[]" value="{{ $perm->id }}" id="perm_{{ $perm->id }}" {{ in_array($perm->id, $assigned) ? 'checked' : '' }}>
-                <label class="form-check-label" for="perm_{{ $perm->id }}"><code>{{ $name }}</code><br><small class="text-muted">{{ $description }}</small></label>
+                <label class="form-check-label" for="perm_{{ $perm->id }}">{{ $meta['label'] }}<br><small class="text-muted">{{ $meta['description'] }}</small></label>
             </div>
         </div>
         @endif
@@ -81,5 +104,13 @@ document.querySelectorAll('.toggle-column').forEach(el => el.addEventListener('c
     const boxes = document.querySelectorAll('.action-' + this.dataset.action);
     const allChecked = [...boxes].every(b => b.checked);
     boxes.forEach(b => b.checked = !allChecked);
+}));
+// Data Scope behaves as a radio group even though it's stored as two
+// independent permissions — checking one unchecks the other.
+const scopeBoxes = document.querySelectorAll('.data-scope-radio');
+scopeBoxes.forEach(box => box.addEventListener('change', function () {
+    if (this.checked) {
+        scopeBoxes.forEach(other => { if (other !== this) other.checked = false; });
+    }
 }));
 </script>

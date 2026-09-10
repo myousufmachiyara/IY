@@ -46,7 +46,7 @@ class InvoiceController extends Controller
 
         $issuedDate = optional($vehicle->won_at)->toDateString() ?? now()->toDateString();
         $data = $request->validate(['issued_date' => ['nullable', 'date']]);
-        if (! empty($data['issued_date']) && $request->user()->isSuperAdmin()) {
+        if (! empty($data['issued_date']) && $request->user()->canBackdate()) {
             $issuedDate = $data['issued_date'];
         }
 
@@ -161,7 +161,7 @@ class InvoiceController extends Controller
 
     public function settle(Request $request, Invoice $invoice)
     {
-        abort_unless($request->user()->canBackdate(), 403);
+        abort_unless($request->user()->canAdjustSettledAmount(), 403, 'You do not have permission to adjust the settled amount.');
         $data = $request->validate(['settled_amount' => ['required', 'integer', 'min:0', "max:{$invoice->sale_price}"]]);
         $invoice->settled_amount = $data['settled_amount'];
         $invoice->refreshTotals()->save();

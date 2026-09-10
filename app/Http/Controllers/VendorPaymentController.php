@@ -42,8 +42,8 @@ class VendorPaymentController extends Controller
             'reference'  => ['nullable', 'string', 'max:255'],
         ]);
 
-        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
-            return back()->withErrors(['paid_at' => 'Only Super Admin may record a vendor payment with a date other than today.'])->withInput();
+        if (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
+            return back()->withErrors(['paid_at' => 'You do not have permission to record a vendor payment with a date other than today.'])->withInput();
         }
 
         $vehicle = Vehicle::findOrFail($data['vehicle_id']);
@@ -83,9 +83,12 @@ class VendorPaymentController extends Controller
             'reference' => ['nullable', 'string', 'max:255'],
         ]);
 
-        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
-            return back()->withErrors(['paid_at' => 'Only Super Admin may set a vendor payment date other than today.'])->withInput();
+        if (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
+            return back()->withErrors(['paid_at' => 'You do not have permission to set a vendor payment date other than today.'])->withInput();
         }
+
+        // Editing a vendor payment always reverses and reposts its ledger entry.
+        abort_unless($request->user()->canReverseVendorPayments(), 403, 'You do not have permission to reverse/void a vendor payment.');
 
         DB::transaction(function () use ($vendorPayment, $data, $ledger) {
             foreach ($vendorPayment->journalEntries as $entry) {
@@ -101,6 +104,10 @@ class VendorPaymentController extends Controller
 
     public function destroy(VendorPayment $vendorPayment, LedgerService $ledger)
     {
+        // Deleting a posted vendor payment reverses its ledger entry — same
+        // permission as an explicit reversal, on top of the route's vendor_payments.delete.
+        abort_unless(auth()->user()->canReverseVendorPayments(), 403, 'You do not have permission to reverse/void a vendor payment.');
+
         DB::transaction(function () use ($vendorPayment, $ledger) {
             foreach ($vendorPayment->journalEntries as $entry) {
                 $ledger->reverseEntry($entry, now()->toDateString(), "Reversal of deleted vendor payment #{$vendorPayment->id}");
