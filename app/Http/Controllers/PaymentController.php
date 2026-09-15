@@ -79,7 +79,7 @@ class PaymentController extends Controller
 
     public function approve(Payment $payment, LedgerService $ledger)
     {
-        abort_unless(auth()->user()->canApprovePayments(), 403);
+        abort_unless(auth()->user()->canBackdate(), 403);
         abort_unless($payment->status === 'pending', 422, 'This payment is not pending.');
 
         DB::transaction(function () use ($payment, $ledger) {
