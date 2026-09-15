@@ -97,7 +97,7 @@ class PaymentController extends Controller
     /** Reject a pending payment with a required reason — visible on the invoice/payment list afterward. */
     public function reject(Request $request, Payment $payment)
     {
-        abort_unless(auth()->user()->canApprovePayments(), 403);
+        abort_unless(auth()->user()->canBackdate(), 403);
         abort_unless($payment->status === 'pending', 422, 'This payment is not pending.');
 
         $data = $request->validate(['rejection_reason' => ['required', 'string', 'max:500']]);

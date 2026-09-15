@@ -232,7 +232,7 @@
                             </div>
                             <div class="col-lg-12 mb-2">
                                 <label>Attachment {{ auth()->user()->canBackdate() ? '' : '(required)' }}</label>
-                                <input type="file" class="form-control" name="attachment" accept=".jpg,.jpeg,.png,.pdf" {{ auth()->user()->canBackdate() ? '' : 'required' }}>
+                                <input type="file" required class="form-control" name="attachment" accept=".jpg,.jpeg,.png,.pdf" {{ auth()->user()->canBackdate() ? '' : 'required' }}>
                                 <small class="text-muted">Receipt / transfer screenshot as evidence.</small>
                             </div>
                         </div>
