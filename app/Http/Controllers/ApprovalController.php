@@ -2,22 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Customer, Payment};
+use App\Models\{Customer, Payment, Vehicle};
 
 class ApprovalController extends Controller
 {
     public function index()
     {
-        $pendingDeposits = Customer::where('security_deposit_status', 'pending')
-            ->with('agent', 'depositReceivedBy')
-            ->latest('security_deposit_received_at')
-            ->get();
+        $pendingDeposits = Customer::where('security_deposit_status', 'pending')->with('depositReceivedBy')->get();
+        $pendingPayments = Payment::where('status', 'pending')->with('customer', 'invoice', 'recorder')->get();
+        $pendingInvoiceRequests = Vehicle::whereNotNull('invoice_requested_at')->with('customer', 'agent')->latest('invoice_requested_at')->get();
 
-        $pendingPayments = Payment::where('status', 'pending')
-            ->with('customer', 'invoice', 'recorder')
-            ->latest('paid_at')
-            ->get();
-
-        return view('approvals.index', compact('pendingDeposits', 'pendingPayments'));
+        return view('approvals.index', compact('pendingDeposits', 'pendingPayments', 'pendingInvoiceRequests'));
     }
 }

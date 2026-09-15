@@ -108,13 +108,20 @@
                                                 <button class="btn btn-sm btn-primary">Generate Invoice</button>
                                             </form>
                                         @else
+                                            @if($vehicle->invoice_request_rejection_reason)
+                                                <div class="alert alert-danger py-2 mt-2 mb-2">
+                                                    <i class="fa fa-times-circle"></i> Your last invoice request was rejected: {{ $vehicle->invoice_request_rejection_reason }}
+                                                </div>
+                                            @endif
                                             @if($vehicle->invoice_requested_at)
                                                 <span class="badge bg-info ms-2">Invoice requested {{ $vehicle->invoice_requested_at->diffForHumans() }}</span>
                                                 <form action="{{ route('vehicles.cancel_invoice_request', $vehicle) }}" method="POST" class="d-inline ms-1" onsubmit="return confirm('Cancel this invoice request?');">
                                                     @csrf<button class="btn btn-sm btn-outline-warning">Cancel Request</button>
                                                 </form>
                                             @else
-                                                <form action="{{ route('vehicles.request_invoice', $vehicle) }}" method="POST" class="d-inline"><button class="btn btn-sm btn-outline-primary ms-2">@csrf Request Invoice</button></form>
+                                                <form action="{{ route('vehicles.request_invoice', $vehicle) }}" method="POST" class="d-inline">
+                                                    @csrf<button class="btn btn-sm btn-outline-primary ms-2">{{ $vehicle->invoice_request_rejection_reason ? 'Re-Request Invoice' : 'Request Invoice' }}</button>
+                                                </form>
                                             @endif
                                         @endcan
                                     </div>

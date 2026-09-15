@@ -36,6 +36,31 @@ class VehicleController extends Controller
         return view('vehicles.sold', compact('vehicles', 'customers'));
     }
 
+    public function requestInvoice(Vehicle $vehicle)
+{
+    abort_unless($vehicle->isWon() && ! $vehicle->invoice, 422, 'Not eligible for an invoice request.');
+    $vehicle->update([
+        'invoice_requested_at'             => now(),
+        'invoice_request_rejection_reason' => null, // a fresh request clears any prior rejection note
+    ]);
+    return back()->with('success', 'Invoice requested — accountant/admin will be notified.');
+}
+
+    /** Accountant/Super Admin rejects a pending invoice request; the agent can re-request afterward. */
+    public function rejectInvoiceRequest(Request $request, Vehicle $vehicle)
+    {
+        abort_unless($request->user()->canBackdate(), 403, 'Only accountant or super admin may reject an invoice request.');
+        abort_unless($vehicle->invoice_requested_at, 422, 'No pending invoice request to reject.');
+
+        $data = $request->validate(['invoice_request_rejection_reason' => ['required', 'string', 'max:500']]);
+
+        $vehicle->update([
+            'invoice_requested_at'             => null,
+            'invoice_request_rejection_reason' => $data['invoice_request_rejection_reason'],
+        ]);
+
+        return back()->with('success', 'Invoice request rejected.');
+    }
     public function store(Request $request)
     {
         $data = $request->validate($this->rules($request));

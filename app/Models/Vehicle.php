@@ -19,7 +19,7 @@ class Vehicle extends Model
         'customer_id', 'agent_id', 'vendor_id', 'shipment_id',
         'make', 'model', 'year', 'grade', 'chassis_no', 'budget',
         'buying_price', 'selling_price', 'winning_screenshot_path',
-        'won_at', 'status', 'invoice_requested_at', 'created_by',
+        'won_at', 'status', 'invoice_requested_at','invoice_request_rejection_reason','created_by',
     ];
 
     protected function casts(): array
