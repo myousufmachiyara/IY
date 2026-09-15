@@ -141,6 +141,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('profit-loss',   [AccountingController::class, 'profitLoss'])->middleware('permission:reports.financial_reports')->name('profit_loss');
     });
 
+    Route::get("accounting/day-book", [AccountingController::class, "dayBook"])->middleware("permission:accounting.index")->name("accounting.day_book");
+    Route::get("accounting/party-ledger", [AccountingController::class, "partyLedger"])->middleware("permission:accounting.index")->name("accounting.party_ledger");
+    Route::get("accounting/cash-book", [AccountingController::class, "cashBook"])->middleware("permission:accounting.index")->name("accounting.cash_book");
+    Route::get("accounting/bank-book", [AccountingController::class, "bankBook"])->middleware("permission:accounting.index")->name("accounting.bank_book");
+    Route::get("accounting/receivables-aging", [AccountingController::class, "receivablesAging"])->middleware("permission:reports.receivables")->name("accounting.receivables_aging");
+    Route::get("accounting/expense-analysis", [AccountingController::class, "expenseAnalysis"])->middleware("permission:reports.financial_reports")->name("accounting.expense_analysis");
+    Route::get("accounting/cash-flow", [AccountingController::class, "cashFlow"])->middleware("permission:reports.financial_reports")->name("accounting.cash_flow");
+    Route::get("accounting/vouchers/{journalEntry}/print", [AccountingController::class, "printVoucher"])->middleware("permission:accounting.index")->name("accounting.voucher_print");
+    
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('agent-wise',    [ReportController::class, 'agentWise'])->middleware('permission:reports.agent_wise')->name('agent_wise');
         Route::get('vendor-wise',   [ReportController::class, 'vendorWise'])->middleware('permission:reports.vendor_wise')->name('vendor_wise');
