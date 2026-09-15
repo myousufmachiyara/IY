@@ -29,7 +29,7 @@ class PaymentController extends Controller
         // A recorder who also holds approval authority gets their own entry
         // auto-posted; everyone else's payment lands as 'pending' for a
         // payments.approve holder to review.
-        $autoApprove = $request->user()->canApprovePayments();
+        $autoApprove = $request->user()->canBackdate();
 
         $data = $request->validate([
             'customer_id' => ['required', 'exists:customers,id'],
