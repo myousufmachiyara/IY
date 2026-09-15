@@ -42,7 +42,9 @@
                 </div>
             </header>
 
-            @include('vehicles._tabs', ['vehicle' => $invoice->vehicle, 'active' => 'invoice'])
+            @if($invoice->vehicle)
+                @include('vehicles._tabs', ['vehicle' => $invoice->vehicle, 'active' => 'invoice'])
+            @endif
 
             <div class="card-body">
                 @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
