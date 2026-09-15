@@ -100,7 +100,13 @@
                                     @if($overdue)<i class="fa fa-exclamation-triangle text-danger ms-1" title="Overdue"></i>@endif
                                 </td>
                                 <td><a href="{{ route('customers.show', $inv->customer) }}">{{ $inv->customer->name }}</a></td>
-                                <td><a href="{{ route('vehicles.show', $inv->vehicle) }}">{{ $inv->vehicle->label() }}</a></td>
+                                <td>
+                                    @if($inv->vehicle)
+                                        <a href="{{ route('vehicles.show', $inv->vehicle) }}">{{ $inv->vehicle->label() }}</a>
+                                    @else
+                                        <span class="text-muted">N/A — Deposit Invoice</span>
+                                    @endif
+                                </td>
                                 @if($isPrivileged)<td>{{ $inv->agent->name ?? '—' }}</td>@endif
                                 <td>¥{{ number_format($inv->sale_price) }}</td>
                                 <td>¥{{ number_format($inv->amount_paid) }}</td>
