@@ -34,6 +34,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::resource('vendors', VendorController::class)->except('show')->middleware('permission:vendors');
     Route::resource('vehicles', VehicleController::class)->middleware('permission:vehicle_requirement');
+    Route::post("vehicles/{vehicle}/cancel-invoice-request", [VehicleController::class, "cancelInvoiceRequest"])->middleware("permission:vehicle_requirement.index")->name("vehicles.cancel_invoice_request");
     Route::post('vehicles/{vehicle}/request-invoice', [VehicleController::class, 'requestInvoice'])->middleware('permission:invoices.request')->name('vehicles.request_invoice');
     Route::post('vehicles/{vehicle}/reassign', [VehicleReassignController::class, 'reassign'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign');
     Route::post('vehicles/{vehicle}/reassign-agent', [VehicleReassignController::class, 'reassignAgent'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign_agent');
