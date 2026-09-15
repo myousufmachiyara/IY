@@ -30,9 +30,15 @@
                             </form>
                         @endif
                     @endcan
-                    <a href="{{ route('vehicles.show', $invoice->vehicle) }}" class="btn btn-sm btn-default">
-                        <i class="fa fa-arrow-left"></i> Back to Vehicle
-                    </a>
+                    @if($invoice->vehicle)
+                        <a href="{{ route('vehicles.show', $invoice->vehicle) }}" class="btn btn-sm btn-default">
+                            <i class="fa fa-arrow-left"></i> Back to Vehicle
+                        </a>
+                    @else
+                        <a href="{{ route('customers.show', $invoice->customer) }}" class="btn btn-sm btn-default">
+                            <i class="fa fa-arrow-left"></i> Back to Customer
+                        </a>
+                    @endif
                 </div>
             </header>
 
