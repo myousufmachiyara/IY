@@ -74,7 +74,7 @@
                         <h6 class="text-muted text-uppercase small mb-2">Bill To</h6>
                         <table class="table table-borderless mb-3">
                             <tr><th width="140">Customer</th><td><a href="{{ route('customers.show', $invoice->customer) }}">{{ $invoice->customer->name }}</a></td></tr>
-                            <tr><th>Vehicle</th><td>{{ $invoice->vehicle->label() }}</td></tr>
+                            <tr><th>Vehicle</th><td>{{ $invoice->vehicle?->label() ?? 'N/A — Deposit Invoice' }}</td></tr>
                             <tr><th>Sales Agent</th><td>{{ $invoice->agent->name ?? '—' }}</td></tr>
                             <tr><th>Issued</th><td>{{ optional($invoice->issued_at)->format('d-m-Y') }}</td></tr>
                         </table>
