@@ -39,7 +39,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('vehicles/{vehicle}/request-invoice', [VehicleController::class, 'requestInvoice'])->middleware('permission:invoices.request')->name('vehicles.request_invoice');
     Route::post('vehicles/{vehicle}/reassign', [VehicleReassignController::class, 'reassign'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign');
     Route::post('vehicles/{vehicle}/reassign-agent', [VehicleReassignController::class, 'reassignAgent'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign_agent');
-
+    
     Route::get('bid-sheets/template', [BidSheetController::class, 'template'])->middleware('permission:bid_sheets.index')->name('bid-sheets.template');
     Route::put('bid-sheets/bulk-assign-customer', [BidSheetController::class, 'bulkAssignCustomer'])->middleware('permission:bid_sheets.edit')->name('bid-sheets.bulk_assign');
     Route::resource('bid-sheets', BidSheetController::class)->except(['edit', 'update'])->middleware('permission:bid_sheets');
@@ -89,6 +89,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('payments/{payment}/edit', [PaymentController::class, 'edit'])->middleware('permission:payments.edit')->name('payments.edit');
     Route::put('payments/{payment}', [PaymentController::class, 'update'])->middleware('permission:payments.edit')->name('payments.update');
     Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->middleware('permission:payments.delete')->name('payments.destroy');
+    Route::post("payments/{payment}/undo-deposit-adjustment", [InvoiceController::class, "undoDepositAdjustment"])->middleware("permission:invoices.edit")->name("payments.undo_deposit_adjustment");
     Route::get('customers/{customer}/ledger', [PaymentController::class, 'customerLedger'])->middleware('permission:payments.index')->name('payments.customer_ledger');
 
     Route::get('approvals', [ApprovalController::class, 'index'])->middleware('permission:pending_approvals.index')->name('approvals.index');
