@@ -23,7 +23,7 @@ class CostingController extends Controller
         // commission, service charge, inland, auction, freight, misc — needs
         // its own permission, separate from the plain costings.edit that the
         // route already requires.
-        abort_unless($request->user()->canEditVehicleCosts(), 403, 'You do not have permission to edit vehicle costing.');
+        abort_unless($request->user()->canBackdate(), 403, 'You do not have permission to edit vehicle costing.');
 
         $data = $request->validate([
             'vendor_commission_percent' => ['required', 'numeric', 'min:0', 'max:100'],
