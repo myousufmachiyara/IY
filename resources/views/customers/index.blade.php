@@ -93,14 +93,25 @@
                                 <td>{{ $c->country ?? '—' }}</td>
                                 @if($isPrivileged)<td>{{ $c->agent->name ?? '—' }}</td>@endif
                                 <td>
-                                    @if($c->deposit_invoice_id && $c->depositInvoice)
-                                        @if($c->depositInvoice->isFullyPaid())
-                                            <span class="badge bg-success">Paid</span>
-                                            <br><small class="text-muted">¥{{ number_format($c->depositInvoice->total_payable) }}</small>
-                                        @else
-                                            <span class="badge bg-warning text-dark">Awaiting Payment</span>
-                                            <br><small class="text-muted">Balance: ¥{{ number_format($c->depositInvoice->balance()) }}</small>
-                                        @endif
+                                    @php $dws = $c->depositWorkflowStatus(); @endphp
+                                    @if($c->deposit_invoice_id && $c->depositInvoice && $dws !== 'incomplete')
+                                        @switch($dws)
+                                            @case('complete')
+                                                <span class="badge bg-success">Paid</span>
+                                                <br><small class="text-muted">¥{{ number_format($c->depositInvoice->total_payable) }}</small>
+                                                @break
+                                            @case('pending_approval')
+                                                <span class="badge bg-warning text-dark">Pending Approval</span>
+                                                @break
+                                            @default
+                                                <span class="badge bg-info text-dark">Awaiting Payment</span>
+                                                <br><small class="text-muted">Balance: ¥{{ number_format($c->depositInvoice->balance()) }}</small>
+                                        @endswitch
+                                        @can('customers.edit')
+                                            @if($dws === 'awaiting_payment')
+                                                <a href="#" class="small ms-1" onclick="openEditDepositInvoice({{ $c->id }})">Edit</a>
+                                            @endif
+                                        @endcan
                                     @elseif($c->security_deposit_status !== 'none')
                                         <span class="badge bg-{{ $badgeClass }}">{{ $badgeLabel }}</span> <small class="text-muted">(legacy)</small>
                                         @if($c->security_deposit_status === 'approved')
@@ -155,7 +166,7 @@
                                         @endif
                                     @else
                                         @can('customers.edit')
-                                            <a href="#" class="text-success me-1" title="Generate Deposit Invoice" onclick="openGenerateDepositInvoice({{ $c->id }}, '{{ $c->name }}')">
+                                            <a href="#" class="text-success me-1" title="{{ $c->deposit_invoice_id ? 'Re-Receive Deposit' : 'Generate Deposit Invoice' }}" onclick="openGenerateDepositInvoice({{ $c->id }}, '{{ $c->name }}')">
                                                 <i class="fa fa-file-invoice-dollar"></i>
                                             </a>
                                         @endcan
@@ -368,6 +379,37 @@
         </div>
         @endcan
 
+        @can('customers.edit')
+        <div id="editDepositInvoiceModal" class="modal-block modal-block-primary mfp-hide">
+            <section class="card">
+                <form method="PUT" id="editDepositInvoiceForm" action="" onkeydown="return event.key != 'Enter';">
+                    @csrf @method('PUT')
+                    <header class="card-header"><h2 class="card-title">Edit Deposit Invoice</h2></header>
+                    <div class="card-body">
+                        @if ($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
+                        <div class="row form-group">
+                            <div class="col-lg-6 mb-2">
+                                <label>Deposit Amount (¥) <span class="text-danger">*</span></label>
+                                <input type="number" id="edi_amount" class="form-control" name="amount" min="1" required>
+                            </div>
+                            <div class="col-lg-6 mb-2">
+                                <label>Invoice Date</label>
+                                <input type="date" id="edi_date" class="form-control" name="invoice_date"
+                                    @unless(auth()->user()->isSuperAdmin()) readonly @endunless>
+                            </div>
+                        </div>
+                    </div>
+                    <footer class="card-footer">
+                        <div class="col-md-12 text-end">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-default modal-dismiss">Cancel</button>
+                        </div>
+                    </footer>
+                </form>
+            </section>
+        </div>
+        @endcan
+
         @include('customers._deposit_modals')
     </div>
 </div>
@@ -401,6 +443,15 @@ function openGenerateDepositInvoice(id, name) {
     document.getElementById('generateDepositInvoiceForm').action = '/customers/' + id + '/generate-deposit-invoice';
     document.getElementById('gdi_customer_name').textContent = name;
     $.magnificPopup.open({ items: { src: '#generateDepositInvoiceModal' }, type: 'inline' });
+}
+
+function openEditDepositInvoice(id) {
+    fetch('/customers/' + id + '/deposit-invoice/edit').then(r => r.json()).then(data => {
+        $('#editDepositInvoiceForm').attr('action', '/customers/' + id + '/deposit-invoice');
+        $('#edi_amount').val(data.sale_price);
+        $('#edi_date').val(data.issued_at.substring(0, 10));
+        $.magnificPopup.open({ items: { src: '#editDepositInvoiceModal' }, type: 'inline' });
+    });
 }
 </script>
 

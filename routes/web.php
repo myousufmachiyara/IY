@@ -162,7 +162,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('auction-house-performance',  [ReportController::class, 'auctionHousePerformance'])->middleware('permission:reports.auction_house_performance')->name('auction_house_performance');
         Route::get('shipment',                   [ReportController::class, 'shipmentReport'])->middleware('permission:reports.shipment')->name('shipment');
     });
-    
+    Route::get("customers/{customer}/deposit-invoice/edit", [CustomerController::class, "editDepositInvoice"])->middleware("permission:customers.edit")->name("customers.deposit_invoice.edit");
+    Route::put("customers/{customer}/deposit-invoice", [CustomerController::class, "updateDepositInvoice"])->middleware("permission:customers.edit")->name("customers.deposit_invoice.update");
     Route::post("customers/{customer}/generate-deposit-invoice", [CustomerController::class, "generateDepositInvoice"])->middleware("permission:customers.edit")->name("customers.generate_deposit_invoice");
     Route::get('system/logs', [LogViewerController::class, 'index'])->middleware('permission:system.logs')->name('system.logs');
     Route::get('system/logs/{file}/download', [LogViewerController::class, 'download'])->middleware('permission:system.logs')->name('system.logs.download');

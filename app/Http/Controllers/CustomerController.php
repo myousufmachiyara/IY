@@ -89,8 +89,7 @@ class CustomerController extends Controller
     /** New workflow entry point — generates an unpaid invoice for the deposit; payment is recorded against it via the normal invoice payment flow. */
     public function generateDepositInvoice(Request $request, Customer $customer, LedgerService $ledger)
     {
-        abort_if($customer->deposit_invoice_id, 422, 'A deposit invoice already exists for this customer.');
-
+        abort_if(in_array($customer->depositWorkflowStatus(), ['awaiting_payment', 'pending_approval', 'complete']), 422, 'This customer already has an active or completed deposit invoice.');
         $data = $request->validate([
             'amount'       => ['required', 'integer', 'min:1'],
             'invoice_date' => ['nullable', 'date'],
@@ -117,12 +116,45 @@ class CustomerController extends Controller
             ]);
 
             $ledger->depositInvoiceReceivable($inv);
-            $customer->update(['deposit_invoice_id' => $inv->id]);
-
+            $customer->update(['deposit_invoice_id' => $inv->id, 'security_deposit_status' => 'none', 'security_deposit' => 0]);
             return $inv;
         });
 
         return redirect()->route('invoices.show', $invoice)->with('success', 'Deposit invoice generated — record the customer\'s payment against it to complete their profile.');
+    }
+
+    public function editDepositInvoice(Customer $customer)
+    {
+        abort_unless($customer->depositInvoice, 404, 'No deposit invoice exists for this customer.');
+        abort_if($customer->depositInvoice->amount_paid > 0, 422, 'Cannot edit — payment has already been recorded against this deposit invoice.');
+        return response()->json($customer->depositInvoice->only(['id', 'sale_price', 'issued_at']));
+    }
+
+    public function updateDepositInvoice(Request $request, Customer $customer, LedgerService $ledger)
+    {
+        $invoice = $customer->depositInvoice;
+        abort_unless($invoice, 404, 'No deposit invoice exists for this customer.');
+        abort_if($invoice->amount_paid > 0, 422, 'Cannot edit — payment has already been recorded against this deposit invoice.');
+
+        $data = $request->validate([
+            'amount'       => ['required', 'integer', 'min:1'],
+            'invoice_date' => ['nullable', 'date'],
+        ]);
+
+        $date = $data['invoice_date'] ?? $invoice->issued_at->toDateString();
+        if ($date !== now()->toDateString() && ! $request->user()->isSuperAdmin()) {
+            return back()->withErrors(['invoice_date' => 'Only Super Admin may set a date other than today.']);
+        }
+
+        DB::transaction(function () use ($invoice, $data, $date, $ledger) {
+            foreach ($invoice->journalEntries as $entry) {
+                $ledger->reverseEntry($entry, now()->toDateString(), "Correction to deposit invoice {$invoice->invoice_no}");
+            }
+            $invoice->update(['sale_price' => $data['amount'], 'total_payable' => $data['amount'], 'issued_at' => $date]);
+            $ledger->depositInvoiceReceivable($invoice->fresh());
+        });
+
+        return back()->with('success', 'Deposit invoice updated.');
     }
 
     // ================= Legacy deposit flow — preserved untouched for customers who went through it before the invoice-first workflow existed =================

@@ -12,7 +12,10 @@ class PaymentController extends Controller
 {
     public function index(Request $request)
     {
+        $user = $request->user();
+
         $payments = Payment::with('customer', 'invoice', 'recorder')
+            ->when(! $user->can('data.view_all'), fn ($q) => $q->whereHas('customer', fn ($c) => $c->where('agent_id', $user->id)))
             ->when($request->customer_id, fn ($q, $v) => $q->where('customer_id', $v))
             ->when($request->method, fn ($q, $v) => $q->where('method', $v))
             ->when($request->status, fn ($q, $v) => $q->where('status', $v))
@@ -20,7 +23,10 @@ class PaymentController extends Controller
             ->when($request->to, fn ($q, $v) => $q->whereDate('paid_at', '<=', $v))
             ->latest('paid_at')->get();
 
-        $customers = Customer::orderBy('name')->get();
+        $customers = $user->can('data.view_all')
+            ? Customer::orderBy('name')->get()
+            : Customer::where('agent_id', $user->id)->orderBy('name')->get();
+
         return view('payments.index', compact('payments', 'customers'));
     }
 

@@ -39,7 +39,29 @@ class Customer extends Model
     public function depositReceivedBy(): BelongsTo { return $this->belongsTo(User::class, 'security_deposit_received_by'); }
     public function depositApprovedBy(): BelongsTo { return $this->belongsTo(User::class, 'security_deposit_approved_by'); }
     public function depositInvoice(): BelongsTo { return $this->belongsTo(Invoice::class, 'deposit_invoice_id'); }
-
+    public function depositWorkflowStatus(): string
+    {
+        if ($this->profile_completed_at) {
+            return 'complete';
+        }
+        if (! $this->deposit_invoice_id || ! $this->depositInvoice) {
+            return 'incomplete';
+        }
+        if ($this->depositInvoice->payments()->where('status', 'pending')->exists()) {
+            return 'pending_approval';
+        }
+        $lastPayment = $this->depositInvoice->payments()->latest()->first();
+        if ($lastPayment && $lastPayment->status === 'rejected') {
+            return 'incomplete';
+        }
+        if ($this->depositInvoice->isFullyPaid()) {
+            // Paid, but profile_completed_at is null — this is exactly the state right
+            // after Adjust Payment by Deposit: the money was real, but it's since been
+            // spent against a sale invoice, so there's currently no active deposit held.
+            return 'incomplete';
+        }
+        return 'awaiting_payment';
+    }
     public function ports(): BelongsToMany { return $this->belongsToMany(Port::class, 'customer_port'); }
 
     public function vehicles(): HasMany  { return $this->hasMany(Vehicle::class); }
