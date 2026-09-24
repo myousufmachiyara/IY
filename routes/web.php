@@ -39,7 +39,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('vehicles/{vehicle}/request-invoice', [VehicleController::class, 'requestInvoice'])->middleware('permission:invoices.request')->name('vehicles.request_invoice');
     Route::post('vehicles/{vehicle}/reassign', [VehicleReassignController::class, 'reassign'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign');
     Route::post('vehicles/{vehicle}/reassign-agent', [VehicleReassignController::class, 'reassignAgent'])->middleware('permission:vehicle_requirement.edit')->name('vehicles.reassign_agent');
-    
+
     Route::get('bid-sheets/template', [BidSheetController::class, 'template'])->middleware('permission:bid_sheets.index')->name('bid-sheets.template');
     Route::put('bid-sheets/bulk-assign-customer', [BidSheetController::class, 'bulkAssignCustomer'])->middleware('permission:bid_sheets.edit')->name('bid-sheets.bulk_assign');
     Route::resource('bid-sheets', BidSheetController::class)->except(['edit', 'update'])->middleware('permission:bid_sheets');
@@ -94,6 +94,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('approvals', [ApprovalController::class, 'index'])->middleware('permission:pending_approvals.index')->name('approvals.index');
 
+    Route::get('shipments/new-options', [ShipmentController::class, 'newShipmentOptions'])->middleware('permission:shipments.create')->name('shipments.new_options');
     Route::get('customers/{customer}/shipments/create', [ShipmentController::class, 'create'])->middleware('permission:shipments.create')->name('shipments.create');
     Route::resource('shipments', ShipmentController::class)->only(['index', 'store', 'show', 'edit', 'update'])->middleware('permission:shipments');
     Route::put('shipments/{shipment}/schedule', [ShipmentController::class, 'setSchedule'])->middleware('permission:shipments.edit')->name('shipments.schedule');
@@ -102,8 +103,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post("shipments/{shipment}/undo-dispatch", [ShipmentController::class, "undoDispatch"])->middleware("permission:shipments.edit")->name("shipments.undo_dispatch");
     Route::post("shipments/{shipment}/undo-arrive", [ShipmentController::class, "undoArrive"])->middleware("permission:shipments.edit")->name("shipments.undo_arrive");
     Route::post("shipments/{shipment}/cancel", [ShipmentController::class, "cancel"])->middleware("permission:shipments.delete")->name("shipments.cancel");
-    Route::get("shipments/new-options", [ShipmentController::class, "newShipmentOptions"])->middleware("permission:shipments.create")->name("shipments.new_options");
-    
+
     Route::get('vehicles/{vehicle}/documents',  [DocumentController::class, 'index'])->middleware('permission:documents.index')->name('documents.index');
     Route::post('vehicles/{vehicle}/documents', [DocumentController::class, 'store'])->middleware('permission:documents.create')->name('documents.store');
     Route::post('vehicles/{vehicle}/documents/release', [DocumentController::class, 'release'])->middleware('permission:documents.edit')->name('documents.release');
@@ -150,7 +150,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get("accounting/expense-analysis", [AccountingController::class, "expenseAnalysis"])->middleware("permission:reports.financial_reports")->name("accounting.expense_analysis");
     Route::get("accounting/cash-flow", [AccountingController::class, "cashFlow"])->middleware("permission:reports.financial_reports")->name("accounting.cash_flow");
     Route::get("accounting/vouchers/{journalEntry}/print", [AccountingController::class, "printVoucher"])->middleware("permission:accounting.index")->name("accounting.voucher_print");
-    
+
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('agent-wise',    [ReportController::class, 'agentWise'])->middleware('permission:reports.agent_wise')->name('agent_wise');
         Route::get('vendor-wise',   [ReportController::class, 'vendorWise'])->middleware('permission:reports.vendor_wise')->name('vendor_wise');
@@ -163,6 +163,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('auction-house-performance',  [ReportController::class, 'auctionHousePerformance'])->middleware('permission:reports.auction_house_performance')->name('auction_house_performance');
         Route::get('shipment',                   [ReportController::class, 'shipmentReport'])->middleware('permission:reports.shipment')->name('shipment');
     });
+
     Route::get("customers/{customer}/deposit-invoice/edit", [CustomerController::class, "editDepositInvoice"])->middleware("permission:customers.edit")->name("customers.deposit_invoice.edit");
     Route::put("customers/{customer}/deposit-invoice", [CustomerController::class, "updateDepositInvoice"])->middleware("permission:customers.edit")->name("customers.deposit_invoice.update");
     Route::post("customers/{customer}/generate-deposit-invoice", [CustomerController::class, "generateDepositInvoice"])->middleware("permission:customers.edit")->name("customers.generate_deposit_invoice");
