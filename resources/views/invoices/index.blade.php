@@ -99,7 +99,13 @@
                                     <a href="{{ route('invoices.show', $inv) }}"><strong>{{ $inv->invoice_no }}</strong></a>
                                     @if($overdue)<i class="fa fa-exclamation-triangle text-danger ms-1" title="Overdue"></i>@endif
                                 </td>
-                                <td><a href="{{ route('customers.show', $inv->customer) }}">{{ $inv->customer->name }}</a></td>
+                                <td>
+                                    @if($inv->customer)
+                                        <a href="{{ route('customers.show', $inv->customer) }}">{{ $inv->customer->name }}</a>
+                                    @else
+                                        <span class="text-danger">Customer Missing (ID: {{ $inv->customer_id ?? '—' }})</span>
+                                    @endif
+                                </td>
                                 <td>
                                     @if($inv->vehicle)
                                         <a href="{{ route('vehicles.show', $inv->vehicle) }}">{{ $inv->vehicle->label() }}</a>
