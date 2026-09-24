@@ -7,12 +7,10 @@
 <div class="row">
     <div class="col">
         <section class="card">
-
-            @if(session('success'))
-                <div class="alert alert-success">{{ session('success') }}</div>
-            @endif
-            @if(session('error'))
-                <div class="alert alert-danger">{{ session('error') }}</div>
+             @if ($errors->any())
+                <div class="alert alert-danger">
+                    <ul class="mb-0">@foreach ($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+                </div>
             @endif
 
             <header class="card-header">
@@ -198,22 +196,27 @@
 </div>
 
 <script>
-function updateOutstanding(select) {
-    const opt = select.options[select.selectedIndex];
-    const outstanding = opt.dataset.outstanding || 0;
-    document.getElementById('add_vp_amount').value = outstanding;
-    document.getElementById('add_vp_amount').max = outstanding;
-    document.getElementById('add_vp_outstanding_hint').textContent = 'Outstanding: ¥' + Number(outstanding).toLocaleString();
-}
+    function updateOutstanding(select) {
+        const opt = select.options[select.selectedIndex];
+        const outstanding = opt.dataset.outstanding || 0;
+        document.getElementById('add_vp_amount').value = outstanding;
+        document.getElementById('add_vp_amount').max = outstanding;
+        document.getElementById('add_vp_outstanding_hint').textContent = 'Outstanding: ¥' + Number(outstanding).toLocaleString();
+    }
 
-function editVendorPayment(id, amount, method, paidAt, reference) {
-    document.getElementById('editVpForm').action = '/vendor-payments/' + id;
-    document.getElementById('edit_vp_amount').value = amount;
-    document.getElementById('edit_vp_date').value = paidAt;
-    document.getElementById('edit_vp_reference').value = reference || '';
-    $('#edit_vp_method').val(method).trigger('change');
-    $.magnificPopup.open({ items: { src: '#editVpModal' }, type: 'inline' });
-}
+    function editVendorPayment(id, amount, method, paidAt, reference) {
+        document.getElementById('editVpForm').action = '/vendor-payments/' + id;
+        document.getElementById('edit_vp_amount').value = amount;
+        document.getElementById('edit_vp_date').value = paidAt;
+        document.getElementById('edit_vp_reference').value = reference || '';
+        $('#edit_vp_method').val(method).trigger('change');
+        $.magnificPopup.open({ items: { src: '#editVpModal' }, type: 'inline' });
+    }
+    @if ($errors->any())
+        $(document).ready(function () {
+            $.magnificPopup.open({ items: { src: '#addModal' }, type: 'inline' });
+        });
+    @endif
 </script>
 
 @endsection
