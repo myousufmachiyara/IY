@@ -34,20 +34,24 @@ class VendorPaymentController extends Controller
 
     public function store(Request $request, LedgerService $ledger)
     {
+        $vehicle = Vehicle::findOrFail($request->vehicle_id);
+        abort_unless($vehicle->vendor_id, 422, 'This vehicle has no vendor assigned.');
+
+        $outstanding = ($vehicle->costing?->total_costing ?? $vehicle->buying_price ?? 0) - $vehicle->vendorPayments()->sum('amount');
+
         $data = $request->validate([
             'vehicle_id' => ['required', 'exists:vehicles,id'],
-            'amount'     => ['required', 'integer', 'min:1'],
+            'amount'     => ['required', 'integer', 'min:1', "max:{$outstanding}"],
             'method'     => ['required', Rule::in(['cash', 'bank'])],
             'paid_at'    => ['required', 'date'],
             'reference'  => ['nullable', 'string', 'max:255'],
+        ], [
+            'amount.max' => "Amount cannot exceed the outstanding balance of ¥" . number_format($outstanding) . ".",
         ]);
 
-        if (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
-            return back()->withErrors(['paid_at' => 'You do not have permission to record a vendor payment with a date other than today.'])->withInput();
+        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
+            return back()->withErrors(['paid_at' => 'Only Super Admin may record a vendor payment with a date other than today.'])->withInput();
         }
-
-        $vehicle = Vehicle::findOrFail($data['vehicle_id']);
-        abort_unless($vehicle->vendor_id, 422, 'This vehicle has no vendor assigned.');
 
         $backdated = \Carbon\Carbon::parse($data['paid_at'])->lt(today());
         $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;

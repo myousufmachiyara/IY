@@ -112,7 +112,7 @@
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Amount (¥) <span class="text-danger">*</span></label>
-                                <input type="number" id="add_vp_amount" class="form-control" name="amount" min="1" required>
+                                <input type="number" id="add_vp_amount" class="form-control" name="amount" min="1" required oninput="this.max = this.dataset.max || ''">
                                 <small class="text-muted" id="add_vp_outstanding_hint"></small>
                             </div>
                             <div class="col-lg-6 mb-2">
@@ -202,6 +202,7 @@ function updateOutstanding(select) {
     const opt = select.options[select.selectedIndex];
     const outstanding = opt.dataset.outstanding || 0;
     document.getElementById('add_vp_amount').value = outstanding;
+    document.getElementById('add_vp_amount').max = outstanding;
     document.getElementById('add_vp_outstanding_hint').textContent = 'Outstanding: ¥' + Number(outstanding).toLocaleString();
 }
 
