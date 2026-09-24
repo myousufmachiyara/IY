@@ -17,8 +17,13 @@
                 <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
 
-            <header class="card-header">
+            <header class="card-header d-flex justify-content-between align-items-center">
                 <h2 class="card-title">All Shipments</h2>
+                @can('shipments.create')
+                    <button type="button" class="btn btn-primary btn-sm" onclick="openNewShipment()">
+                        <i class="fa fa-plus"></i> New Shipment
+                    </button>
+                @endcan
             </header>
 
             <div class="card-body">
@@ -69,11 +74,63 @@
                 </div>
 
                 <p class="text-muted small mt-3 mb-0">
-                    <i class="fa fa-info-circle"></i> New shipments are prepared from a customer's page once their vehicle(s) reach 50% payment —
-                    look for "Prepare Shipment" on the vehicle detail page.
+                    <i class="fa fa-info-circle"></i> A shipment can carry several vehicles for one customer at once —
+                    click "New Shipment" above, or use "Prepare Shipment" on a specific vehicle's detail page.
                 </p>
             </div>
         </section>
+
+        @can('shipments.create')
+        <div id="newShipmentModal" class="modal-block modal-block-primary mfp-hide">
+            <section class="card">
+                <form method="GET" id="newShipmentForm" action="" onkeydown="return event.key != 'Enter';">
+                    <header class="card-header"><h2 class="card-title">New Shipment</h2></header>
+                    <div class="card-body">
+                        <label>Customer <span class="text-danger">*</span></label>
+                        <select id="ns_customer_select" class="form-control select2-js" required>
+                            <option value="" disabled selected>Loading customers…</option>
+                        </select>
+                        <small class="text-muted d-block mt-1">Only customers with at least one shipment-eligible vehicle (invoiced, 50%+ paid, not already on a shipment) are listed. You'll pick which vehicle(s) to include on the next step.</small>
+                    </div>
+                    <footer class="card-footer">
+                        <div class="col-md-12 text-end">
+                            <button type="button" class="btn btn-primary" onclick="goToShipmentCreate()">Continue</button>
+                            <button type="button" class="btn btn-default modal-dismiss">Cancel</button>
+                        </div>
+                    </footer>
+                </form>
+            </section>
+        </div>
+        @endcan
     </div>
 </div>
+
+<script>
+function openNewShipment() {
+    $.magnificPopup.open({ items: { src: '#newShipmentModal' }, type: 'inline' });
+    fetch('/shipments/new-options')
+        .then(r => r.json())
+        .then(customers => {
+            const select = $('#ns_customer_select');
+            select.empty();
+            if (customers.length === 0) {
+                select.append('<option value="" disabled selected>No customers currently eligible</option>');
+            } else {
+                select.append('<option value="" disabled selected>Select customer</option>');
+                customers.forEach(c => {
+                    select.append(`<option value="${c.id}">${c.name} (${c.vehicle_count} vehicle${c.vehicle_count === 1 ? '' : 's'} eligible)</option>`);
+                });
+            }
+            select.trigger('change');
+        })
+        .catch(() => {
+            $('#ns_customer_select').empty().append('<option value="" disabled selected>Failed to load — try again</option>').trigger('change');
+        });
+}
+function goToShipmentCreate() {
+    const customerId = $('#ns_customer_select').val();
+    if (!customerId) { alert('Select a customer first.'); return; }
+    window.location.href = '/customers/' + customerId + '/shipments/create';
+}
+</script>
 @endsection

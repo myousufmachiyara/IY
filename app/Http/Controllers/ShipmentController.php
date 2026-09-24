@@ -226,4 +226,15 @@ class ShipmentController extends Controller
             ->filter(fn ($v) => $bypass || $v->invoice?->isHalfPaid())
             ->values();
     }
+
+    public function newShipmentOptions()
+    {
+        $customers = Customer::whereHas('vehicles', fn ($q) => $q->where('status', 'invoiced')->whereNull('shipment_id'))
+            ->get()
+            ->filter(fn ($c) => $this->eligibleVehicles($c)->isNotEmpty())
+            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'vehicle_count' => $this->eligibleVehicles($c)->count()])
+            ->values();
+
+        return response()->json($customers);
+    }
 }

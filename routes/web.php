@@ -102,7 +102,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post("shipments/{shipment}/undo-dispatch", [ShipmentController::class, "undoDispatch"])->middleware("permission:shipments.edit")->name("shipments.undo_dispatch");
     Route::post("shipments/{shipment}/undo-arrive", [ShipmentController::class, "undoArrive"])->middleware("permission:shipments.edit")->name("shipments.undo_arrive");
     Route::post("shipments/{shipment}/cancel", [ShipmentController::class, "cancel"])->middleware("permission:shipments.delete")->name("shipments.cancel");
-
+    Route::get("shipments/new-options", [ShipmentController::class, "newShipmentOptions"])->middleware("permission:shipments.create")->name("shipments.new_options");
+    
     Route::get('vehicles/{vehicle}/documents',  [DocumentController::class, 'index'])->middleware('permission:documents.index')->name('documents.index');
     Route::post('vehicles/{vehicle}/documents', [DocumentController::class, 'store'])->middleware('permission:documents.create')->name('documents.store');
     Route::post('vehicles/{vehicle}/documents/release', [DocumentController::class, 'release'])->middleware('permission:documents.edit')->name('documents.release');
