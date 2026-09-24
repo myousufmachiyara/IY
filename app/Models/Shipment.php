@@ -11,7 +11,7 @@ class Shipment extends Model
 
     protected $fillable = [
         'customer_id', 'method', 'container_no', 'bl_no', 'shipping_company',
-        'shipment_date', 'expected_arrival', 'freight_total', 'status', 'created_by',
+        'shipment_date', 'expected_arrival', 'arrived_at', 'freight_total', 'status', 'created_by',
     ];
 
     protected function casts(): array
@@ -19,6 +19,7 @@ class Shipment extends Model
         return [
             'shipment_date'    => 'date',
             'expected_arrival' => 'date',
+            'arrived_at'       => 'date',
             'freight_total'    => 'integer',
         ];
     }
