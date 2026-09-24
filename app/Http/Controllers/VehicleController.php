@@ -148,14 +148,22 @@ class VehicleController extends Controller
 
     public function sold(Request $request)
     {
+        $user = $request->user();
+
         $vehicles = Vehicle::with('customer', 'agent', 'invoice')
             ->whereIn('status', ['invoiced', 'dispatched', 'arrived', 'delivered'])
+            ->when(! $user->can('data.view_all'), fn ($q) => $q->where('agent_id', $user->id))
             ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
+            ->when($request->agent_id, fn ($q) => $q->where('agent_id', $request->agent_id))
             ->when($request->from, fn ($q) => $q->whereDate('won_at', '>=', $request->from))
             ->when($request->to, fn ($q) => $q->whereDate('won_at', '<=', $request->to))
             ->latest('won_at')->get();
 
         $customers = Customer::orderBy('name')->get();
-        return view('vehicles.sold', compact('vehicles', 'customers'));
+        $agents = $user->can('data.view_all')
+            ? \App\Models\User::permission('scope.by_agent')->orderBy('name')->get()
+            : collect();
+
+        return view('vehicles.sold', compact('vehicles', 'customers', 'agents'));
     }
 }
