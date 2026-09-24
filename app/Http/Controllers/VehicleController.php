@@ -145,4 +145,17 @@ class VehicleController extends Controller
             'requirement_date' => ['nullable', 'date'],
         ];
     }
+
+    public function sold(Request $request)
+    {
+        $vehicles = Vehicle::with('customer', 'agent', 'invoice')
+            ->whereIn('status', ['invoiced', 'dispatched', 'arrived', 'delivered'])
+            ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
+            ->when($request->from, fn ($q) => $q->whereDate('won_at', '>=', $request->from))
+            ->when($request->to, fn ($q) => $q->whereDate('won_at', '<=', $request->to))
+            ->latest('won_at')->get();
+
+        $customers = Customer::orderBy('name')->get();
+        return view('vehicles.sold', compact('vehicles', 'customers'));
+    }
 }
