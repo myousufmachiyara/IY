@@ -105,8 +105,7 @@ class VendorPaymentController extends Controller
     {
         // Deleting a posted vendor payment reverses its ledger entry — same
         // permission as an explicit reversal, on top of the route's vendor_payments.delete.
-        abort_unless(auth()->user()->canReverseVendorPayments(), 403, 'You do not have permission to reverse/void a vendor payment.');
-
+        abort_unless($request->user()->can('vendor_payments.reverse'), 403, 'You do not have permission to reverse/void a vendor payment.');
         DB::transaction(function () use ($vendorPayment, $ledger) {
             foreach ($vendorPayment->journalEntries as $entry) {
                 $ledger->reverseEntry($entry, now()->toDateString(), "Reversal of deleted vendor payment #{$vendorPayment->id}");
