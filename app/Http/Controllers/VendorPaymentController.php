@@ -88,8 +88,7 @@ class VendorPaymentController extends Controller
         }
 
         // Editing a vendor payment always reverses and reposts its ledger entry.
-        abort_unless($request->user()->canReverseVendorPayments(), 403, 'You do not have permission to reverse/void a vendor payment.');
-
+        abort_unless($request->user()->can('vendor_payments.reverse'), 403, 'You do not have permission to reverse/void a vendor payment.');
         DB::transaction(function () use ($vendorPayment, $data, $ledger) {
             foreach ($vendorPayment->journalEntries as $entry) {
                 $ledger->reverseEntry($entry, now()->toDateString(), "Correction to vendor payment #{$vendorPayment->id}");
