@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
         // by RoleController::moduleMatrix() in sync with this list.
 
         $fullActionModules = [
-            'members', 'roles', 'customers', 'vehicle_requirement', 'vendors',
+            'members', 'accounting', 'roles', 'customers', 'vehicle_requirement', 'vendors',
             'bid_sheets', 'merge_bids', 'bid_results', 'costings', 'invoices',
             'payments', 'vendor_payments', 'expenses', 'shipments', 'documents',
         ];
