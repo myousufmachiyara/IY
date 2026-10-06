@@ -72,9 +72,6 @@ class DatabaseSeeder extends Seeder
         Permission::where('name', 'like', 'pending_approvals.%')
             ->whereNotIn('name', ['pending_approvals.index', 'pending_approvals.show'])
             ->delete();
-        Permission::where('name', 'like', 'accounting.%')
-            ->whereNotIn('name', ['accounting.index', 'accounting.show', 'accounting.print'])
-            ->delete();
 
         // ── Report Access permissions ───────────────────────────────────────
 
