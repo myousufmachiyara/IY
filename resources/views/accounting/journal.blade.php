@@ -2,9 +2,16 @@
 @section('title', 'Accounting | Journal')
 @section('content')
 <div class="row"><div class="col"><section class="card">
-    <header class="card-header"><h2 class="card-title">Accounting</h2></header>
+    <header class="card-header d-flex justify-content-between align-items-center">
+        <h2 class="card-title">Accounting</h2>
+        @can('accounting.create')
+            <a href="{{ route('accounting.journal_voucher.create') }}" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> New Journal Voucher</a>
+        @endcan
+    </header>
     @include('accounting._tabs', ['active' => 'journal'])
     <div class="card-body">
+        @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
+        @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
         <form method="GET" class="row g-2 mb-3">
             <div class="col-md-2"><input type="date" name="from" class="form-control" value="{{ request('from') }}" title="From"></div>
             <div class="col-md-2"><input type="date" name="to" class="form-control" value="{{ request('to') }}" title="To"></div>
@@ -26,7 +33,16 @@
                             @endforeach
                         </td>
                         <td class="text-end">¥{{ number_format($e->totalDebit()) }}</td>
-                        <td><a href="{{ route('accounting.voucher_print', $e) }}" class="text-success" title="Print Voucher"><i class="fa fa-print"></i></a></td>
+                        <td class="text-nowrap">
+                            <a href="{{ route('accounting.voucher_print', $e) }}" class="text-success me-1" title="Print Voucher"><i class="fa fa-print"></i></a>
+                            @can('accounting.delete')
+                                @if(! $e->reference_type && ! str_starts_with($e->description, 'Reversal of '))
+                                    <form action="{{ route('accounting.journal_voucher.reverse', $e) }}" method="POST" class="d-inline" onsubmit="return confirm('Post a reversing entry for {{ $e->entry_no }}?');">
+                                        @csrf<button type="submit" class="btn btn-link p-0 text-warning" title="Reverse this voucher"><i class="fa fa-undo"></i></button>
+                                    </form>
+                                @endif
+                            @endcan
+                        </td>
                     </tr>
                     @empty
                     <tr><td colspan="7" class="text-center text-muted py-4">No journal entries in this range.</td></tr>

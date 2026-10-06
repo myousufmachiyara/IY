@@ -151,6 +151,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get("accounting/cash-flow", [AccountingController::class, "cashFlow"])->middleware("permission:reports.financial_reports")->name("accounting.cash_flow");
     Route::get("accounting/vouchers/{journalEntry}/print", [AccountingController::class, "printVoucher"])->middleware("permission:accounting.index")->name("accounting.voucher_print");
 
+    Route::get('accounting/journal-vouchers/create', [\App\Http\Controllers\JournalVoucherController::class, 'create'])->middleware('permission:accounting.create')->name('accounting.journal_voucher.create');
+    Route::post('accounting/journal-vouchers', [\App\Http\Controllers\JournalVoucherController::class, 'store'])->middleware('permission:accounting.create')->name('accounting.journal_voucher.store');
+    Route::post('accounting/journal-vouchers/{journalEntry}/reverse', [\App\Http\Controllers\JournalVoucherController::class, 'reverse'])->middleware('permission:accounting.delete')->name('accounting.journal_voucher.reverse');
+
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('agent-wise',    [ReportController::class, 'agentWise'])->middleware('permission:reports.agent_wise')->name('agent_wise');
         Route::get('vendor-wise',   [ReportController::class, 'vendorWise'])->middleware('permission:reports.vendor_wise')->name('vendor_wise');
