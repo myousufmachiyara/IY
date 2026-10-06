@@ -190,7 +190,7 @@ class PaymentController extends Controller
         // needs the same permission as an explicit reversal — not just the plain
         // payments.delete permission already enforced by the route.
         if ($payment->status === 'approved') {
-            abort_unless(auth()->user()->canReversePayments(), 403, 'Only a holder of "Reverse/Void Customer Payment" may delete an approved payment.');
+            abort_unless(auth()->user()->can('vendor_payments.reverse'), 403, 'You do not have permission to reverse/void a vendor payment.');
         }
 
         DB::transaction(function () use ($payment, $ledger) {
