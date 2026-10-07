@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Customer, Invoice, Payment, Vehicle};
+use App\Models\{Customer, Invoice, JournalEntry, Payment, Vehicle};
 use App\Services\{InvoiceNumber, LedgerService};
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -154,17 +154,25 @@ class InvoiceController extends Controller
 
     public function show(Request $request, Invoice $invoice)
     {
-        $invoice->load('vehicle.costing', 'vehicle.shipment', 'customer', 'payments.recorder', 'agent');
+        $invoice->load('vehicle.costing', 'vehicle.shipment', 'customer', 'payments.recorder', 'payments.account', 'agent');
         $customers = Customer::where('id', '!=', $invoice->customer_id)->orderBy('name')->get();
         return view('invoices.show', compact('invoice', 'customers'));
     }
 
-    public function settle(Request $request, Invoice $invoice)
+    public function settle(Request $request, Invoice $invoice, LedgerService $ledger)
     {
-        abort_unless($request->user()->canAdjustSettledAmount(), 403, 'You do not have permission to adjust the settled amount.');
+        abort_unless($request->user()->can('invoices.adjust_settled_amount'), 403, 'You do not have permission to adjust the settled amount.');
         $data = $request->validate(['settled_amount' => ['required', 'integer', 'min:0', "max:{$invoice->sale_price}"]]);
-        $invoice->settled_amount = $data['settled_amount'];
-        $invoice->refreshTotals()->save();
+
+        DB::transaction(function () use ($invoice, $data, $ledger) {
+            $invoice->settled_amount = $data['settled_amount'];
+            $invoice->refreshTotals()->save();
+
+            // A discount changes what the customer owes — the receivable must follow.
+            $ledger->syncInvoiceReceivable($invoice->fresh());
+            $ledger->syncRevenueRecognition($invoice->fresh());
+        });
+
         return back()->with('success', 'Settled amount updated.');
     }
 
@@ -187,18 +195,20 @@ class InvoiceController extends Controller
         abort_if($amount <= 0, 422, 'Nothing to adjust — either the invoice is fully paid or the deposit is exhausted.');
 
         DB::transaction(function () use ($invoice, $customer, $amount, $ledger, $request) {
-            $ledger->applyDepositToInvoice($invoice, $amount);
-
-            Payment::create([
+            $payment = Payment::create([
                 'customer_id' => $customer->id, 'invoice_id' => $invoice->id, 'vehicle_id' => $invoice->vehicle_id,
                 'amount' => $amount, 'method' => 'deposit',
-                'account_id' => $ledger->account(LedgerService::CUST_DEPOSIT)->id,
+                'account_id' => $ledger->mapped('customer_deposits')->id,
                 'paid_at' => now(), 'reference' => 'Applied from security deposit',
                 'is_backdated' => false, 'recorded_by' => $request->user()->id, 'status' => 'approved',
                 'approved_by' => $request->user()->id, 'approved_at' => now(),
             ]);
 
+            // Tied to the Payment (not the invoice) so "Undo deposit adjustment" can find and reverse it.
+            $ledger->applyDepositToInvoice($invoice, $amount, $payment);
+
             $invoice->refreshTotals()->save();
+            $ledger->syncRevenueRecognition($invoice->fresh());
 
             $remaining = $customer->security_deposit - $amount;
             $customer->update([
@@ -222,13 +232,27 @@ class InvoiceController extends Controller
             $amount = $payment->amount;
             $invoice = $payment->invoice;
 
-            foreach ($payment->journalEntries as $entry) {
-                $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — deposit adjustment #{$payment->id} undone");
+            $entries = $payment->journalEntries;
+
+            // Adjustments made before this fix were tied to the invoice instead of the payment.
+            // `php artisan accounting:restate --apply` re-links them; this is the safety net if it hasn't run.
+            if ($entries->isEmpty() && $invoice) {
+                $entries = JournalEntry::where('reference_type', $invoice->getMorphClass())
+                    ->where('reference_id', $invoice->id)
+                    ->where('voucher_type', 'deposit_adjustment')
+                    ->get()
+                    ->filter(fn ($e) => $e->totalDebit() === (int) $amount && ! JournalEntry::where('description', 'like', "%{$e->entry_no}%")->where('voucher_type', 'reversal')->exists())
+                    ->sortByDesc('id')->take(1);
+            }
+
+            foreach ($entries as $entry) {
+                $ledger->reverseEntry($entry, now()->toDateString(), "Reversal of {$entry->entry_no} — deposit adjustment #{$payment->id} undone");
             }
             $payment->delete();
 
             if ($invoice) {
                 $invoice->refreshTotals()->save();
+                $ledger->syncRevenueRecognition($invoice->fresh());
             }
             $customer->update([
                 'security_deposit'        => $customer->security_deposit + $amount,

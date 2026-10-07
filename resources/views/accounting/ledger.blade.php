@@ -29,6 +29,9 @@
                             <tr><th>Date</th><th>Entry #</th><th>Memo</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Running Balance</th></tr>
                         </thead>
                         <tbody>
+                            @if(request('from'))
+                            <tr class="table-light"><td colspan="5" class="fw-semibold">Opening balance — before {{ \Carbon\Carbon::parse(request('from'))->format('d-m-Y') }}</td><td class="text-end fw-bold">¥{{ number_format($opening) }}</td></tr>
+                            @endif
                             @forelse ($lines as $l)
                             <tr>
                                 <td>{{ $l->entry->date->format('d-m-Y') }}</td>

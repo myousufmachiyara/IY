@@ -23,7 +23,7 @@ class CostingController extends Controller
         // commission, service charge, inland, auction, freight, misc — needs
         // its own permission, separate from the plain costings.edit that the
         // route already requires.
-        abort_unless($request->user()->canBackdate(), 403, 'You do not have permission to edit vehicle costing.');
+        abort_unless($request->user()->can('costings.edit_costs'), 403, 'You do not have permission to edit vehicle costing.');
 
         $data = $request->validate([
             'vendor_commission_percent' => ['required', 'numeric', 'min:0', 'max:100'],
@@ -45,9 +45,9 @@ class CostingController extends Controller
             (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
         )->save();
 
-        $ledger->adjustVendorPayable($vehicle);
+        $ledger->syncVehicleCost($vehicle->fresh());
 
-        return back()->with('success', 'Costing updated. Vendor payable synced with the new total costing.');
+        return back()->with('success', 'Costing updated. Every cost component and the vendor payable are now posted to the ledger.');
     }
 
     private function ensureCosting(Vehicle $vehicle): VehicleCosting

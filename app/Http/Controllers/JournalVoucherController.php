@@ -13,7 +13,7 @@ class JournalVoucherController extends Controller
     {
         abort_unless(auth()->user()->can('accounting.create'), 403);
 
-        $accounts = ChartOfAccount::where('is_active', true)->orderBy('code')->get();
+        $accounts = ChartOfAccount::with('subhead.head')->where('is_active', true)->orderBy('code')->get();
 
         return view('accounting.journal_voucher_create', compact('accounts'));
     }
@@ -67,7 +67,7 @@ class JournalVoucherController extends Controller
 
         $lines = $rows->map(function ($r) use ($accounts) {
             $account = $accounts[$r['account_id']];
-            $line = ['account' => $account->code, 'debit' => $r['debit'], 'credit' => $r['credit'], 'memo' => $r['memo']];
+            $line = ['account_id' => $account->id, 'debit' => $r['debit'], 'credit' => $r['credit'], 'memo' => $r['memo']];
 
             // Posting to a customer/vendor sub-account tags the party, same as auto-posted entries.
             if ($account->customer_id && ($customer = Customer::find($account->customer_id))) {

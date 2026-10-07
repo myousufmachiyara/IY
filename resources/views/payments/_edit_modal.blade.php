@@ -11,11 +11,8 @@
                         <input type="number" id="edit_pay_amount" class="form-control" name="amount" min="1" required>
                     </div>
                     <div class="col-lg-6 mb-2">
-                        <label>Method <span class="text-danger">*</span></label>
-                        <select id="edit_pay_method" class="form-control select2-js" name="method" required>
-                            <option value="bank">Bank</option>
-                            <option value="cash">Cash</option>
-                        </select>
+                        <label>Paid Into <span class="text-danger">*</span></label>
+                                @include('partials.money_account', ['name' => 'account_id', 'id' => 'edit_pay_account'])
                     </div>
                     <div class="col-lg-6 mb-2">
                         <label>Date Paid <span class="text-danger">*</span></label>
@@ -39,12 +36,12 @@
 </div>
 
 <script>
-function editPayment(id, amount, method, paidAt, reference) {
+function editPayment(id, amount, accountId, paidAt, reference) {
     document.getElementById('editPaymentForm').action = '/payments/' + id;
     document.getElementById('edit_pay_amount').value = amount;
     document.getElementById('edit_pay_date').value = paidAt;
     document.getElementById('edit_pay_reference').value = reference || '';
-    $('#edit_pay_method').val(method).trigger('change');
+    if (accountId) $('#edit_pay_account').val(accountId);
     $.magnificPopup.open({ items: { src: '#editPaymentModal' }, type: 'inline' });
 }
 </script>

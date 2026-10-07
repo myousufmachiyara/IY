@@ -4,7 +4,7 @@
 
 @section('content')
 
-@php $categoryLabels = ['salary' => 'Salary', 'office' => 'Office', 'utilities' => 'Utilities', 'misc' => 'Miscellaneous']; @endphp
+@php $categoryLabels = collect(\App\Models\Expense::CATEGORIES)->map(fn ($c) => $c['label'])->all(); @endphp
 
 <div class="row">
     <div class="col">
@@ -48,6 +48,7 @@
                                 <th>Category</th>
                                 <th>Description</th>
                                 <th>Amount</th>
+                                <th>Paid From</th>
                                 <th>Backdated</th>
                                 <th>Action</th>
                             </tr>
@@ -59,11 +60,12 @@
                                 <td><span class="badge bg-secondary">{{ $categoryLabels[$e->category] ?? ucfirst($e->category) }}</span></td>
                                 <td>{{ $e->description ?? '—' }}</td>
                                 <td>¥{{ number_format($e->amount) }}</td>
+                                <td>{{ $e->account?->name ?? '—' }}</td>
                                 <td>{{ $e->is_backdated ? 'Yes' : '—' }}</td>
                                 <td class="text-nowrap">
                                     @can('expenses.edit')
                                         <a href="#" class="text-primary me-1" title="Edit"
-                                           onclick="editExpense({{ $e->id }}, '{{ $e->category }}', '{{ addslashes($e->description) }}', {{ $e->amount }}, '{{ $e->expense_date->format('Y-m-d') }}')">
+                                           onclick="editExpense({{ $e->id }}, '{{ $e->category }}', '{{ addslashes($e->description) }}', {{ $e->amount }}, '{{ $e->expense_date->format('Y-m-d') }}', {{ (int) $e->paid_from_account_id }})">
                                             <i class="fa fa-edit"></i>
                                         </a>
                                     @endcan
@@ -77,7 +79,7 @@
                                 </td>
                             </tr>
                             @empty
-                            <tr><td colspan="6" class="text-center text-muted py-4">No expenses recorded yet.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted py-4">No expenses recorded yet.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -113,10 +115,7 @@
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Paid From <span class="text-danger">*</span></label>
-                                <select class="form-control select2-js" name="method" required>
-                                    <option value="bank" selected>Bank</option>
-                                    <option value="cash">Cash</option>
-                                </select>
+                                @include('partials.money_account', ['name' => 'account_id'])
                             </div>
                             <div class="col-lg-12 mb-2">
                                 <label>Description</label>
@@ -171,10 +170,7 @@
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Paid From <span class="text-danger">*</span></label>
-                                <select class="form-control select2-js" name="method" required>
-                                    <option value="bank">Bank</option>
-                                    <option value="cash">Cash</option>
-                                </select>
+                                @include('partials.money_account', ['name' => 'account_id', 'id' => 'edit_exp_account'])
                             </div>
                             <div class="col-lg-12 mb-2">
                                 <label>Description</label>
@@ -197,12 +193,13 @@
 </div>
 
 <script>
-function editExpense(id, category, description, amount, date) {
+function editExpense(id, category, description, amount, date, accountId) {
     document.getElementById('editExpForm').action = '/expenses/' + id;
     document.getElementById('edit_exp_amount').value = amount;
     document.getElementById('edit_exp_date').value = date;
     document.getElementById('edit_exp_description').value = description || '';
     $('#edit_exp_category').val(category).trigger('change');
+    if (accountId) $('#edit_exp_account').val(accountId);
     $.magnificPopup.open({ items: { src: '#editExpModal' }, type: 'inline' });
 }
 </script>

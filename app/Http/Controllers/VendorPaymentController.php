@@ -3,16 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Vehicle, Vendor, VendorPayment};
+use App\Rules\MoneyAccount;
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
 class VendorPaymentController extends Controller
 {
     public function index(Request $request)
     {
-        $payments = VendorPayment::with('vendor', 'vehicle')
+        $payments = VendorPayment::with('vendor', 'vehicle', 'account')
             ->when($request->vendor_id, fn ($q, $v) => $q->where('vendor_id', $v))
             ->latest('paid_at')->get();
 
@@ -42,32 +42,35 @@ class VendorPaymentController extends Controller
         $data = $request->validate([
             'vehicle_id' => ['required', 'exists:vehicles,id'],
             'amount'     => ['required', 'integer', 'min:1', "max:{$outstanding}"],
-            'method'     => ['required', Rule::in(['cash', 'bank'])],
+            'account_id' => ['required', new MoneyAccount],
             'paid_at'    => ['required', 'date'],
             'reference'  => ['nullable', 'string', 'max:255'],
         ], [
             'amount.max' => "Amount cannot exceed the outstanding balance of ¥" . number_format($outstanding) . ".",
         ]);
 
-        if (! $request->user()->isSuperAdmin() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
-            return back()->withErrors(['paid_at' => 'Only Super Admin may record a vendor payment with a date other than today.'])->withInput();
+        if (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
+            return back()->withErrors(['paid_at' => 'You do not have permission to record a vendor payment with a date other than today.'])->withInput();
         }
 
         $backdated = \Carbon\Carbon::parse($data['paid_at'])->lt(today());
-        $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
+        $account = $ledger->moneyAccount($data['account_id']);
 
         DB::transaction(function () use ($data, $backdated, $request, $ledger, $vehicle, $account) {
+            // Make sure the vendor's payable already reflects the full costing before it is paid down.
+            $ledger->syncVehicleCost($vehicle);
+
             $payment = VendorPayment::create([
                 'vendor_id'    => $vehicle->vendor_id,
                 'vehicle_id'   => $vehicle->id,
                 'amount'       => $data['amount'],
-                'account_id'   => $ledger->account($account)->id,
+                'account_id'   => $account->id,
                 'paid_at'      => $data['paid_at'],
                 'reference'    => $data['reference'] ?? null,
                 'is_backdated' => $backdated,
                 'recorded_by'  => $request->user()->id,
             ]);
-            $ledger->vendorPayment($payment, $account);
+            $ledger->vendorPayment($payment);
         });
 
         return back()->with('success', 'Vendor payment recorded.');
@@ -81,10 +84,10 @@ class VendorPaymentController extends Controller
     public function update(Request $request, VendorPayment $vendorPayment, LedgerService $ledger)
     {
         $data = $request->validate([
-            'amount'    => ['required', 'integer', 'min:1'],
-            'method'    => ['required', Rule::in(['cash', 'bank'])],
-            'paid_at'   => ['required', 'date'],
-            'reference' => ['nullable', 'string', 'max:255'],
+            'amount'     => ['required', 'integer', 'min:1'],
+            'account_id' => ['required', new MoneyAccount],
+            'paid_at'    => ['required', 'date'],
+            'reference'  => ['nullable', 'string', 'max:255'],
         ]);
 
         if (! $request->user()->canBackdate() && ! \Carbon\Carbon::parse($data['paid_at'])->isToday()) {
@@ -93,13 +96,15 @@ class VendorPaymentController extends Controller
 
         // Editing a vendor payment always reverses and reposts its ledger entry.
         abort_unless($request->user()->can('vendor_payments.reverse'), 403, 'You do not have permission to reverse/void a vendor payment.');
-        DB::transaction(function () use ($vendorPayment, $data, $ledger) {
+
+        $account = $ledger->moneyAccount($data['account_id']);
+
+        DB::transaction(function () use ($vendorPayment, $data, $ledger, $account) {
             foreach ($vendorPayment->journalEntries as $entry) {
                 $ledger->reverseEntry($entry, now()->toDateString(), "Correction to vendor payment #{$vendorPayment->id}");
             }
-            $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
-            $vendorPayment->update($data + ['account_id' => $ledger->account($account)->id]);
-            $ledger->vendorPayment($vendorPayment->fresh(), $account);
+            $vendorPayment->update(['amount' => $data['amount'], 'paid_at' => $data['paid_at'], 'reference' => $data['reference'] ?? null, 'account_id' => $account->id]);
+            $ledger->vendorPayment($vendorPayment->fresh());
         });
 
         return back()->with('success', 'Vendor payment updated — original ledger entry reversed and reposted.');

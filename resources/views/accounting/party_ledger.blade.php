@@ -24,11 +24,15 @@
         </form>
 
         @if($selected)
-        <h6 class="mb-3">{{ $selected->name }} <span class="badge bg-secondary">{{ $selected->code }}</span></h6>
+        <h6 class="mb-3">{{ $selected->name }} <span class="badge bg-secondary">{{ $selected->code }}</span>
+            <small class="text-muted ms-2">{{ $type === 'customer' ? 'Positive balance = customer owes us' : 'Positive balance = we owe the vendor' }}</small></h6>
         <div class="table-scroll">
             <table class="table table-bordered table-striped mb-0">
                 <thead><tr><th>Date</th><th>Description</th><th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Balance</th></tr></thead>
                 <tbody>
+                    @if(request('from'))
+                    <tr class="table-light"><td colspan="4" class="fw-semibold">Opening balance — before {{ \Carbon\Carbon::parse(request('from'))->format('d-m-Y') }}</td><td class="text-end fw-bold">¥{{ number_format($opening) }}</td></tr>
+                    @endif
                     @forelse($lines as $l)
                     <tr>
                         <td>{{ $l->entry->date->format('d-m-Y') }}</td>

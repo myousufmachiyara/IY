@@ -141,6 +141,9 @@ class DatabaseSeeder extends Seeder
             );
         }
 
+        // Heads / sub-heads, classification of the accounts above, and default account mapping.
+        \App\Services\AccountStructure::install();
+
         // ── Ports (destination ports for vehicle export) ────────────────────
 
         $ports = [

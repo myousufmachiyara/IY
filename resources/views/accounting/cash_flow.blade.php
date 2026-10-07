@@ -14,10 +14,11 @@
             <tr><td>Opening Balance</td><td class="text-end">¥{{ number_format($openingBalance) }}</td></tr>
             <tr><td>Cash In (Receipts &amp; Deposits)</td><td class="text-end text-success">+¥{{ number_format($operatingIn) }}</td></tr>
             <tr><td>Cash Out (Payments &amp; Expenses)</td><td class="text-end text-danger">−¥{{ number_format($operatingOut) }}</td></tr>
+            <tr><td>Other movements (journal vouchers, reversals, transfers)</td><td class="text-end {{ $other < 0 ? 'text-danger' : '' }}">{{ $other < 0 ? '−' : '+' }}¥{{ number_format(abs($other)) }}</td></tr>
             <tr class="fw-bold border-top"><td>Net Change</td><td class="text-end">¥{{ number_format($netChange) }}</td></tr>
             <tr class="fw-bold"><td>Closing Balance</td><td class="text-end">¥{{ number_format($closingBalance) }}</td></tr>
         </table>
-        <p class="text-muted small mt-2">Note: this reflects direct cash/bank movement only, categorized by voucher type — not a full indirect-method cash flow statement.</p>
+        <p class="text-muted small mt-2">Covers every cash and bank account together. Categorised by voucher type; anything else (journal vouchers, reversals) is shown as "other movements" so the closing balance always reconciles with the Cash &amp; Bank books.</p>
     </div>
 </section></div></div>
 @endsection

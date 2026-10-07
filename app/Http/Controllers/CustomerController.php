@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Customer, Invoice, Port, User};
+use App\Rules\MoneyAccount;
 use App\Services\{InvoiceNumber, LedgerService};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -165,7 +166,7 @@ class CustomerController extends Controller
 
         $data = $request->validate([
             'security_deposit' => ['required', 'integer', 'min:1'],
-            'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
+            'account_id'        => ['required', new MoneyAccount],
             'evidence'          => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'received_date'     => ['required', 'date'],
         ]);
@@ -176,7 +177,7 @@ class CustomerController extends Controller
 
         $customer->update([
             'security_deposit'                  => $data['security_deposit'],
-            'security_deposit_account'          => $data['account'],
+            'security_deposit_account_id'       => $data['account_id'],
             'security_deposit_evidence_path'    => $request->file('evidence')->store('deposit_evidence', 'public'),
             'security_deposit_status'           => 'pending',
             'security_deposit_received_by'      => $request->user()->id,
@@ -190,7 +191,7 @@ class CustomerController extends Controller
     public function editDeposit(Customer $customer)
     {
         abort_if($customer->security_deposit_status === 'approved', 422, 'Approved deposits cannot be edited.');
-        return response()->json($customer->only(['security_deposit', 'security_deposit_account', 'security_deposit_received_at']));
+        return response()->json($customer->only(['security_deposit', 'security_deposit_account_id', 'security_deposit_received_at']));
     }
 
     public function updateDeposit(Request $request, Customer $customer)
@@ -199,7 +200,7 @@ class CustomerController extends Controller
 
         $data = $request->validate([
             'security_deposit' => ['required', 'integer', 'min:1'],
-            'account'           => ['required', Rule::in([LedgerService::CASH, LedgerService::BANK])],
+            'account_id'        => ['required', new MoneyAccount],
             'evidence'          => [$customer->security_deposit_evidence_path ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
             'received_date'     => ['required', 'date'],
         ]);
@@ -217,7 +218,7 @@ class CustomerController extends Controller
 
         $customer->update([
             'security_deposit'             => $data['security_deposit'],
-            'security_deposit_account'     => $data['account'],
+            'security_deposit_account_id'  => $data['account_id'],
             'security_deposit_received_at' => $data['received_date'],
             'security_deposit_status'      => 'pending',
         ] + array_intersect_key($data, ['security_deposit_evidence_path' => true]));
@@ -227,7 +228,7 @@ class CustomerController extends Controller
 
     public function approveDeposit(Customer $customer, LedgerService $ledger)
     {
-        abort_unless(request()->user()->canApproveDeposits(), 403, 'You do not have permission to approve deposits.');
+        abort_unless(request()->user()->can('customers.approve_deposit'), 403, 'You do not have permission to approve deposits.');
         abort_unless($customer->security_deposit_status === 'pending', 422, 'No pending deposit to approve.');
         abort_unless($customer->security_deposit_evidence_path, 422, 'Cannot approve — no evidence attached to this deposit. Edit the deposit and attach a file first.');
 
@@ -239,14 +240,18 @@ class CustomerController extends Controller
             'profile_completed_at'         => now(),
         ]);
 
-        $ledger->securityDeposit($customer, $customer->security_deposit_account ?? LedgerService::BANK);
+        $money = $customer->security_deposit_account_id
+            ? $ledger->moneyAccount($customer->security_deposit_account_id)
+            : $ledger->legacyMoneyAccount($customer->security_deposit_account);
+
+        $ledger->securityDeposit($customer, $money);
 
         return back()->with('success', 'Deposit approved — profile is now complete and bidding is enabled.');
     }
 
     public function rejectDeposit(Request $request, Customer $customer)
     {
-        abort_unless($request->user()->canApproveDeposits(), 403, 'You do not have permission to reject deposits.');
+        abort_unless($request->user()->can('customers.approve_deposit'), 403, 'You do not have permission to reject deposits.');
         abort_unless($customer->security_deposit_status === 'pending', 422, 'No pending deposit to reject.');
 
         $data = $request->validate(['security_deposit_rejection_reason' => ['required', 'string', 'max:500']]);

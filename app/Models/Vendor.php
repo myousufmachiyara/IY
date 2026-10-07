@@ -21,7 +21,12 @@ class Vendor extends Model
     public function vehicles(): HasMany  { return $this->hasMany(Vehicle::class, 'vendor_id'); }
     public function payments(): HasMany  { return $this->hasMany(VendorPayment::class, 'vendor_id'); }
 
-    public function totalPayable(): int { return (int) $this->vehicles()->sum('buying_price'); }
+    /** Total owed to this vendor — total costing per vehicle, falling back to the buying price. Matches the ledger. */
+    public function totalPayable(): int
+    {
+        return (int) $this->vehicles()->whereNotNull('buying_price')->with('costing')->get()
+            ->sum(fn ($v) => $v->costing?->total_costing ?: $v->buying_price);
+    }
     public function totalPaid(): int    { return (int) $this->payments()->sum('amount'); }
     public function balance(): int      { return $this->totalPayable() - $this->totalPaid(); }
 

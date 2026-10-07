@@ -12,10 +12,7 @@
                     </div>
                     <div class="col-lg-6 mb-2">
                         <label>Received Into <span class="text-danger">*</span></label>
-                        <select class="form-control select2-js" name="account" required>
-                            <option value="1000">Cash</option>
-                            <option value="1010" selected>Bank</option>
-                        </select>
+                                @include('partials.money_account', ['name' => 'account_id'])
                     </div>
                     <div class="col-lg-6 mb-2">
                         <label>Received Date <span class="text-danger">*</span></label>
@@ -54,10 +51,7 @@
                     </div>
                     <div class="col-lg-6 mb-2">
                         <label>Received Into <span class="text-danger">*</span></label>
-                        <select id="edit_dep_account" class="form-control select2-js" name="account" required>
-                            <option value="1000">Cash</option>
-                            <option value="1010">Bank</option>
-                        </select>
+                                @include('partials.money_account', ['name' => 'account_id', 'id' => 'edit_dep_account'])
                     </div>
                     <div class="col-lg-6 mb-2">
                         <label>Received Date <span class="text-danger">*</span></label>
@@ -114,7 +108,7 @@ function openEditDeposit(id) {
         document.getElementById('editDepositForm').action = '/customers/' + id + '/deposit';
         document.getElementById('edit_dep_amount').value = data.security_deposit;
         document.getElementById('edit_dep_date').value = data.security_deposit_received_at ? data.security_deposit_received_at.substring(0, 10) : '';
-        $('#edit_dep_account').val(data.security_deposit_account).trigger('change');
+        $('#edit_dep_account').val(data.security_deposit_account_id);
         $.magnificPopup.open({ items: { src: '#editDepositModal' }, type: 'inline' });
     });
 }

@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Customer, Invoice, Payment};
+use App\Rules\MoneyAccount;
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
 class PaymentController extends Controller
 {
@@ -14,7 +14,7 @@ class PaymentController extends Controller
     {
         $user = $request->user();
 
-        $payments = Payment::with('customer', 'invoice', 'recorder')
+        $payments = Payment::with('customer', 'invoice', 'recorder', 'account')
             ->when(! $user->can('data.view_all'), fn ($q) => $q->whereHas('customer', fn ($c) => $c->where('agent_id', $user->id)))
             ->when($request->customer_id, fn ($q, $v) => $q->where('customer_id', $v))
             ->when($request->method, fn ($q, $v) => $q->where('method', $v))
@@ -32,17 +32,16 @@ class PaymentController extends Controller
 
     public function store(Request $request, LedgerService $ledger)
     {
-        // A recorder who also holds approval authority gets their own entry
-        // auto-posted; everyone else's payment lands as 'pending' for a
-        // payments.approve holder to review.
-        $autoApprove = $request->user()->canBackdate();
+        // Whoever holds payments.approve has their own entry posted straight away;
+        // everyone else's payment waits as 'pending' for an approver.
+        $autoApprove = $request->user()->can('payments.approve');
 
         $data = $request->validate([
             'customer_id' => ['required', 'exists:customers,id'],
             'invoice_id'  => ['nullable', 'exists:invoices,id'],
             'vehicle_id'  => ['nullable', 'exists:vehicles,id'],
             'amount'      => ['required', 'integer', 'min:1'],
-            'method'      => ['required', Rule::in(['cash', 'bank'])],
+            'account_id'  => ['required', new MoneyAccount],
             'paid_at'     => ['required', 'date'],
             'reference'   => ['nullable', 'string', 'max:255'],
             'attachment'  => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
@@ -52,31 +51,29 @@ class PaymentController extends Controller
             return back()->withErrors(['paid_at' => 'You do not have permission to record a payment with a date other than today.'])->withInput();
         }
 
-        $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
+        $account = $ledger->moneyAccount($data['account_id']);
 
         DB::transaction(function () use ($data, $autoApprove, $request, $ledger, $account) {
             $payment = Payment::create([
-                'customer_id'      => $data['customer_id'],
-                'invoice_id'       => $data['invoice_id'] ?? null,
-                'vehicle_id'       => $data['vehicle_id'] ?? null,
-                'amount'           => $data['amount'],
-                'method'           => $data['method'],
-                'account_id'       => $ledger->account($account)->id,
-                'paid_at'          => $data['paid_at'],
-                'reference'        => $data['reference'] ?? null,
-                'attachment_path'  => $request->file('attachment')->store('payment_attachments', 'public'),
-                'is_backdated'     => ! \Carbon\Carbon::parse($data['paid_at'])->isToday(),
-                'recorded_by'      => $request->user()->id,
-                'status'           => $autoApprove ? 'approved' : 'pending',
-                'approved_by'      => $autoApprove ? $request->user()->id : null,
-                'approved_at'      => $autoApprove ? now() : null,
+                'customer_id'     => $data['customer_id'],
+                'invoice_id'      => $data['invoice_id'] ?? null,
+                'vehicle_id'      => $data['vehicle_id'] ?? null,
+                'amount'          => $data['amount'],
+                'method'          => $account->moneyKind(),
+                'account_id'      => $account->id,
+                'paid_at'         => $data['paid_at'],
+                'reference'       => $data['reference'] ?? null,
+                'attachment_path' => $request->file('attachment')->store('payment_attachments', 'public'),
+                'is_backdated'    => ! \Carbon\Carbon::parse($data['paid_at'])->isToday(),
+                'recorded_by'     => $request->user()->id,
+                'status'          => $autoApprove ? 'approved' : 'pending',
+                'approved_by'     => $autoApprove ? $request->user()->id : null,
+                'approved_at'     => $autoApprove ? now() : null,
             ]);
 
             if ($autoApprove) {
-                $ledger->customerPayment($payment, $account);
-                if ($payment->invoice_id) {
-                    Invoice::find($payment->invoice_id)?->refreshTotals()->save();
-                }
+                $ledger->customerPayment($payment);
+                $this->settleInvoice($payment->invoice_id, $ledger, $payment->paid_at->toDateString());
             }
         });
 
@@ -85,16 +82,13 @@ class PaymentController extends Controller
 
     public function approve(Payment $payment, LedgerService $ledger)
     {
-        abort_unless(auth()->user()->canBackdate(), 403);
+        abort_unless(auth()->user()->can('payments.approve'), 403);
         abort_unless($payment->status === 'pending', 422, 'This payment is not pending.');
 
         DB::transaction(function () use ($payment, $ledger) {
-            $account = $payment->method === 'cash' ? LedgerService::CASH : LedgerService::BANK;
-            $ledger->customerPayment($payment, $account);
             $payment->update(['status' => 'approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
-            if ($payment->invoice_id) {
-                Invoice::find($payment->invoice_id)?->refreshTotals()->save();
-            }
+            $ledger->customerPayment($payment->fresh());
+            $this->settleInvoice($payment->invoice_id, $ledger, $payment->paid_at->toDateString());
         });
 
         return back()->with('success', 'Payment approved and posted.');
@@ -103,7 +97,7 @@ class PaymentController extends Controller
     /** Reject a pending payment with a required reason — visible on the invoice/payment list afterward. */
     public function reject(Request $request, Payment $payment)
     {
-        abort_unless(auth()->user()->canBackdate(), 403);
+        abort_unless(auth()->user()->can('payments.approve'), 403);
         abort_unless($payment->status === 'pending', 422, 'This payment is not pending.');
 
         $data = $request->validate(['rejection_reason' => ['required', 'string', 'max:500']]);
@@ -114,17 +108,16 @@ class PaymentController extends Controller
 
     public function undoApproval(Payment $payment, LedgerService $ledger)
     {
-        abort_unless(auth()->user()->canReversePayments(), 403, 'You do not have permission to reverse an approved payment.');
+        abort_unless(auth()->user()->can('payments.reverse'), 403, 'You do not have permission to reverse an approved payment.');
         abort_unless($payment->status === 'approved', 422, 'This payment is not currently approved.');
+        abort_if($payment->method === 'deposit', 422, 'A deposit adjustment is undone from the invoice page, not here.');
 
         DB::transaction(function () use ($payment, $ledger) {
             foreach ($payment->journalEntries as $entry) {
                 $ledger->reverseEntry($entry, now()->toDateString(), "Reversal — payment #{$payment->id} approval undone");
             }
             $payment->update(['status' => 'pending', 'approved_by' => null, 'approved_at' => null]);
-            if ($payment->invoice_id) {
-                Invoice::find($payment->invoice_id)?->refreshTotals()->save();
-            }
+            $this->settleInvoice($payment->invoice_id, $ledger);
         });
 
         return back()->with('success', 'Payment approval undone — reverted to pending.');
@@ -134,6 +127,7 @@ class PaymentController extends Controller
 
     public function update(Request $request, Payment $payment, LedgerService $ledger)
     {
+        abort_if($payment->method === 'deposit', 422, 'A deposit adjustment cannot be edited — undo it from the invoice page instead.');
         abort_if(
             $payment->invoice?->vehicle?->documents()->where('is_final_clearance', true)->where('visible_to_customer', true)->exists(),
             422, 'Payments cannot be changed after the final clearance document has been released.'
@@ -141,7 +135,7 @@ class PaymentController extends Controller
 
         $data = $request->validate([
             'amount'     => ['required', 'integer', 'min:1'],
-            'method'     => ['required', Rule::in(['cash', 'bank'])],
+            'account_id' => ['required', new MoneyAccount],
             'paid_at'    => ['required', 'date'],
             'reference'  => ['nullable', 'string', 'max:255'],
             'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
@@ -161,23 +155,23 @@ class PaymentController extends Controller
         unset($data['attachment']);
 
         if ($payment->status === 'approved') {
-            abort_unless(auth()->user()->canReversePayments(), 403, 'Correcting an already-approved payment reverses and reposts its ledger entry — you need the "Reverse/Void Customer Payment" permission for that.');
+            abort_unless(auth()->user()->can('payments.reverse'), 403, 'Correcting an already-approved payment reverses and reposts its ledger entry — you need the "Reverse/Void Customer Payment" permission for that.');
         }
 
-        DB::transaction(function () use ($payment, $data, $ledger) {
-            $account = $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK;
+        $account = $ledger->moneyAccount($data['account_id']);
+        $data['account_id'] = $account->id;
+        $data['method'] = $account->moneyKind();
 
+        DB::transaction(function () use ($payment, $data, $ledger) {
             if ($payment->status === 'approved') {
                 foreach ($payment->journalEntries as $entry) {
                     $ledger->reverseEntry($entry, now()->toDateString(), "Correction to payment #{$payment->id}");
                 }
-                $payment->update($data + ['account_id' => $ledger->account($account)->id]);
-                $ledger->customerPayment($payment->fresh(), $account);
-                if ($payment->invoice_id) {
-                    Invoice::find($payment->invoice_id)?->refreshTotals()->save();
-                }
+                $payment->update($data);
+                $ledger->customerPayment($payment->fresh());
+                $this->settleInvoice($payment->invoice_id, $ledger, $payment->fresh()->paid_at->toDateString());
             } else {
-                $payment->update($data + ['account_id' => $ledger->account($account)->id, 'status' => 'pending', 'rejection_reason' => null]);
+                $payment->update($data + ['status' => 'pending', 'rejection_reason' => null]);
             }
         });
 
@@ -186,11 +180,12 @@ class PaymentController extends Controller
 
     public function destroy(Payment $payment, LedgerService $ledger)
     {
-        // Deleting an approved (posted) payment reverses its ledger entry, so it
-        // needs the same permission as an explicit reversal — not just the plain
-        // payments.delete permission already enforced by the route.
+        abort_if($payment->method === 'deposit', 422, 'A deposit adjustment cannot be deleted — undo it from the invoice page instead.');
+
+        // Deleting an approved (posted) payment reverses its ledger entry, so it needs the
+        // reversal permission on top of the route's plain payments.delete.
         if ($payment->status === 'approved') {
-            abort_unless(auth()->user()->can('vendor_payments.reverse'), 403, 'You do not have permission to reverse/void a vendor payment.');
+            abort_unless(auth()->user()->can('payments.reverse'), 403, 'You do not have permission to reverse/void a customer payment.');
         }
 
         DB::transaction(function () use ($payment, $ledger) {
@@ -201,9 +196,7 @@ class PaymentController extends Controller
             }
             $invoiceId = $payment->invoice_id;
             $payment->delete();
-            if ($invoiceId) {
-                Invoice::find($invoiceId)?->refreshTotals()->save();
-            }
+            $this->settleInvoice($invoiceId, $ledger);
         });
 
         return back()->with('success', 'Payment deleted.');
@@ -211,7 +204,18 @@ class PaymentController extends Controller
 
     public function customerLedger(Customer $customer)
     {
-        $payments = $customer->payments()->with('invoice', 'recorder')->latest('paid_at')->get();
+        $payments = $customer->payments()->with('invoice', 'recorder', 'account')->latest('paid_at')->get();
         return view('payments.customer_ledger', compact('customer', 'payments'));
+    }
+
+    /** Refresh an invoice's paid totals and bring recognised revenue in line with money actually received. */
+    private function settleInvoice(?int $invoiceId, LedgerService $ledger, ?string $date = null): void
+    {
+        if (! $invoiceId || ! ($invoice = Invoice::find($invoiceId))) {
+            return;
+        }
+
+        $invoice->refreshTotals()->save();
+        $ledger->syncRevenueRecognition($invoice->fresh(), $date);
     }
 }

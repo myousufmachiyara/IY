@@ -218,6 +218,30 @@
               <li class="{{ request()->routeIs('accounting.balance_sheet') ? 'active' : '' }}">
                 <a class="nav-link" href="{{ route('accounting.balance_sheet') }}">Balance Sheet</a>
               </li>
+              <li class="{{ request()->routeIs('accounting.day_book') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.day_book') }}">Day Book</a>
+              </li>
+              <li class="{{ request()->routeIs('accounting.party_ledger') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.party_ledger') }}">Party Ledger</a>
+              </li>
+              <li class="{{ request()->routeIs('accounting.cash_book') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.cash_book') }}">Cash Book</a>
+              </li>
+              <li class="{{ request()->routeIs('accounting.bank_book') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.bank_book') }}">Bank Book</a>
+              </li>
+              <li class="{{ request()->routeIs('accounting.receivables_aging') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.receivables_aging') }}">Receivables Aging</a>
+              </li>
+              <li class="{{ request()->routeIs('accounting.expense_analysis') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.expense_analysis') }}">Expense Analysis</a>
+              </li>
+              <li class="{{ request()->routeIs('accounting.cash_flow') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.cash_flow') }}">Cash Flow</a>
+              </li>
+              <li class="{{ request()->routeIs('accounting.mappings') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('accounting.mappings') }}">Account Mapping</a>
+              </li>
             </ul>
           </li>
           @endcan

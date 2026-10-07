@@ -44,7 +44,7 @@
                                 <th>Vendor</th>
                                 <th>Vehicle</th>
                                 <th>Amount</th>
-                                <th>Method</th>
+                                <th>Paid From</th>
                                 <th>Reference</th>
                                 <th>Backdated</th>
                                 <th>Action</th>
@@ -57,13 +57,13 @@
                                 <td>{{ $p->vendor->name ?? '—' }}</td>
                                 <td><a href="{{ route('vehicles.show', $p->vehicle) }}">{{ $p->vehicle->label() }}</a></td>
                                 <td>¥{{ number_format($p->amount) }}</td>
-                                <td class="text-capitalize">{{ $p->method }}</td>
+                                <td>{{ $p->account?->name ?? '—' }}</td>
                                 <td>{{ $p->reference ?? '—' }}</td>
                                 <td>{{ $p->is_backdated ? 'Yes' : '—' }}</td>
                                 <td class="text-nowrap">
                                     @can('vendor_payments.edit')
                                         <a href="#" class="text-primary me-1" title="Edit"
-                                           onclick="editVendorPayment({{ $p->id }}, {{ $p->amount }}, '{{ $p->method }}', '{{ $p->paid_at->format('Y-m-d') }}', '{{ $p->reference }}')">
+                                           onclick="editVendorPayment({{ $p->id }}, {{ $p->amount }}, {{ (int) $p->account_id }}, '{{ $p->paid_at->format('Y-m-d') }}', '{{ $p->reference }}')">
                                             <i class="fa fa-edit"></i>
                                         </a>
                                     @endcan
@@ -114,11 +114,8 @@
                                 <small class="text-muted" id="add_vp_outstanding_hint"></small>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Method <span class="text-danger">*</span></label>
-                                <select class="form-control select2-js" name="method" required>
-                                    <option value="bank" selected>Bank</option>
-                                    <option value="cash">Cash</option>
-                                </select>
+                                <label>Paid From <span class="text-danger">*</span></label>
+                                @include('partials.money_account', ['name' => 'account_id'])
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Date Paid <span class="text-danger">*</span></label>
@@ -164,11 +161,8 @@
                                 <input type="number" id="edit_vp_amount" class="form-control" name="amount" min="1" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Method <span class="text-danger">*</span></label>
-                                <select id="edit_vp_method" class="form-control select2-js" name="method" required>
-                                    <option value="bank">Bank</option>
-                                    <option value="cash">Cash</option>
-                                </select>
+                                <label>Paid From <span class="text-danger">*</span></label>
+                                @include('partials.money_account', ['name' => 'account_id', 'id' => 'edit_vp_account'])
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Date Paid <span class="text-danger">*</span></label>
@@ -204,12 +198,12 @@
         document.getElementById('add_vp_outstanding_hint').textContent = 'Outstanding: ¥' + Number(outstanding).toLocaleString();
     }
 
-    function editVendorPayment(id, amount, method, paidAt, reference) {
+    function editVendorPayment(id, amount, accountId, paidAt, reference) {
         document.getElementById('editVpForm').action = '/vendor-payments/' + id;
         document.getElementById('edit_vp_amount').value = amount;
         document.getElementById('edit_vp_date').value = paidAt;
         document.getElementById('edit_vp_reference').value = reference || '';
-        $('#edit_vp_method').val(method).trigger('change');
+        $('#edit_vp_account').val(accountId);
         $.magnificPopup.open({ items: { src: '#editVpModal' }, type: 'inline' });
     }
     @if ($errors->any())

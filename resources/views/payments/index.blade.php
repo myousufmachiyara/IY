@@ -65,7 +65,7 @@
                                     @else <span class="text-muted">General / Total Balance</span> @endif
                                 </td>
                                 <td>¥{{ number_format($p->amount) }}</td>
-                                <td class="text-capitalize">{{ $p->method }}</td>
+                                <td>{{ $p->method === 'deposit' ? 'Deposit adjustment' : ($p->account?->name ?? ucfirst($p->method)) }}</td>
                                 <td>
                                     <span class="badge bg-{{ $statusColors[$p->status] ?? 'secondary' }}">{{ ucfirst($p->status) }}</span>
                                     @if($p->status === 'rejected' && $p->rejection_reason)
@@ -91,7 +91,7 @@
                                         </form>
                                     @endif
                                     @can('payments.edit')
-                                        <a href="#" class="text-primary me-1" title="Edit" onclick="editPayment({{ $p->id }}, {{ $p->amount }}, '{{ $p->method }}', '{{ $p->paid_at->format('Y-m-d') }}', '{{ $p->reference }}')"><i class="fa fa-edit"></i></a>
+                                        <a href="#" class="text-primary me-1" title="Edit" onclick="editPayment({{ $p->id }}, {{ $p->amount }}, {{ (int) $p->account_id }}, '{{ $p->paid_at->format('Y-m-d') }}', '{{ $p->reference }}')"><i class="fa fa-edit"></i></a>
                                     @endcan
                                     @can('payments.delete')
                                         <form action="{{ route('payments.destroy', $p) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete this payment?');">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
+use App\Rules\MoneyAccount;
 use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +13,8 @@ class ExpenseController extends Controller
 {
     public function index(Request $request)
     {
-        $expenses = Expense::when($request->category, fn ($q, $v) => $q->where('category', $v))
+        $expenses = Expense::with('account')
+            ->when($request->category, fn ($q, $v) => $q->where('category', $v))
             ->latest('expense_date')
             ->get();
 
@@ -22,11 +24,11 @@ class ExpenseController extends Controller
     public function store(Request $request, LedgerService $ledger)
     {
         $data = $request->validate([
-            'category'     => ['required', Rule::in(['salary', 'office', 'utilities', 'misc'])],
+            'category'     => ['required', Rule::in(array_keys(Expense::CATEGORIES))],
             'description'  => ['nullable', 'string', 'max:255'],
             'amount'       => ['required', 'integer', 'min:1'],
             'expense_date' => ['required', 'date', 'before_or_equal:today'],
-            'method'       => ['required', Rule::in(['cash', 'bank'])],
+            'account_id'   => ['required', new MoneyAccount],
             'is_backdated' => ['boolean'],
         ]);
 
@@ -35,13 +37,20 @@ class ExpenseController extends Controller
             abort_unless($request->user()->canBackdate(), 403);
         }
 
-        DB::transaction(function () use ($data, $backdated, $request, $ledger) {
-            $expense = Expense::create($data + [
-                'is_backdated' => $backdated,
-                'recorded_by'  => $request->user()->id,
+        $account = $ledger->moneyAccount($data['account_id']);
+
+        DB::transaction(function () use ($data, $backdated, $request, $ledger, $account) {
+            $expense = Expense::create([
+                'category'             => $data['category'],
+                'description'          => $data['description'] ?? null,
+                'amount'               => $data['amount'],
+                'expense_date'         => $data['expense_date'],
+                'paid_from_account_id' => $account->id,
+                'is_backdated'         => $backdated,
+                'recorded_by'          => $request->user()->id,
             ]);
 
-            $ledger->expense($expense, $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK);
+            $ledger->expense($expense);
         });
 
         return back()->with('success', 'Expense recorded.');
@@ -56,21 +65,29 @@ class ExpenseController extends Controller
     public function update(Request $request, Expense $expense, LedgerService $ledger)
     {
         $data = $request->validate([
-            'category'     => ['required', Rule::in(['salary', 'office', 'utilities', 'misc'])],
+            'category'     => ['required', Rule::in(array_keys(Expense::CATEGORIES))],
             'description'  => ['nullable', 'string', 'max:255'],
             'amount'       => ['required', 'integer', 'min:1'],
             'expense_date' => ['required', 'date', 'before_or_equal:today'],
-            'method'       => ['required', Rule::in(['cash', 'bank'])],
+            'account_id'   => ['required', new MoneyAccount],
         ]);
 
-        DB::transaction(function () use ($expense, $data, $ledger) {
+        $account = $ledger->moneyAccount($data['account_id']);
+
+        DB::transaction(function () use ($expense, $data, $ledger, $account) {
             foreach ($expense->journalEntries as $entry) {
                 $ledger->reverseEntry($entry, now()->toDateString(), "Correction to expense #{$expense->id}");
             }
 
-            $expense->update($data);
+            $expense->update([
+                'category'             => $data['category'],
+                'description'          => $data['description'] ?? null,
+                'amount'               => $data['amount'],
+                'expense_date'         => $data['expense_date'],
+                'paid_from_account_id' => $account->id,
+            ]);
 
-            $ledger->expense($expense->fresh(), $data['method'] === 'cash' ? LedgerService::CASH : LedgerService::BANK);
+            $ledger->expense($expense->fresh());
         });
 
         return back()->with('success', 'Expense updated — original ledger entry reversed and reposted.');

@@ -27,17 +27,22 @@ class DashboardController extends Controller
             'pending_bids'   => Bid::where('result', 'pending')->count(), // current backlog — not date-filtered
         ];
 
-        $stats['receivables'] = $this->accountBalanceAsOf(LedgerService::AR, $to);
+        // Balances come from the ledger by sub-head (every customer / vendor account, plus any
+        // unallocated control balance) — not from a single hard-coded control account.
+        $ledger = app(LedgerService::class);
+        $asOf = $to->toDateString();
+
+        $stats['receivables'] = $ledger->kindBalance(['customer'], $asOf);
 
         if ($isPrivileged) {
             $stats['pending_approvals'] = Payment::where('status', 'pending')->count() + Customer::where('security_deposit_status', 'pending')->count();
-            $stats['vendor_payable']    = $this->accountBalanceAsOf(LedgerService::AP_VENDOR, $to);
+            $stats['vendor_payable']    = $ledger->kindBalance(['vendor'], $asOf);
         }
 
         // ===================== FINANCIAL POSITION — balances AS OF the "To" date =====================
-        $cashBank = $this->accountBalanceAsOf(LedgerService::CASH, $to) + $this->accountBalanceAsOf(LedgerService::BANK, $to);
+        $cashBank = $ledger->kindBalance(['cash', 'bank'], $asOf);
         $receivables = $stats['receivables'];
-        $payablesTotal = $stats['vendor_payable'] ?? $this->accountBalanceAsOf(LedgerService::AP_VENDOR, $to);
+        $payablesTotal = $stats['vendor_payable'] ?? $ledger->kindBalance(['vendor'], $asOf);
 
         $opExpensesInRange = (int) Expense::whereBetween('expense_date', [$from, $to])->sum('amount');
 
@@ -177,19 +182,4 @@ class DashboardController extends Controller
         ));
     }
 
-    /** True point-in-time ledger balance for one account, as of a given date (inclusive). */
-    private function accountBalanceAsOf(string $code, $asOf): int
-    {
-        $account = ChartOfAccount::where('code', $code)->first();
-        if (! $account) return 0;
-
-        $lines = JournalLine::where('account_id', $account->id)
-            ->whereHas('entry', fn ($q) => $q->whereDate('date', '<=', $asOf));
-
-        $debit  = (clone $lines)->sum('debit');
-        $credit = (clone $lines)->sum('credit');
-
-        $debitNormal = in_array($account->type, ['asset', 'expense']);
-        return (int) ($debitNormal ? ($debit - $credit) : ($credit - $debit));
-    }
 }

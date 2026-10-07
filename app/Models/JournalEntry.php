@@ -18,6 +18,8 @@ class JournalEntry extends Model
         'payment'            => 'Vendor Payment Voucher',
         'payable'            => 'Vendor Payable Voucher',
         'expense'            => 'Expense Voucher',
+        'invoice_adjustment' => 'Invoice Adjustment Voucher',
+        'revenue_recognition'=> 'Revenue Recognition Voucher',
         'reversal'           => 'Reversal Voucher',
         'journal'            => 'Journal Voucher',
     ];

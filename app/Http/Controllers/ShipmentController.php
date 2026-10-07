@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Customer, Shipment, Vehicle};
+use App\Services\LedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -101,9 +102,9 @@ class ShipmentController extends Controller
         $currentIds  = $shipment->vehicles()->pluck('vehicles.id')->toArray();
         $selectedIds = array_map('intval', $data['vehicle_ids']);
 
-        Vehicle::where('shipment_id', $shipment->id)
-            ->whereNotIn('id', $selectedIds)
-            ->update(['shipment_id' => null]);
+        $removed = Vehicle::where('shipment_id', $shipment->id)->whereNotIn('id', $selectedIds)->get();
+        Vehicle::where('shipment_id', $shipment->id)->whereNotIn('id', $selectedIds)->update(['shipment_id' => null]);
+        $removed->each(fn ($v) => $this->releaseFreight($v));
 
         foreach (array_diff($selectedIds, $currentIds) as $vehicleId) {
             $vehicle = Vehicle::findOrFail($vehicleId);
@@ -151,10 +152,28 @@ class ShipmentController extends Controller
                     $vehicle->agent->sales_commission_percent ?? 15,
                     (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
                 )->save();
+
+                // Freight is a real cost: post it to the freight account and the vendor payable.
+                app(LedgerService::class)->syncVehicleCost($vehicle->fresh());
             }
         }
 
         return $perVehicleFreight;
+    }
+
+    /** A vehicle leaving a shipment no longer carries that shipment's freight. */
+    private function releaseFreight(Vehicle $vehicle): void
+    {
+        if ($costing = $vehicle->costing) {
+            $costing->freight_charges = 0;
+            $costing->recalculate(
+                $vehicle->selling_price,
+                $vehicle->agent->sales_commission_percent ?? 15,
+                (int) ($vehicle->agent->sales_fixed_bonus ?? 0)
+            )->save();
+
+            app(LedgerService::class)->syncVehicleCost($vehicle->fresh());
+        }
     }
 
     public function dispatch(Shipment $shipment)
@@ -207,7 +226,9 @@ class ShipmentController extends Controller
         abort_unless($shipment->status === 'preparing', 422, 'Only a shipment still in "preparing" status can be cancelled — undo dispatch/arrival first.');
 
         DB::transaction(function () use ($shipment) {
+            $vehicles = $shipment->vehicles()->get();
             $shipment->vehicles()->update(['shipment_id' => null, 'status' => 'invoiced']);
+            $vehicles->each(fn ($v) => $this->releaseFreight($v));
             $shipment->delete();
         });
 

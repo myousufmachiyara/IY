@@ -3,13 +3,11 @@
 @section('content')
 
 @php
-    $groups = $accounts->groupBy('type');
-    $typeLabels = ['asset' => 'Assets', 'liability' => 'Liabilities', 'equity' => 'Equity', 'income' => 'Income', 'expense' => 'Expenses', 'customer' => 'Customer Accounts', 'vendor' => 'Vendor Accounts'];
+    // Grouped Head › Sub-head so a long customer / vendor list never buries the other accounts.
     $optionsHtml = '<option value="">Select account</option>';
-    foreach ($typeLabels as $type => $label) {
-        if (! $groups->has($type)) continue;
+    foreach ($accounts->sortBy(fn ($a) => ($a->subhead?->head->sort_order ?? 99) . '-' . ($a->subhead?->sort_order ?? 99))->groupBy(fn ($a) => ($a->subhead ? $a->subhead->head->name . ' › ' . $a->subhead->name : 'Unclassified')) as $label => $items) {
         $optionsHtml .= '<optgroup label="' . e($label) . '">';
-        foreach ($groups[$type] as $a) {
+        foreach ($items as $a) {
             $optionsHtml .= '<option value="' . $a->id . '">' . e($a->code . ' — ' . $a->name) . '</option>';
         }
         $optionsHtml .= '</optgroup>';

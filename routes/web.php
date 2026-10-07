@@ -124,8 +124,16 @@ Route::middleware(['auth'])->group(function () {
     // the module's own View/View Detail/Export permissions are enough for these.
     Route::middleware('permission:accounting.index')->prefix('accounting')->name('accounting.')->group(function () {
         Route::get('chart',       [AccountingController::class, 'chartOfAccounts'])->name('chart');
-        Route::post('chart',      [AccountingController::class, 'storeAccount'])->name('chart.store');
-        Route::put('chart/{account}', [AccountingController::class, 'updateAccount'])->name('chart.update');
+        Route::post('chart',      [AccountingController::class, 'storeAccount'])->middleware('permission:accounting.create')->name('chart.store');
+        Route::put('chart/{account}', [AccountingController::class, 'updateAccount'])->middleware('permission:accounting.edit')->name('chart.update');
+        Route::delete('chart/{account}', [AccountingController::class, 'destroyAccount'])->middleware('permission:accounting.delete')->name('chart.destroy');
+
+        Route::post('subheads', [AccountingController::class, 'storeSubhead'])->middleware('permission:accounting.create')->name('subheads.store');
+        Route::put('subheads/{subhead}', [AccountingController::class, 'updateSubhead'])->middleware('permission:accounting.edit')->name('subheads.update');
+        Route::delete('subheads/{subhead}', [AccountingController::class, 'destroySubhead'])->middleware('permission:accounting.delete')->name('subheads.destroy');
+
+        Route::get('mappings', [AccountingController::class, 'mappings'])->name('mappings');
+        Route::put('mappings', [AccountingController::class, 'updateMappings'])->middleware('permission:accounting.edit')->name('mappings.update');
         Route::get('journal',     [AccountingController::class, 'journal'])->name('journal');
         Route::get('ledger/{account}', [AccountingController::class, 'ledger'])->name('ledger');
         Route::get('cash-bank',   [AccountingController::class, 'cashBankBook'])->name('cash_bank');

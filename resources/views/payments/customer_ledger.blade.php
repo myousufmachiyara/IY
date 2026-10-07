@@ -91,13 +91,13 @@
                                 <td>{{ $p->paid_at->format('d-m-Y') }}</td>
                                 <td>{{ $p->invoice->invoice_no ?? 'General / Total Balance' }}</td>
                                 <td>¥{{ number_format($p->amount) }}</td>
-                                <td class="text-capitalize">{{ $p->method }}</td>
+                                <td>{{ $p->method === 'deposit' ? 'Deposit adjustment' : ($p->account?->name ?? ucfirst($p->method)) }}</td>
                                 <td>{{ $p->reference ?? '—' }}</td>
                                 <td>{{ $p->is_backdated ? 'Yes' : '—' }}</td>
                                 <td class="text-nowrap">
                                     @can('payments.edit')
                                         <a href="#" class="text-primary me-1" title="Edit"
-                                           onclick="editPayment({{ $p->id }}, {{ $p->amount }}, '{{ $p->method }}', '{{ $p->paid_at->format('Y-m-d') }}', '{{ $p->reference }}')">
+                                           onclick="editPayment({{ $p->id }}, {{ $p->amount }}, {{ (int) $p->account_id }}, '{{ $p->paid_at->format('Y-m-d') }}', '{{ $p->reference }}')">
                                             <i class="fa fa-edit"></i>
                                         </a>
                                     @endcan
@@ -135,11 +135,8 @@
                                 <input type="number" id="ledger_amount" class="form-control" name="amount" min="1" required>
                             </div>
                             <div class="col-lg-6 mb-2">
-                                <label>Method <span class="text-danger">*</span></label>
-                                <select class="form-control select2-js" name="method" required>
-                                    <option value="bank" selected>Bank</option>
-                                    <option value="cash">Cash</option>
-                                </select>
+                                <label>Paid Into <span class="text-danger">*</span></label>
+                                @include('partials.money_account', ['name' => 'account_id'])
                             </div>
                             <div class="col-lg-6 mb-2">
                                 <label>Date Paid <span class="text-danger">*</span></label>

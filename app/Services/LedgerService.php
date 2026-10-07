@@ -2,22 +2,62 @@
 
 namespace App\Services;
 
-use App\Models\{ChartOfAccount, Customer, Expense, Invoice, JournalEntry, JournalLine, Payment, Vehicle, Vendor, VendorPayment};
+use App\Models\{AccountMapping, AccountSubhead, ChartOfAccount, Customer, Expense, Invoice, JournalEntry, JournalLine, Payment, Vehicle, Vendor, VendorPayment};
 use Illuminate\Support\Facades\{Auth, DB};
 use InvalidArgumentException;
+use RuntimeException;
 
+/**
+ * Double-entry posting engine. Every account is resolved through the Account Mapping page
+ * (or an explicit account id) — no posting method depends on a hard-coded account code.
+ */
 class LedgerService
 {
-    public const CASH = '1000', BANK = '1010', AR = '1100', AP_VENDOR = '2000',
-        CUST_DEPOSIT = '2100', SALES_INCOME = '4000', COST_VEHICLES = '5000',
-        FREIGHT = '5100', INLAND = '5200', AUCTION = '5300', VENDOR_COMM = '5400',
-        SALARY = '5500', OFFICE = '5600', MISC = '5900';
+    /** Default codes only ever used by AccountStructure to seed the first mapping. */
+    public const CASH = '1000', BANK = '1010';
 
-    protected array $cache = [];
+    // ──────────────────────────── account resolution ────────────────────────────
 
+    public function mapped(string $key): ChartOfAccount
+    {
+        return AccountMapping::accountFor($key);
+    }
+
+    /** Legacy helper: look an account up by code. Prefer mapped() in new code. */
     public function account(string $code): ChartOfAccount
     {
-        return $this->cache[$code] ??= ChartOfAccount::where('code', $code)->firstOrFail();
+        return ChartOfAccount::where('code', $code)->firstOrFail();
+    }
+
+    /** Accepts an account, or an account id; the account must sit under a Cash/Bank sub-head. */
+    public function moneyAccount(ChartOfAccount|int|string|null $value): ChartOfAccount
+    {
+        $account = $value instanceof ChartOfAccount ? $value : ChartOfAccount::with('subhead')->find((int) $value);
+
+        if (! $account || ! $account->isMoneyAccount()) {
+            throw new InvalidArgumentException('The selected account is not a cash or bank account.');
+        }
+
+        return $account;
+    }
+
+    /** Old records stored the cash/bank account as a code ("1000"/"1010"), not an id. */
+    public function legacyMoneyAccount(?string $code): ChartOfAccount
+    {
+        $account = $code ? ChartOfAccount::with('subhead')->where('code', $code)->first() : null;
+
+        return $this->moneyAccount($account ?? $this->mapped('default_money_account'));
+    }
+
+    protected function partySubhead(string $kind): AccountSubhead
+    {
+        $sub = AccountSubhead::where('kind', $kind)->orderBy('sort_order')->first();
+
+        if (! $sub) {
+            throw new RuntimeException("No \"{$kind}\" sub-head exists. Run: php artisan migrate");
+        }
+
+        return $sub;
     }
 
     public function ensureCustomerAccount(Customer $customer): ChartOfAccount
@@ -25,13 +65,10 @@ class LedgerService
         return ChartOfAccount::firstOrCreate(
             ['customer_id' => $customer->id],
             [
-                'code'         => self::AR . '-' . $customer->id,
-                'account_code' => self::AR . '-' . $customer->id,
-                'name'         => 'Receivable — ' . $customer->name,
-                'type'         => 'customer',
-                'parent_id'    => $this->account(self::AR)->id,
-                'is_system'    => false,
-                'is_active'    => true,
+                'code' => 'CUS-' . $customer->id, 'account_code' => 'CUS-' . $customer->id,
+                'name' => 'Receivable — ' . $customer->name, 'type' => 'asset',
+                'subhead_id' => $this->partySubhead('customer')->id,
+                'is_system' => false, 'is_active' => true,
             ]
         );
     }
@@ -41,17 +78,20 @@ class LedgerService
         return ChartOfAccount::firstOrCreate(
             ['vendor_id' => $vendor->id],
             [
-                'code'         => self::AP_VENDOR . '-' . $vendor->id,
-                'account_code' => self::AP_VENDOR . '-' . $vendor->id,
-                'name'         => 'Payable — ' . $vendor->name,
-                'type'         => 'vendor',
-                'parent_id'    => $this->account(self::AP_VENDOR)->id,
-                'is_system'    => false,
-                'is_active'    => true,
+                'code' => 'VEN-' . $vendor->id, 'account_code' => 'VEN-' . $vendor->id,
+                'name' => 'Payable — ' . $vendor->name, 'type' => 'liability',
+                'subhead_id' => $this->partySubhead('vendor')->id,
+                'is_system' => false, 'is_active' => true,
             ]
         );
     }
 
+    // ──────────────────────────── core posting ────────────────────────────
+
+    /**
+     * Each line: ['account_id' => int] | ['account' => code] | ['key' => mappingKey],
+     * plus debit/credit, optional party and memo.
+     */
     public function post(string $date, string $description, array $lines, ?object $reference = null, bool $backdated = false, string $voucherType = 'journal'): JournalEntry
     {
         $debit  = array_sum(array_column($lines, 'debit'));
@@ -75,7 +115,9 @@ class LedgerService
 
             foreach ($lines as $l) {
                 $party = $l['party'] ?? null;
-                $accountId = $l['account_id'] ?? $this->account($l['account'])->id;
+                $accountId = $l['account_id']
+                    ?? (isset($l['key']) ? $this->mapped($l['key'])->id : $this->account($l['account'])->id);
+
                 $entry->lines()->create([
                     'account_id' => $accountId,
                     'debit'      => $l['debit'] ?? 0,
@@ -93,108 +135,6 @@ class LedgerService
     protected function nextNo(): string
     {
         return 'JE' . str_pad((int) JournalEntry::max('id') + 1, 6, '0', STR_PAD_LEFT);
-    }
-
-    public function securityDeposit(Customer $c, string $cashAccount = self::BANK): JournalEntry
-    {
-        return $this->post(today()->toDateString(), "Security deposit received — {$c->name}", [
-            ['account' => $cashAccount,        'debit'  => $c->security_deposit],
-            ['account' => self::CUST_DEPOSIT,  'credit' => $c->security_deposit, 'party' => $c],
-        ], $c, false, 'deposit_receipt');
-    }
-
-    public function adjustVendorPayable(Vehicle $vehicle): ?JournalEntry
-    {
-        $vehicle->loadMissing('costing', 'vendor');
-        $targetPayable = $vehicle->costing?->total_costing ?? $vehicle->buying_price;
-
-        $vendorAccount = $this->ensureVendorAccount($vehicle->vendor);
-
-        $currentlyPosted = (int) JournalLine::whereHas('entry', fn ($q) => $q
-                ->where('reference_type', $vehicle->getMorphClass())
-                ->where('reference_id', $vehicle->id))
-            ->where('account_id', $vendorAccount->id)
-            ->get()
-            ->sum(fn ($l) => $l->credit - $l->debit);
-
-        $delta = $targetPayable - $currentlyPosted;
-
-        if ($delta === 0) {
-            return null;
-        }
-
-        if ($delta > 0) {
-            return $this->post(now()->toDateString(), "Vendor payable — {$vehicle->label()} (total costing)", [
-                ['account' => self::COST_VEHICLES, 'debit'  => $delta],
-                ['account_id' => $vendorAccount->id, 'credit' => $delta, 'party' => $vehicle->vendor],
-            ], $vehicle, false, 'payable');
-        }
-
-        $delta = abs($delta);
-        return $this->post(now()->toDateString(), "Vendor payable correction — {$vehicle->label()} (total costing decreased)", [
-            ['account_id' => $vendorAccount->id, 'debit'  => $delta, 'party' => $vehicle->vendor],
-            ['account' => self::COST_VEHICLES, 'credit' => $delta],
-        ], $vehicle, false, 'payable');
-    }
-
-    public function invoiceReceivable(Invoice $inv): JournalEntry
-    {
-        $customerAccount = $this->ensureCustomerAccount($inv->customer);
-
-        return $this->post(today()->toDateString(), "Invoice {$inv->invoice_no} — {$inv->customer->name}", [
-            ['account_id' => $customerAccount->id, 'debit'  => $inv->total_payable, 'party' => $inv->customer],
-            ['account' => self::SALES_INCOME,       'credit' => $inv->total_payable],
-        ], $inv, false, 'sale_invoice');
-    }
-
-    public function depositInvoiceReceivable(Invoice $inv): JournalEntry
-    {
-        $customerAccount = $this->ensureCustomerAccount($inv->customer);
-
-        return $this->post(today()->toDateString(), "Deposit invoice {$inv->invoice_no} — {$inv->customer->name}", [
-            ['account_id' => $customerAccount->id, 'debit'  => $inv->total_payable, 'party' => $inv->customer],
-            ['account' => self::CUST_DEPOSIT,       'credit' => $inv->total_payable, 'party' => $inv->customer],
-        ], $inv, false, 'deposit_invoice');
-    }
-
-    public function customerPayment(Payment $p, string $cashAccount = self::BANK): JournalEntry
-    {
-        $customerAccount = $this->ensureCustomerAccount($p->customer);
-
-        return $this->post($p->paid_at->toDateString(), "Payment received — {$p->customer->name}", [
-            ['account' => $cashAccount,          'debit'  => $p->amount],
-            ['account_id' => $customerAccount->id, 'credit' => $p->amount, 'party' => $p->customer],
-        ], $p, $p->is_backdated, 'receipt');
-    }
-
-    public function applyDepositToInvoice(Invoice $invoice, int $amount): JournalEntry
-    {
-        $customerAccount = $this->ensureCustomerAccount($invoice->customer);
-
-        return $this->post(now()->toDateString(), "Security deposit applied to invoice {$invoice->invoice_no}", [
-            ['account' => self::CUST_DEPOSIT,       'debit'  => $amount, 'party' => $invoice->customer],
-            ['account_id' => $customerAccount->id,  'credit' => $amount, 'party' => $invoice->customer],
-        ], $invoice, false, 'deposit_adjustment');
-    }
-
-    public function vendorPayment(VendorPayment $vp, string $cashAccount = self::BANK): JournalEntry
-    {
-        $vendorAccount = $this->ensureVendorAccount($vp->vendor);
-
-        return $this->post($vp->paid_at->toDateString(), "Vendor payment — vehicle #{$vp->vehicle_id}", [
-            ['account_id' => $vendorAccount->id, 'debit'  => $vp->amount, 'party' => $vp->vendor],
-            ['account' => $cashAccount,          'credit' => $vp->amount],
-        ], $vp, $vp->is_backdated, 'payment');
-    }
-
-    public function expense(Expense $e, string $cashAccount = self::BANK): JournalEntry
-    {
-        $account = ['salary' => self::SALARY, 'office' => self::OFFICE][$e->category] ?? self::MISC;
-
-        return $this->post($e->expense_date->toDateString(), "Expense: {$e->category}", [
-            ['account' => $account,     'debit'  => $e->amount],
-            ['account' => $cashAccount, 'credit' => $e->amount],
-        ], $e, $e->is_backdated, 'expense');
     }
 
     public function reverseEntry(JournalEntry $original, string $date, ?string $description = null): JournalEntry
@@ -224,5 +164,261 @@ class LedgerService
 
             return $entry;
         });
+    }
+
+    // ──────────────────────────── balances ────────────────────────────
+
+    /** account_id => ['debit' => int, 'credit' => int], optionally limited to a date window. */
+    public function totals(?string $asOf = null, ?string $from = null): array
+    {
+        return JournalLine::query()
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+            ->when($asOf, fn ($q) => $q->whereDate('journal_entries.date', '<=', $asOf))
+            ->when($from, fn ($q) => $q->whereDate('journal_entries.date', '>=', $from))
+            ->groupBy('journal_lines.account_id')
+            ->selectRaw('journal_lines.account_id as account_id, SUM(journal_lines.debit) as d, SUM(journal_lines.credit) as c')
+            ->get()
+            ->mapWithKeys(fn ($r) => [(int) $r->account_id => ['debit' => (int) $r->d, 'credit' => (int) $r->c]])
+            ->all();
+    }
+
+    /** Combined balance (in each account's natural direction) of every account under the given sub-head kinds. */
+    public function kindBalance(array $kinds, ?string $asOf = null): int
+    {
+        $totals = $this->totals($asOf);
+        $sum = 0;
+
+        ChartOfAccount::with('subhead.head')
+            ->whereHas('subhead', fn ($q) => $q->whereIn('kind', $kinds))
+            ->get()
+            ->each(function (ChartOfAccount $a) use ($totals, &$sum) {
+                $t = $totals[$a->id] ?? ['debit' => 0, 'credit' => 0];
+                $sum += $a->isDebitNature() ? $t['debit'] - $t['credit'] : $t['credit'] - $t['debit'];
+            });
+
+        return $sum;
+    }
+
+    /** account_id => net debit (debit − credit) of every line tied to a record, optionally by voucher type. */
+    protected function netByReference(object $reference, ?array $voucherTypes = null, ?int $accountId = null): array
+    {
+        return JournalLine::query()
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+            ->where('journal_entries.reference_type', $reference->getMorphClass())
+            ->where('journal_entries.reference_id', $reference->getKey())
+            ->when($voucherTypes, fn ($q) => $q->whereIn('journal_entries.voucher_type', $voucherTypes))
+            ->when($accountId, fn ($q) => $q->where('journal_lines.account_id', $accountId))
+            ->groupBy('journal_lines.account_id')
+            ->selectRaw('journal_lines.account_id as account_id, SUM(journal_lines.debit) - SUM(journal_lines.credit) as net')
+            ->get()
+            ->mapWithKeys(fn ($r) => [(int) $r->account_id => (int) $r->net])
+            ->all();
+    }
+
+    // ──────────────────────────── vehicle cost / vendor payable ────────────────────────────
+
+    /**
+     * Keeps the books equal to the vehicle's costing: each component (purchase price, vendor
+     * commission, inland, auction, freight, misc) is debited to its own expense account and the
+     * vendor's payable carries the total. Only the DIFFERENCE since the last posting is entered,
+     * so it is safe to call after every costing, freight or shipment change.
+     */
+    public function syncVehicleCost(Vehicle $vehicle): ?JournalEntry
+    {
+        $vehicle->loadMissing('costing', 'vendor');
+
+        if (! $vehicle->vendor || ! $vehicle->buying_price) {
+            return null;
+        }
+
+        $c = $vehicle->costing;
+        $components = [
+            'vehicle_cost'           => (int) $vehicle->buying_price,
+            'vendor_commission_cost' => (int) ($c?->vendor_commission_amount ?? 0),
+            'inland_cost'            => (int) ($c?->inland_charges ?? 0),
+            'auction_cost'           => (int) ($c?->auction_commission ?? 0),
+            'freight_cost'           => (int) ($c?->freight_charges ?? 0),
+            'misc_cost'              => (int) ($c?->misc_expenses ?? 0),
+        ];
+
+        $targets = [];
+        foreach ($components as $key => $amount) {
+            if ($amount > 0) {
+                $id = $this->mapped($key)->id;
+                $targets[$id] = ($targets[$id] ?? 0) + $amount;
+            }
+        }
+
+        $vendorAccount = $this->ensureVendorAccount($vehicle->vendor);
+        $current = $this->netByReference($vehicle);
+        $plan = AccountingMath::costSyncLines($targets, $current, $vendorAccount->id, array_sum($targets));
+
+        if (! $plan['lines']) {
+            return null;
+        }
+
+        if ($plan['debit'] !== $plan['credit']) {
+            throw new RuntimeException("Vehicle cost sync for {$vehicle->label()} would not balance (Dr {$plan['debit']} / Cr {$plan['credit']}).");
+        }
+
+        $lines = array_map(function (array $l) use ($vendorAccount, $vehicle) {
+            if ($l['account_id'] === $vendorAccount->id) {
+                $l['party'] = $vehicle->vendor;
+            }
+            return $l;
+        }, $plan['lines']);
+
+        // First posting is dated the day the vehicle was won; later corrections are dated today.
+        $date = $current ? today()->toDateString() : ($vehicle->won_at?->toDateString() ?? today()->toDateString());
+
+        return $this->post($date, "Vehicle cost — {$vehicle->label()}", $lines, $vehicle, false, 'payable');
+    }
+
+    /** Kept so existing callers (costing screen, bid won) keep working. */
+    public function adjustVendorPayable(Vehicle $vehicle): ?JournalEntry
+    {
+        return $this->syncVehicleCost($vehicle);
+    }
+
+    // ──────────────────────────── sale invoices ────────────────────────────
+
+    public function invoiceCreditAccount(Invoice $inv): ChartOfAccount
+    {
+        return $inv->isDepositInvoice() ? $this->mapped('customer_deposits') : $this->mapped('invoice_credit');
+    }
+
+    protected function invoiceDate(Invoice $inv): string
+    {
+        return $inv->issued_at?->toDateString() ?? today()->toDateString();
+    }
+
+    /** Dr customer receivable / Cr invoice-credit account. Income is not touched (default mapping). */
+    public function invoiceReceivable(Invoice $inv): JournalEntry
+    {
+        $customerAccount = $this->ensureCustomerAccount($inv->customer);
+
+        return $this->post($this->invoiceDate($inv), "Invoice {$inv->invoice_no} — {$inv->customer->name}", [
+            ['account_id' => $customerAccount->id, 'debit' => $inv->total_payable, 'party' => $inv->customer],
+            ['account_id' => $this->invoiceCreditAccount($inv)->id, 'credit' => $inv->total_payable],
+        ], $inv, false, 'sale_invoice');
+    }
+
+    public function depositInvoiceReceivable(Invoice $inv): JournalEntry
+    {
+        $customerAccount = $this->ensureCustomerAccount($inv->customer);
+
+        return $this->post($this->invoiceDate($inv), "Deposit invoice {$inv->invoice_no} — {$inv->customer->name}", [
+            ['account_id' => $customerAccount->id, 'debit' => $inv->total_payable, 'party' => $inv->customer],
+            ['account_id' => $this->mapped('customer_deposits')->id, 'credit' => $inv->total_payable, 'party' => $inv->customer],
+        ], $inv, false, 'deposit_invoice');
+    }
+
+    /** After a discount / settled-amount change: post only the difference on the customer's receivable. */
+    public function syncInvoiceReceivable(Invoice $inv): ?JournalEntry
+    {
+        $customerAccount = $this->ensureCustomerAccount($inv->customer);
+        $posted = $this->netByReference($inv, ['sale_invoice', 'deposit_invoice', 'invoice_adjustment', 'reversal'], $customerAccount->id)[$customerAccount->id] ?? 0;
+        $delta = AccountingMath::receivableDelta($posted, (int) $inv->total_payable);
+
+        if ($delta === 0) {
+            return null;
+        }
+
+        $credit = $this->invoiceCreditAccount($inv);
+        $abs = abs($delta);
+
+        return $this->post(today()->toDateString(), "Invoice {$inv->invoice_no} adjusted", [
+            ['account_id' => $customerAccount->id, 'debit' => $delta > 0 ? $abs : 0, 'credit' => $delta < 0 ? $abs : 0, 'party' => $inv->customer],
+            ['account_id' => $credit->id, 'debit' => $delta < 0 ? $abs : 0, 'credit' => $delta > 0 ? $abs : 0],
+        ], $inv, false, 'invoice_adjustment');
+    }
+
+    /**
+     * Sales income is recognised only as money is received. Moves income between the
+     * invoice-credit (unearned) account and Sales Income until income equals the approved
+     * amount received — in either direction, so reversals correct themselves.
+     * Does nothing when both roles point at the same account (standard accrual mode).
+     */
+    public function syncRevenueRecognition(Invoice $inv, ?string $date = null): ?JournalEntry
+    {
+        if ($inv->isDepositInvoice() || $inv->status === 'cancelled') {
+            return null;
+        }
+
+        $unearned = $this->mapped('invoice_credit');
+        $sales    = $this->mapped('sales_income');
+
+        if ($unearned->id === $sales->id) {
+            return null;
+        }
+
+        $recognised = -($this->netByReference($inv, null, $sales->id)[$sales->id] ?? 0);
+        $delta = AccountingMath::recognitionDelta($recognised, (int) $inv->amount_paid);
+
+        if ($delta === 0) {
+            return null;
+        }
+
+        $abs = abs($delta);
+
+        return $this->post($date ?? today()->toDateString(), "Revenue recognised — invoice {$inv->invoice_no}", [
+            ['account_id' => $unearned->id, 'debit' => $delta > 0 ? $abs : 0, 'credit' => $delta < 0 ? $abs : 0],
+            ['account_id' => $sales->id, 'debit' => $delta < 0 ? $abs : 0, 'credit' => $delta > 0 ? $abs : 0],
+        ], $inv, false, 'revenue_recognition');
+    }
+
+    // ──────────────────────────── money in / out ────────────────────────────
+
+    public function customerPayment(Payment $p): JournalEntry
+    {
+        $customerAccount = $this->ensureCustomerAccount($p->customer);
+        $money = $this->moneyAccount($p->account_id);
+
+        return $this->post($p->paid_at->toDateString(), "Payment received — {$p->customer->name}", [
+            ['account_id' => $money->id, 'debit' => $p->amount],
+            ['account_id' => $customerAccount->id, 'credit' => $p->amount, 'party' => $p->customer],
+        ], $p, $p->is_backdated, 'receipt');
+    }
+
+    /** Settles part of an invoice from the customer's held deposit. Tied to the Payment row so undo can find it. */
+    public function applyDepositToInvoice(Invoice $invoice, int $amount, Payment $payment): JournalEntry
+    {
+        $customerAccount = $this->ensureCustomerAccount($invoice->customer);
+
+        return $this->post(today()->toDateString(), "Security deposit applied to invoice {$invoice->invoice_no}", [
+            ['account_id' => $this->mapped('customer_deposits')->id, 'debit' => $amount, 'party' => $invoice->customer],
+            ['account_id' => $customerAccount->id, 'credit' => $amount, 'party' => $invoice->customer],
+        ], $payment, false, 'deposit_adjustment');
+    }
+
+    public function vendorPayment(VendorPayment $vp): JournalEntry
+    {
+        $vendorAccount = $this->ensureVendorAccount($vp->vendor);
+        $money = $this->moneyAccount($vp->account_id);
+
+        return $this->post($vp->paid_at->toDateString(), "Vendor payment — vehicle #{$vp->vehicle_id}", [
+            ['account_id' => $vendorAccount->id, 'debit' => $vp->amount, 'party' => $vp->vendor],
+            ['account_id' => $money->id, 'credit' => $vp->amount],
+        ], $vp, $vp->is_backdated, 'payment');
+    }
+
+    public function expense(Expense $e): JournalEntry
+    {
+        $key = Expense::CATEGORIES[$e->category]['key'] ?? 'expense_misc';
+        $money = $this->moneyAccount($e->paid_from_account_id);
+
+        return $this->post($e->expense_date->toDateString(), "Expense: {$e->category}", [
+            ['account_id' => $this->mapped($key)->id, 'debit' => $e->amount],
+            ['account_id' => $money->id, 'credit' => $e->amount],
+        ], $e, $e->is_backdated, 'expense');
+    }
+
+    /** Legacy deposit flow: money straight into the deposit liability. */
+    public function securityDeposit(Customer $c, ChartOfAccount $money): JournalEntry
+    {
+        return $this->post(today()->toDateString(), "Security deposit received — {$c->name}", [
+            ['account_id' => $this->moneyAccount($money)->id, 'debit' => $c->security_deposit],
+            ['account_id' => $this->mapped('customer_deposits')->id, 'credit' => $c->security_deposit, 'party' => $c],
+        ], $c, false, 'deposit_receipt');
     }
 }
