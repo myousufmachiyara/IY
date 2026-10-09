@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{AccountHead, AccountMapping, AccountSubhead, ChartOfAccount, Customer, Expense, Invoice, JournalEntry, JournalLine, Payment, Vendor, VendorPayment};
-use App\Services\LedgerService;
+use App\Services\{AccountCodes, AccountStructure, LedgerService};
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,7 +50,6 @@ class AccountingController extends Controller
     public function storeAccount(Request $request)
     {
         $data = $request->validate([
-            'code'       => ['required', 'string', 'max:30', 'unique:chart_of_accounts,code'],
             'name'       => ['required', 'string', 'max:255'],
             'subhead_id' => ['required', 'exists:account_subheads,id'],
         ]);
@@ -61,20 +60,21 @@ class AccountingController extends Controller
             return $this->refuse('Customer and vendor accounts are created automatically with each customer / vendor — add other accounts under a different sub-head.');
         }
 
+        $code = AccountCodes::forAccount($sub->head->nature);
+
         ChartOfAccount::create([
-            'code' => $data['code'], 'account_code' => $data['code'], 'name' => $data['name'],
+            'code' => $code, 'account_code' => $code, 'name' => $data['name'],
             'subhead_id' => $sub->id, 'type' => $sub->head->nature,
             'is_system' => false, 'is_active' => true,
         ]);
 
-        return back()->with('success', 'Account created.');
+        return back()->with('success', "Account {$code} created.");
     }
 
     public function updateAccount(Request $request, ChartOfAccount $account)
     {
         $data = $request->validate([
             'name'       => ['required', 'string', 'max:255'],
-            'code'       => ['required', 'string', 'max:30', Rule::unique('chart_of_accounts', 'code')->ignore($account->id)],
             'subhead_id' => ['required', 'exists:account_subheads,id'],
         ]);
 
@@ -97,12 +97,19 @@ class AccountingController extends Controller
             return $this->refuse('Cannot deactivate — this account is used for: ' . implode(', ', $roles) . '. Re-map those roles first.');
         }
 
-        $account->update([
-            'name' => $data['name'], 'code' => $data['code'], 'account_code' => $data['code'],
-            'subhead_id' => $sub->id, 'type' => $sub->head->nature, 'is_active' => $active,
-        ]);
+        $fields = ['name' => $data['name'], 'subhead_id' => $sub->id, 'type' => $sub->head->nature, 'is_active' => $active];
 
-        return back()->with('success', 'Account updated.');
+        // The code is never edited by hand. It only changes when the account moves to a head of a
+        // different nature (possible only while it has no transactions), so it stays in that head's range.
+        $note = '';
+        if (! $account->isParty() && $sub->head->nature !== $account->type) {
+            $fields['code'] = $fields['account_code'] = AccountCodes::forAccount($sub->head->nature);
+            $note = " New code: {$fields['code']}.";
+        }
+
+        $account->update($fields);
+
+        return back()->with('success', 'Account updated.' . $note);
     }
 
     public function destroyAccount(ChartOfAccount $account)
@@ -133,25 +140,66 @@ class AccountingController extends Controller
     {
         $data = $request->validate([
             'head_id' => ['required', 'exists:account_heads,id'],
-            'code'    => ['required', 'string', 'max:20', 'unique:account_subheads,code'],
             'name'    => ['required', 'string', 'max:255'],
         ]);
 
-        AccountSubhead::create($data + ['kind' => null, 'sort_order' => (int) preg_replace('/\D/', '', $data['code']) ?: 99]);
+        $head = AccountHead::findOrFail($data['head_id']);
+        $code = AccountCodes::forSubhead($head);
 
-        return back()->with('success', 'Sub-head created.');
+        AccountSubhead::create([
+            'head_id' => $head->id, 'code' => $code, 'name' => $data['name'], 'kind' => null,
+            'sort_order' => ((int) AccountSubhead::where('head_id', $head->id)->max('sort_order')) + 1,
+        ]);
+
+        return back()->with('success', "Sub-head {$code} created.");
     }
 
     public function updateSubhead(Request $request, AccountSubhead $subhead)
     {
-        $data = $request->validate([
-            'code' => ['required', 'string', 'max:20', Rule::unique('account_subheads', 'code')->ignore($subhead->id)],
-            'name' => ['required', 'string', 'max:255'],
-        ]);
+        $data = $request->validate(['name' => ['required', 'string', 'max:255']]);
 
         $subhead->update($data);
 
         return back()->with('success', 'Sub-head updated.');
+    }
+
+    public function storeHead(Request $request)
+    {
+        $data = $request->validate([
+            'name'   => ['required', 'string', 'max:255'],
+            'nature' => ['required', Rule::in(array_keys(AccountCodes::NATURE_BASE))],
+        ]);
+
+        $code = AccountCodes::forHead();
+
+        AccountHead::create([
+            'code' => $code, 'name' => $data['name'], 'nature' => $data['nature'],
+            'sort_order' => ((int) AccountHead::max('sort_order')) + 1,
+        ]);
+
+        return back()->with('success', "Head {$code} created. Add a sub-head under it, then accounts under the sub-head.");
+    }
+
+    public function updateHead(Request $request, AccountHead $head)
+    {
+        // Only the name: the nature decides the sign of every account beneath it.
+        $head->update($request->validate(['name' => ['required', 'string', 'max:255']]));
+
+        return back()->with('success', 'Head renamed.');
+    }
+
+    public function destroyHead(AccountHead $head)
+    {
+        if (in_array($head->code, array_column(AccountStructure::HEADS, 'code'), true)) {
+            return $this->refuse("\"{$head->name}\" is one of the five standard heads and cannot be deleted.");
+        }
+        if ($head->subheads()->exists()) {
+            return $this->refuse('Delete or empty the sub-heads inside this head first.');
+        }
+
+        $head->delete();
+
+        return back()->with('success', 'Head deleted.');
     }
 
     public function destroySubhead(AccountSubhead $subhead)

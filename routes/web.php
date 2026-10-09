@@ -128,6 +128,10 @@ Route::middleware(['auth'])->group(function () {
         Route::put('chart/{account}', [AccountingController::class, 'updateAccount'])->middleware('permission:accounting.edit')->name('chart.update');
         Route::delete('chart/{account}', [AccountingController::class, 'destroyAccount'])->middleware('permission:accounting.delete')->name('chart.destroy');
 
+        Route::post('heads', [AccountingController::class, 'storeHead'])->middleware('permission:accounting.create')->name('heads.store');
+        Route::put('heads/{head}', [AccountingController::class, 'updateHead'])->middleware('permission:accounting.edit')->name('heads.update');
+        Route::delete('heads/{head}', [AccountingController::class, 'destroyHead'])->middleware('permission:accounting.delete')->name('heads.destroy');
+
         Route::post('subheads', [AccountingController::class, 'storeSubhead'])->middleware('permission:accounting.create')->name('subheads.store');
         Route::put('subheads/{subhead}', [AccountingController::class, 'updateSubhead'])->middleware('permission:accounting.edit')->name('subheads.update');
         Route::delete('subheads/{subhead}', [AccountingController::class, 'destroySubhead'])->middleware('permission:accounting.delete')->name('subheads.destroy');

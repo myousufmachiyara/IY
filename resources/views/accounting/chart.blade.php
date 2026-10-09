@@ -13,6 +13,7 @@
                         <a href="{{ route('accounting.mappings') }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-link"></i> Account Mapping</a>
                     @endcan
                     @can('accounting.create')
+                        <button type="button" class="modal-with-form btn btn-outline-secondary btn-sm" href="#addHeadModal"><i class="fas fa-sitemap"></i> Add Head</button>
                         <button type="button" class="modal-with-form btn btn-outline-primary btn-sm" href="#addSubheadModal"><i class="fas fa-layer-group"></i> Add Sub-head</button>
                         <button type="button" class="modal-with-form btn btn-primary btn-sm" href="#addAccountModal"><i class="fas fa-plus"></i> Add Account</button>
                     @endcan
@@ -30,7 +31,19 @@
                 <div class="mb-4">
                     <h5 class="d-flex justify-content-between border-bottom pb-2 mb-2">
                         <span><span class="text-muted">{{ $head->code }}</span> &nbsp;{{ strtoupper($head->name) }}</span>
-                        <span class="fw-bold">¥{{ number_format($head->total) }}</span>
+                        <span class="d-flex align-items-center gap-3">
+                            <span class="fw-bold">¥{{ number_format($head->total) }}</span>
+                            @can('accounting.edit')
+                                <a href="#" class="text-primary fs-6" title="Rename head" onclick="editHead({{ $head->id }}, {{ \Illuminate\Support\Js::from($head->name) }}); return false;"><i class="fa fa-edit"></i></a>
+                            @endcan
+                            @can('accounting.delete')
+                                @if($head->subheads->isEmpty() && ! in_array($head->code, ['1','2','3','4','5'], true))
+                                    <form action="{{ route('accounting.heads.destroy', $head) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this head?');">
+                                        @csrf @method('DELETE')<button class="btn btn-link p-0 text-danger fs-6" title="Delete head"><i class="fa fa-trash-alt"></i></button>
+                                    </form>
+                                @endif
+                            @endcan
+                        </span>
                     </h5>
 
                     @forelse($head->subheads as $sub)
@@ -47,7 +60,7 @@
                             <div class="d-flex align-items-center gap-3">
                                 <span class="fw-bold">¥{{ number_format($sub->total) }}</span>
                                 @can('accounting.edit')
-                                    <a href="#" class="text-primary" title="Edit sub-head" onclick="editSubhead({{ $sub->id }}, {{ \Illuminate\Support\Js::from($sub->name) }}, {{ \Illuminate\Support\Js::from($sub->code) }}); return false;"><i class="fa fa-edit"></i></a>
+                                    <a href="#" class="text-primary" title="Edit sub-head" onclick="editSubhead({{ $sub->id }}, {{ \Illuminate\Support\Js::from($sub->name) }}); return false;"><i class="fa fa-edit"></i></a>
                                 @endcan
                                 @can('accounting.delete')
                                     @if(! $sub->kind && $sub->accounts->isEmpty())
@@ -81,7 +94,7 @@
                                             <a href="{{ route('accounting.ledger', $a) }}" class="btn btn-sm btn-outline-secondary">Ledger</a>
                                             @can('accounting.edit')
                                                 <a href="#" class="btn btn-sm btn-outline-primary"
-                                                   onclick="editAccount({{ $a->id }}, {{ \Illuminate\Support\Js::from($a->name) }}, {{ \Illuminate\Support\Js::from($a->code) }}, {{ $a->subhead_id }}, {{ $a->is_active ? 'true' : 'false' }}, {{ $a->isParty() ? 'true' : 'false' }}); return false;">Edit</a>
+                                                   onclick="editAccount({{ $a->id }}, {{ \Illuminate\Support\Js::from($a->name) }}, {{ $a->subhead_id }}, {{ $a->is_active ? 'true' : 'false' }}, {{ $a->isParty() ? 'true' : 'false' }}); return false;">Edit</a>
                                             @endcan
                                             @can('accounting.delete')
                                                 @if(! $a->has_lines && ! $a->is_mapped)
@@ -111,7 +124,7 @@
                     <strong>Unclassified accounts</strong> — run <code>php artisan migrate</code> or edit each one and choose a sub-head:
                     @foreach($unclassified as $a)
                         <div><code>{{ $a->code }}</code> {{ $a->name }}
-                            @can('accounting.edit')<a href="#" onclick="editAccount({{ $a->id }}, {{ \Illuminate\Support\Js::from($a->name) }}, {{ \Illuminate\Support\Js::from($a->code) }}, null, {{ $a->is_active ? 'true' : 'false' }}, false); return false;">Classify</a>@endcan
+                            @can('accounting.edit')<a href="#" onclick="editAccount({{ $a->id }}, {{ \Illuminate\Support\Js::from($a->name) }}, null, {{ $a->is_active ? 'true' : 'false' }}, false); return false;">Classify</a>@endcan
                         </div>
                     @endforeach
                 </div>
@@ -128,8 +141,7 @@
                     <header class="card-header"><h2 class="card-title">Add Account</h2></header>
                     <div class="card-body">
                         <div class="row form-group">
-                            <div class="col-lg-4 mb-2"><label>Code <span class="text-danger">*</span></label><input type="text" class="form-control" name="code" required></div>
-                            <div class="col-lg-8 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+                            <div class="col-lg-12 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
                             <div class="col-lg-12 mb-2">
                                 <label>Sub-head <span class="text-danger">*</span></label>
                                 <select class="form-control" name="subhead_id" required>
@@ -139,11 +151,37 @@
                                         </optgroup>
                                     @endforeach
                                 </select>
-                                <small class="text-muted">The sub-head decides the account's type. To add a bank or cash account, choose "Bank Accounts" or "Cash in Hand" — it then appears in every payment dropdown.</small>
+                                <small class="text-muted">The code is generated automatically. The sub-head decides the account's type. To add a bank or cash account, choose "Bank Accounts" or "Cash in Hand" — it then appears in every payment dropdown.</small>
                             </div>
                         </div>
                     </div>
                     <footer class="card-footer"><div class="col-md-12 text-end"><button type="submit" class="btn btn-primary">Add Account</button><button type="button" class="btn btn-default modal-dismiss">Cancel</button></div></footer>
+                </form>
+            </section>
+        </div>
+
+        <div id="addHeadModal" class="modal-block modal-block-primary mfp-hide">
+            <section class="card">
+                <form method="POST" action="{{ route('accounting.heads.store') }}" onkeydown="return event.key != 'Enter';">
+                    @csrf
+                    <header class="card-header"><h2 class="card-title">Add Head</h2></header>
+                    <div class="card-body">
+                        <div class="row form-group">
+                            <div class="col-lg-12 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+                            <div class="col-lg-12 mb-2">
+                                <label>Type <span class="text-danger">*</span></label>
+                                <select class="form-control" name="nature" required>
+                                    <option value="asset">Asset</option>
+                                    <option value="liability">Liability</option>
+                                    <option value="equity">Equity</option>
+                                    <option value="income">Income</option>
+                                    <option value="expense">Expense</option>
+                                </select>
+                                <small class="text-muted">The code is generated automatically. The type decides whether balances grow with debits (asset, expense) or credits (liability, equity, income) and cannot be changed later.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <footer class="card-footer"><div class="col-md-12 text-end"><button type="submit" class="btn btn-primary">Add Head</button><button type="button" class="btn btn-default modal-dismiss">Cancel</button></div></footer>
                 </form>
             </section>
         </div>
@@ -161,8 +199,7 @@
                                     @foreach($heads as $h)<option value="{{ $h->id }}">{{ $h->name }}</option>@endforeach
                                 </select>
                             </div>
-                            <div class="col-lg-4 mb-2"><label>Code <span class="text-danger">*</span></label><input type="text" class="form-control" name="code" required></div>
-                            <div class="col-lg-8 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required></div>
+                            <div class="col-lg-12 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" class="form-control" name="name" required><small class="text-muted">The code is generated automatically from the head.</small></div>
                         </div>
                     </div>
                     <footer class="card-footer"><div class="col-md-12 text-end"><button type="submit" class="btn btn-primary">Add Sub-head</button><button type="button" class="btn btn-default modal-dismiss">Cancel</button></div></footer>
@@ -180,8 +217,7 @@
                     <header class="card-header"><h2 class="card-title">Edit Account</h2></header>
                     <div class="card-body">
                         <div class="row form-group">
-                            <div class="col-lg-4 mb-2"><label>Code <span class="text-danger">*</span></label><input type="text" id="ea_code" class="form-control" name="code" required></div>
-                            <div class="col-lg-8 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" id="ea_name" class="form-control" name="name" required></div>
+                            <div class="col-lg-12 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" id="ea_name" class="form-control" name="name" required></div>
                             <div class="col-lg-12 mb-2">
                                 <label>Sub-head <span class="text-danger">*</span></label>
                                 <select id="ea_subhead" class="form-control" name="subhead_id" required>
@@ -192,6 +228,7 @@
                                     @endforeach
                                 </select>
                                 <small class="text-muted" id="ea_party_note" style="display:none;">Customer / vendor accounts stay in their own sub-head.</small>
+                                <small class="text-muted d-block">The code never changes — except when an account moves to a head of a different type, which assigns a new code from that head's range.</small>
                             </div>
                             <div class="col-lg-12 mb-2">
                                 <div class="form-check"><input type="checkbox" class="form-check-input" name="is_active" id="ea_active" value="1"><label class="form-check-label" for="ea_active">Active</label></div>
@@ -210,11 +247,25 @@
                     <header class="card-header"><h2 class="card-title">Edit Sub-head</h2></header>
                     <div class="card-body">
                         <div class="row form-group">
-                            <div class="col-lg-4 mb-2"><label>Code <span class="text-danger">*</span></label><input type="text" id="es_code" class="form-control" name="code" required></div>
-                            <div class="col-lg-8 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" id="es_name" class="form-control" name="name" required></div>
+                            <div class="col-lg-12 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" id="es_name" class="form-control" name="name" required></div>
                         </div>
                     </div>
                     <footer class="card-footer"><div class="col-md-12 text-end"><button type="submit" class="btn btn-primary">Update Sub-head</button><button type="button" class="btn btn-default modal-dismiss">Cancel</button></div></footer>
+                </form>
+            </section>
+        </div>
+
+        <div id="editHeadModal" class="modal-block modal-block-primary mfp-hide">
+            <section class="card">
+                <form method="POST" id="editHeadForm" action="" onkeydown="return event.key != 'Enter';">
+                    @csrf @method('PUT')
+                    <header class="card-header"><h2 class="card-title">Rename Head</h2></header>
+                    <div class="card-body">
+                        <div class="row form-group">
+                            <div class="col-lg-12 mb-2"><label>Name <span class="text-danger">*</span></label><input type="text" id="eh_name" class="form-control" name="name" required><small class="text-muted">Codes are fixed once generated; only the name can change.</small></div>
+                        </div>
+                    </div>
+                    <footer class="card-footer"><div class="col-md-12 text-end"><button type="submit" class="btn btn-primary">Update Head</button><button type="button" class="btn btn-default modal-dismiss">Cancel</button></div></footer>
                 </form>
             </section>
         </div>
@@ -223,10 +274,14 @@
 </div>
 
 <script>
-function editAccount(id, name, code, subheadId, isActive, isParty) {
+function editHead(id, name) {
+    document.getElementById('editHeadForm').action = '/accounting/heads/' + id;
+    document.getElementById('eh_name').value = name;
+    $.magnificPopup.open({ items: { src: '#editHeadModal' }, type: 'inline' });
+}
+function editAccount(id, name, subheadId, isActive, isParty) {
     document.getElementById('editAccountForm').action = '/accounting/chart/' + id;
     document.getElementById('ea_name').value = name;
-    document.getElementById('ea_code').value = code;
     const sel = document.getElementById('ea_subhead');
     sel.value = subheadId;
     sel.style.pointerEvents = isParty ? 'none' : '';
@@ -235,10 +290,9 @@ function editAccount(id, name, code, subheadId, isActive, isParty) {
     document.getElementById('ea_active').checked = isActive;
     $.magnificPopup.open({ items: { src: '#editAccountModal' }, type: 'inline' });
 }
-function editSubhead(id, name, code) {
+function editSubhead(id, name) {
     document.getElementById('editSubheadForm').action = '/accounting/subheads/' + id;
     document.getElementById('es_name').value = name;
-    document.getElementById('es_code').value = code;
     $.magnificPopup.open({ items: { src: '#editSubheadModal' }, type: 'inline' });
 }
 </script>
