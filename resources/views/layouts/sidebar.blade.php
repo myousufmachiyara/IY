@@ -246,39 +246,31 @@
           </li>
           @endcan
 
-          {{-- Reports --}}
-          @if(auth()->user()->can('reports.agent_wise') || auth()->user()->can('reports.vendor_wise') || auth()->user()->can('reports.bid_wise') || auth()->user()->can('reports.bid_won') || auth()->user()->can('reports.customer_wise'))
+          {{-- Reports — categories and items come from App\Support\ReportCatalog --}}
+          @php $reportMenu = \App\Support\ReportCatalog::visibleTo(auth()->user()); @endphp
+          @if($reportMenu)
           <li class="nav-parent {{ request()->routeIs('reports.*') ? 'nav-expanded nav-active' : '' }}">
             <a class="nav-link" href="#">
               <i class="fa fa-chart-bar"></i>
               <span>Reports</span>
             </a>
             <ul class="nav nav-children">
-              @can('reports.agent_wise')
-                <li class="{{ request()->routeIs('reports.agent_wise') ? 'active' : '' }}">
-                  <a class="nav-link" href="{{ route('reports.agent_wise') }}">Agent-wise</a>
+              <li class="{{ request()->routeIs('reports.index') ? 'active' : '' }}">
+                <a class="nav-link" href="{{ route('reports.index') }}">All Reports</a>
+              </li>
+              @foreach($reportMenu as $cat)
+                @php $catActive = collect($cat['reports'])->contains(fn ($r) => request()->routeIs($r['route'])); @endphp
+                <li class="nav-parent {{ $catActive ? 'nav-expanded nav-active' : '' }}">
+                  <a class="nav-link" href="#">{{ $cat['label'] }}</a>
+                  <ul class="nav nav-children">
+                    @foreach($cat['reports'] as $r)
+                      <li class="{{ request()->routeIs($r['route']) ? 'active' : '' }}">
+                        <a class="nav-link" href="{{ route($r['route']) }}">{{ $r['label'] }}</a>
+                      </li>
+                    @endforeach
+                  </ul>
                 </li>
-              @endcan
-              @can('reports.vendor_wise')
-                <li class="{{ request()->routeIs('reports.vendor_wise') ? 'active' : '' }}">
-                  <a class="nav-link" href="{{ route('reports.vendor_wise') }}">Vendor-wise</a>
-                </li>
-              @endcan
-              @can('reports.bid_wise')
-                <li class="{{ request()->routeIs('reports.bid_wise') ? 'active' : '' }}">
-                  <a class="nav-link" href="{{ route('reports.bid_wise') }}">Bid-wise</a>
-                </li>
-              @endcan
-              @can('reports.bid_won')
-                <li class="{{ request()->routeIs('reports.bid_won') ? 'active' : '' }}">
-                  <a class="nav-link" href="{{ route('reports.bid_won') }}">Bid Won</a>
-                </li>
-              @endcan
-              @can('reports.customer_wise')
-                <li class="{{ request()->routeIs('reports.customer_wise') ? 'active' : '' }}">
-                  <a class="nav-link" href="{{ route('reports.customer_wise') }}">Customer-wise</a>
-                </li>
-              @endcan
+              @endforeach
             </ul>
           </li>
           @endif

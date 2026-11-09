@@ -39,17 +39,7 @@
     </table>
 </div>
 
-<h2 class="card-title">Report Access</h2>
-<div class="row mb-4">
-    @foreach($reportPermissions as $perm)
-    <div class="col-md-3 mb-2">
-        <div class="form-check">
-            <input type="checkbox" class="form-check-input" name="permissions[]" value="{{ $perm->id }}" id="perm_{{ $perm->id }}" {{ in_array($perm->id, $assigned) ? 'checked' : '' }}>
-            <label class="form-check-label" for="perm_{{ $perm->id }}">{{ \Illuminate\Support\Str::headline(str($perm->name)->after('reports.')) }}</label>
-        </div>
-    </div>
-    @endforeach
-</div>
+@include('roles._report_access')
 
 @php
     // scope.by_agent / data.view_all render as a small radio-style pair — spec

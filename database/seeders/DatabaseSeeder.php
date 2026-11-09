@@ -75,13 +75,9 @@ class DatabaseSeeder extends Seeder
 
         // ── Report Access permissions ───────────────────────────────────────
 
-        foreach ([
-            'agent_wise', 'vendor_wise', 'bid_wise', 'bid_won', 'customer_wise',
-            'agent_profitability', 'auction_house_performance',
-            'vehicle_profitability', 'customer_profitability',
-            'shipment', 'receivables', 'payables', 'financial_reports',
-        ] as $report) {
-            Permission::firstOrCreate(['name' => "reports.$report"]);
+        // Driven by App\Support\ReportCatalog — one permission per report.
+        foreach (\App\Support\ReportCatalog::permissionNames() as $name) {
+            Permission::firstOrCreate(['name' => $name]);
         }
 
         // ── Special / business-logic permissions ────────────────────────────
@@ -103,6 +99,8 @@ class DatabaseSeeder extends Seeder
             'costings.edit_costs', 'invoices.adjust_settled_amount',
             // misc, pre-existing
             'system.logs', 'invoices.request',
+            // reports — confidential columns (buy price, costs, bank accounts)
+            \App\Support\ReportCatalog::SENSITIVE_PERMISSION,
         ] as $name) {
             Permission::firstOrCreate(['name' => $name]);
         }

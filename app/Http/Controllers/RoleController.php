@@ -92,6 +92,10 @@ class RoleController extends Controller
             'label' => 'Request Invoice (Sales Agent)',
             'description' => 'Allow a Sales Agent to request an invoice for a won vehicle, without granting full invoice creation rights.',
         ],
+        \App\Support\ReportCatalog::SENSITIVE_PERMISSION => [
+            'label' => 'View Confidential Report Fields',
+            'description' => 'Show buy prices, cost breakdowns, gross profit, freight and bank/cash account names inside reports. Without it those columns are hidden.',
+        ],
         'system.logs' => [
             'label' => 'View System Logs',
             'description' => 'View and download raw application error logs — technical/debugging access only.',
@@ -199,8 +203,25 @@ class RoleController extends Controller
         return $ordered->merge($grouped->except($ordered->keys()));
     }
 
-    private function reportPermissions()
+    /**
+     * Report Access accordion: categories → reports, straight from App\Support\ReportCatalog,
+     * each report resolved to its Permission row (reports missing a row are skipped).
+     */
+    private function reportPermissions(): array
     {
-        return Permission::where('name', 'like', 'reports.%')->get();
+        $perms = Permission::where('name', 'like', 'reports.%')->get()->keyBy('name');
+        $out = [];
+        foreach (\App\Support\ReportCatalog::CATEGORIES as $catKey => $cat) {
+            $reports = [];
+            foreach ($cat['reports'] as $key => $r) {
+                if ($perm = $perms->get("reports.$key")) {
+                    $reports[] = ['permission' => $perm, 'label' => $r['label'], 'description' => $r['description']];
+                }
+            }
+            if ($reports) {
+                $out[$catKey] = ['label' => $cat['label'], 'icon' => $cat['icon'], 'reports' => $reports];
+            }
+        }
+        return $out;
     }
 }

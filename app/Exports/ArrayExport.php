@@ -2,9 +2,10 @@
 
 namespace App\Exports;
 
-use Maatwebsite\Excel\Concerns\{FromArray, WithHeadings};
+use Maatwebsite\Excel\Concerns\{FromArray, WithHeadings, WithStrictNullComparison};
 
-class ArrayExport implements FromArray, WithHeadings
+/** Strict null comparison keeps real zeros (¥0, 0 vehicles) as 0 instead of blank cells. */
+class ArrayExport implements FromArray, WithHeadings, WithStrictNullComparison
 {
     public function __construct(private array $rows, private array $headings) {}
 

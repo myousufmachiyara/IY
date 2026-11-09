@@ -6,7 +6,8 @@ use App\Http\Controllers\{DashboardController, UserController, RoleController, P
 use App\Http\Controllers\{CustomerController, VendorController, VehicleController, BidSheetController, BidController};
 use App\Http\Controllers\{BiddingResultController, CostingController, InvoiceController, PaymentController};
 use App\Http\Controllers\{ShipmentController, VehicleReassignController, DocumentController, VendorPaymentController,
-    ExpenseController, AccountingController, ReportController, LogViewerController};
+    ExpenseController, AccountingController, ReportController, ReportHubController, LogViewerController};
+use App\Http\Controllers\Reports;
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
@@ -167,17 +168,57 @@ Route::middleware(['auth'])->group(function () {
     Route::post('accounting/journal-vouchers', [\App\Http\Controllers\JournalVoucherController::class, 'store'])->middleware('permission:accounting.create')->name('accounting.journal_voucher.store');
     Route::post('accounting/journal-vouchers/{journalEntry}/reverse', [\App\Http\Controllers\JournalVoucherController::class, 'reverse'])->middleware('permission:accounting.delete')->name('accounting.journal_voucher.reverse');
 
+    // Reports V2 — every report key / permission / label lives in App\Support\ReportCatalog.
     Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('agent-wise',    [ReportController::class, 'agentWise'])->middleware('permission:reports.agent_wise')->name('agent_wise');
-        Route::get('vendor-wise',   [ReportController::class, 'vendorWise'])->middleware('permission:reports.vendor_wise')->name('vendor_wise');
-        Route::get('bid-wise',      [ReportController::class, 'bidWise'])->middleware('permission:reports.bid_wise')->name('bid_wise');
-        Route::get('bid-won',       [ReportController::class, 'bidWon'])->middleware('permission:reports.bid_won')->name('bid_won');
-        Route::get('customer-wise', [ReportController::class, 'customerWise'])->middleware('permission:reports.customer_wise')->name('customer_wise');
-        Route::get('agent-profitability',        [ReportController::class, 'agentProfitability'])->middleware('permission:reports.agent_profitability')->name('agent_profitability');
-        Route::get('customer-profitability',     [ReportController::class, 'customerProfitability'])->middleware('permission:reports.customer_profitability')->name('customer_profitability');
-        Route::get('vehicle-profitability',      [ReportController::class, 'vehicleProfitability'])->middleware('permission:reports.vehicle_profitability')->name('vehicle_profitability');
-        Route::get('auction-house-performance',  [ReportController::class, 'auctionHousePerformance'])->middleware('permission:reports.auction_house_performance')->name('auction_house_performance');
-        Route::get('shipment',                   [ReportController::class, 'shipmentReport'])->middleware('permission:reports.shipment')->name('shipment');
+        Route::get('/', [ReportHubController::class, 'index'])->name('index');
+
+        $r = fn (string $uri, array $action, string $key) => Route::get($uri, $action)->middleware("permission:reports.$key")->name($key);
+
+        // Executive & Management
+        $r('executive-summary', [Reports\ExecutiveReportController::class, 'summary'], 'executive_summary');
+        $r('business-trends',   [Reports\ExecutiveReportController::class, 'trends'], 'business_trends');
+        $r('business-exposure', [Reports\ExecutiveReportController::class, 'exposure'], 'business_exposure');
+
+        // Sales & Customers
+        $r('customer-wise',             [Reports\SalesReportController::class, 'customerWise'], 'customer_wise');
+        $r('customer-360',              [Reports\SalesReportController::class, 'customer360'], 'customer_360');
+        $r('customer-profitability',    [Reports\SalesReportController::class, 'customerProfitability'], 'customer_profitability');
+        $r('customer-purchase-history', [Reports\SalesReportController::class, 'purchaseHistory'], 'customer_purchase_history');
+        $r('invoice-summary',           [Reports\SalesReportController::class, 'invoiceSummary'], 'invoice_summary');
+        $r('inactive-customers',        [Reports\SalesReportController::class, 'inactive'], 'inactive_customers');
+
+        // Auctions & Vehicles
+        $r('bid-won',                   [Reports\VehicleReportController::class, 'won'], 'bid_won');
+        $r('vehicle-pipeline',          [Reports\VehicleReportController::class, 'pipeline'], 'vehicle_pipeline');
+        $r('vehicle-profitability',     [Reports\VehicleReportController::class, 'profitability'], 'vehicle_profitability');
+        $r('bid-wise',                  [ReportController::class, 'bidWise'], 'bid_wise');
+        $r('auction-house-performance', [ReportController::class, 'auctionHousePerformance'], 'auction_house_performance');
+
+        // Finance & Payments
+        $r('receivables-aging',      [Reports\FinanceReportController::class, 'receivablesAging'], 'receivables_aging');
+        $r('payment-collections',    [Reports\FinanceReportController::class, 'collections'], 'payment_collections');
+        $r('payment-stages',         [Reports\FinanceReportController::class, 'stages'], 'payment_stages');
+        $r('security-deposits',      [Reports\FinanceReportController::class, 'deposits'], 'security_deposits');
+        $r('vendor-payables',        [Reports\FinanceReportController::class, 'vendorPayables'], 'vendor_payables');
+        $r('vendor-payment-history', [Reports\FinanceReportController::class, 'vendorPaymentHistory'], 'vendor_payment_history');
+        $r('expense-analysis',       [Reports\FinanceReportController::class, 'expenses'], 'expense_analysis');
+        $r('revenue-vs-expense',     [Reports\FinanceReportController::class, 'revenueVsExpense'], 'revenue_vs_expense');
+        $r('vendor-wise',            [ReportController::class, 'vendorWise'], 'vendor_wise');
+
+        // Shipping & Logistics
+        $r('shipment',          [Reports\ShippingReportController::class, 'overview'], 'shipment');
+        $r('ready-for-shipment', [Reports\ShippingReportController::class, 'ready'], 'ready_for_shipment');
+        $r('awaiting-shipment', [Reports\ShippingReportController::class, 'awaiting'], 'awaiting_shipment');
+        $r('shipping-cost',     [Reports\ShippingReportController::class, 'cost'], 'shipping_cost');
+
+        // Agents & Commissions
+        $r('agent-wise',          [Reports\AgentReportController::class, 'performance'], 'agent_wise');
+        $r('agent-commission',    [Reports\AgentReportController::class, 'commission'], 'agent_commission');
+        $r('agent-monthly',       [Reports\AgentReportController::class, 'monthly'], 'agent_monthly');
+        $r('agent-conversion',    [Reports\AgentReportController::class, 'conversion'], 'agent_conversion');
+        $r('agent-portfolio',     [Reports\AgentReportController::class, 'portfolio'], 'agent_portfolio');
+        $r('agent-leaderboard',   [Reports\AgentReportController::class, 'leaderboard'], 'agent_leaderboard');
+        $r('agent-profitability', [ReportController::class, 'agentProfitability'], 'agent_profitability');
     });
 
     Route::get("customers/{customer}/deposit-invoice/edit", [CustomerController::class, "editDepositInvoice"])->middleware("permission:customers.edit")->name("customers.deposit_invoice.edit");
