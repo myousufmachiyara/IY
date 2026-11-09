@@ -36,7 +36,7 @@
     @php $customer = $group['customer']; $invoices = $group['invoices']; $grandTotal = $invoices->sum('total_payable'); @endphp
 
     <div class="center">
-        <img src="{{ public_path('assets/img/iy-auto-trades-logo.png') }}" class="logo">
+        <img src="{{ public_path('assets/img/imx-logo.jpeg') }}" class="logo">
     </div>
 
     <table class="header-table">
