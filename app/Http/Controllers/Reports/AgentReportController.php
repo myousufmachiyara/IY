@@ -38,7 +38,8 @@ class AgentReportController extends BaseReportController
 
     public function performance(Request $request)
     {
-        $rows = $this->agents($request)->map(fn (User $a) => ['agent' => $a->name,
+        $period = $this->periodText($request->from, $request->to);
+        $rows = $this->agents($request)->map(fn (User $a) => ['agent' => $a->name, 'event_date' => $period,
             'url' => $this->reportLink('agent_commission', ['agent_id' => $a->id, 'from' => $request->from, 'to' => $request->to])]
             + $this->agentStats($a, $request->from, $request->to));
 
@@ -51,6 +52,7 @@ class AgentReportController extends BaseReportController
             ['key' => 'sales', 'label' => 'Sales', 'type' => 'money', 'total' => true],
             ['key' => 'gross', 'label' => 'Gross Profit', 'type' => 'money', 'total' => true, 'sensitive' => true],
             ['key' => 'earnings', 'label' => 'Earnings', 'type' => 'money', 'total' => true],
+            ['key' => 'event_date', 'label' => 'Relevant Event Date', 'class' => 'small text-muted'],
         ], $rows, $this->filters(
             $this->fDateRange('Date range'),
             $this->fAgent(),
@@ -105,7 +107,7 @@ class AgentReportController extends BaseReportController
             ['key' => 'agent', 'label' => 'Agent'],
             ['key' => 'vehicle', 'label' => 'Vehicle', 'link' => 'vehicle_url'],
             ['key' => 'customer', 'label' => 'Customer'],
-            ['key' => 'won_date', 'label' => 'Won Date', 'type' => 'date'],
+            ['key' => 'won_date', 'label' => 'Relevant Event Date (won)', 'type' => 'date'],
             ['key' => 'selling', 'label' => 'Selling Price', 'type' => 'money', 'total' => true],
             ['key' => 'floor', 'label' => 'Floor', 'type' => 'money', 'total' => true],
             ['key' => 'upsell', 'label' => 'Upsell', 'type' => 'money', 'total' => true],
@@ -186,7 +188,7 @@ class AgentReportController extends BaseReportController
             $invoiced = $won->filter(fn ($b) => $b->vehicle?->invoice && $b->vehicle->invoice->status !== 'cancelled');
             $paid = $invoiced->filter(fn ($b) => $b->vehicle->invoice->isFullyPaid());
             return [
-                'agent' => $a->name,
+                'agent' => $a->name, 'event_date' => $this->periodText($request->from, $request->to) . ' (bid date)',
                 'bids' => $bids->count(), 'won' => $won->count(), 'invoiced' => $invoiced->count(), 'paid' => $paid->count(),
                 'bid_win' => $this->pct($won->count(), $bids->count()),
                 'win_invoice' => $this->pct($invoiced->count(), $won->count()),
@@ -205,6 +207,7 @@ class AgentReportController extends BaseReportController
             ['key' => 'win_invoice', 'label' => 'Win → Invoice %', 'type' => 'pct'],
             ['key' => 'invoice_paid', 'label' => 'Invoice → Paid %', 'type' => 'pct'],
             ['key' => 'overall', 'label' => 'Bid → Paid %', 'type' => 'pct'],
+            ['key' => 'event_date', 'label' => 'Relevant Event Date', 'class' => 'small text-muted'],
         ], $rows, $this->filters(
             $this->fDateRange('Bid date (cohort)'),
             $this->fAgent(),
@@ -236,7 +239,7 @@ class AgentReportController extends BaseReportController
 
             $inv = $this->saleInvoices()->withoutGlobalScopes()->whereIn('customer_id', $customers)->whereDate('issued_at', '<=', $asOf)->get();
             return [
-                'agent' => $a->name, 'url' => $this->reportLink('customer_wise', ['agent_id' => $a->id]),
+                'agent' => $a->name, 'url' => $this->reportLink('customer_wise', ['agent_id' => $a->id]), 'event_date' => "As of $asOf",
                 'customers' => $customers->count(),
                 'active' => $active,
                 'active_pct' => $this->pct($active, $customers->count()),
@@ -254,6 +257,7 @@ class AgentReportController extends BaseReportController
             ['key' => 'won', 'label' => 'Won Vehicles', 'type' => 'int', 'total' => true],
             ['key' => 'sales', 'label' => 'Invoiced Sales', 'type' => 'money', 'total' => true],
             ['key' => 'receivables', 'label' => 'Receivables', 'type' => 'money', 'total' => true],
+            ['key' => 'event_date', 'label' => 'Relevant Event Date', 'class' => 'small text-muted'],
         ], $rows, $this->filters(
             $this->fDate('as_of', 'As of', $asOf),
             $this->fAgent(),
@@ -281,7 +285,7 @@ class AgentReportController extends BaseReportController
         $all = $all->map(function ($r) use ($max) {
             $r['score'] = round(($r['wins'] / $max('wins') + $r['sales'] / $max('sales') + $r['collections'] / $max('collections') + $r['earnings'] / $max('earnings')) * 25, 1);
             return $r;
-        })->sortByDesc($metric)->values()->map(fn ($r, $i) => ['rank' => $i + 1] + $r);
+        })->sortByDesc($metric)->values()->map(fn ($r, $i) => ['rank' => $i + 1, 'event_date' => "$from → $to"] + $r);
 
         $rows = $all->when($this->ownOnly(), fn ($c) => $c->where('id', auth()->id()))
             ->when(! $this->ownOnly() && $request->agent_id, fn ($c) => $c->where('id', (int) $request->agent_id));
@@ -296,6 +300,7 @@ class AgentReportController extends BaseReportController
             ['key' => 'collections', 'label' => 'Collections', 'type' => 'money'],
             ['key' => 'earnings', 'label' => 'Commission', 'type' => 'money'],
             ['key' => 'score', 'label' => 'Score', 'type' => 'pct'],
+            ['key' => 'event_date', 'label' => 'Relevant Event Date', 'class' => 'small text-muted'],
         ], $rows, $this->filters(
             $this->fDateRange('Period', 'from', 'to', $from, $to),
             $this->fSelect('metric', 'Rank by', $metrics, 'score', ''),

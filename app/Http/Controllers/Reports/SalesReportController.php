@@ -45,15 +45,15 @@ class SalesReportController extends BaseReportController
         })->filter(fn ($r) => $r['invoiced'] > 0 || $r['last_purchase'])->sortByDesc('invoiced');
 
         return $this->render($request, 'customer_wise', [
-            ['key' => 'customer', 'label' => 'Customer', 'link' => 'customer_url'],
+            ['key' => 'customer', 'label' => 'Customer (Record / Reference)', 'link' => 'customer_url'],
             ['key' => 'country', 'label' => 'Country'],
             ['key' => 'agent', 'label' => 'Agent'],
-            ['key' => 'vehicles', 'label' => 'Vehicles Invoiced', 'type' => 'int', 'total' => true],
+            ['key' => 'vehicles', 'label' => 'Vehicles', 'type' => 'int', 'total' => true],
             ['key' => 'invoiced', 'label' => 'Invoiced Sales', 'type' => 'money', 'total' => true],
             ['key' => 'paid', 'label' => 'Approved Payments', 'type' => 'money', 'total' => true],
             ['key' => 'outstanding', 'label' => 'Outstanding', 'type' => 'money', 'total' => true],
             ['key' => 'last_purchase', 'label' => 'Last Purchase', 'type' => 'date'],
-            ['key' => 'last_invoice', 'label' => 'Last Invoice', 'type' => 'date'],
+            ['key' => 'last_invoice', 'label' => 'Relevant Event Date (last invoice)', 'type' => 'date'],
         ], $rows, $this->filters(
             $this->fDateRange('Invoice date'),
             $this->fCustomer(),
@@ -190,6 +190,7 @@ class SalesReportController extends BaseReportController
                 'agent_earning' => (int) $vehicles->sum(fn ($v) => $v->costing?->agentEarning() ?? 0),
                 'company' => (int) $vehicles->sum(fn ($v) => $v->costing?->finalProfit() ?? 0),
                 'margin' => $this->pct($gross, $sales),
+                'event_date' => optional($vehicles->max('won_at'), fn ($d) => $d->toDateString()),
             ];
         })->filter(fn ($r) => $r['vehicles'] > 0)->sortByDesc('gross');
 
@@ -203,6 +204,7 @@ class SalesReportController extends BaseReportController
             ['key' => 'agent_earning', 'label' => 'Agent Earnings', 'type' => 'money', 'total' => true],
             ['key' => 'company', 'label' => 'Company Profit', 'type' => 'money', 'total' => true],
             ['key' => 'margin', 'label' => 'Margin %', 'type' => 'pct'],
+            ['key' => 'event_date', 'label' => 'Relevant Event Date (last won)', 'type' => 'date'],
         ], $rows, $this->filters(
             $this->fDateRange('Won date'),
             $this->fCustomer(),
@@ -307,7 +309,7 @@ class SalesReportController extends BaseReportController
             ['key' => 'paid', 'label' => 'Paid', 'type' => 'money', 'total' => true],
             ['key' => 'outstanding', 'label' => 'Outstanding', 'type' => 'money', 'total' => true],
             ['key' => 'first_due', 'label' => '50% Due', 'type' => 'date'],
-            ['key' => 'due', 'label' => 'Final Due', 'type' => 'date'],
+            ['key' => 'due', 'label' => 'Due Date', 'type' => 'date'],
             ['key' => 'status', 'label' => 'Status', 'type' => 'badge'],
         ], $rows, $this->filters(
             $this->fDateRange('Invoice date'),
@@ -351,7 +353,7 @@ class SalesReportController extends BaseReportController
             ['key' => 'last_bid', 'label' => 'Last Bid', 'type' => 'date'],
             ['key' => 'last_purchase', 'label' => 'Last Purchase', 'type' => 'date'],
             ['key' => 'last_payment', 'label' => 'Last Payment', 'type' => 'date'],
-            ['key' => 'last_activity', 'label' => 'Last Activity'],
+            ['key' => 'last_activity', 'label' => 'Relevant Event Date (last activity)'],
             ['key' => 'inactive_days', 'label' => 'Inactive Days', 'type' => 'int'],
         ], $rows, $this->filters(
             $this->fNumber('days', 'Inactive for (days) ≥', $days),

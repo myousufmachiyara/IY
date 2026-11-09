@@ -182,7 +182,7 @@ class FinanceReportController extends BaseReportController
             ['key' => 'vehicle', 'label' => 'Vehicle', 'link' => 'vehicle_url'],
             ['key' => 'customer', 'label' => 'Customer', 'link' => 'customer_url'],
             ['key' => 'invoice', 'label' => 'Invoice', 'link' => 'invoice_url'],
-            ['key' => 'date', 'label' => 'Invoice Date', 'type' => 'date'],
+            ['key' => 'date', 'label' => 'Relevant Event Date (invoice)', 'type' => 'date'],
             ['key' => 'total', 'label' => 'Total', 'type' => 'money', 'total' => true],
             ['key' => 'paid', 'label' => 'Paid', 'type' => 'money', 'total' => true],
             ['key' => 'pct', 'label' => 'Paid %', 'type' => 'pct'],
@@ -239,12 +239,12 @@ class FinanceReportController extends BaseReportController
             ['key' => 'customer', 'label' => 'Customer', 'link' => 'customer_url'],
             ['key' => 'agent', 'label' => 'Agent'],
             ['key' => 'invoice', 'label' => 'Deposit Invoice', 'link' => 'invoice_url'],
-            ['key' => 'date', 'label' => 'Issued', 'type' => 'date'],
+            ['key' => 'date', 'label' => 'Relevant Event Date (issued)', 'type' => 'date'],
             ['key' => 'invoiced', 'label' => 'Invoiced', 'type' => 'money', 'total' => true],
-            ['key' => 'paid', 'label' => 'Collected', 'type' => 'money', 'total' => true],
+            ['key' => 'paid', 'label' => 'Paid', 'type' => 'money', 'total' => true],
             ['key' => 'applied', 'label' => 'Applied', 'type' => 'money', 'total' => true],
             ['key' => 'held', 'label' => 'Held', 'type' => 'money', 'total' => true],
-            ['key' => 'balance', 'label' => 'Uncollected', 'type' => 'money', 'total' => true],
+            ['key' => 'balance', 'label' => 'Balance (unpaid)', 'type' => 'money', 'total' => true],
             ['key' => 'status', 'label' => 'Approval Status', 'type' => 'badge'],
         ], $rows, $this->filters(
             $this->fDate('as_of', 'As of', $asOf),
@@ -308,7 +308,7 @@ class FinanceReportController extends BaseReportController
             ['key' => 'vendor', 'label' => 'Vendor', 'class' => 'fw-semibold'],
             ['key' => 'vehicle', 'label' => 'Vehicle', 'link' => 'vehicle_url'],
             ['key' => 'agent', 'label' => 'Agent'],
-            ['key' => 'won_date', 'label' => 'Won Date', 'type' => 'date'],
+            ['key' => 'won_date', 'label' => 'Relevant Event Date (won)', 'type' => 'date'],
             ['key' => 'payable', 'label' => 'Costed Payable', 'type' => 'money', 'total' => true],
             ['key' => 'paid', 'label' => 'Paid', 'type' => 'money', 'total' => true],
             ['key' => 'outstanding', 'label' => 'Outstanding', 'type' => 'money', 'total' => true],
@@ -464,6 +464,7 @@ class FinanceReportController extends BaseReportController
                 'period' => $p['label'], 'url' => $this->link('reports.financial_reports', 'accounting.profit_loss', ['from' => $p['from'], 'to' => $p['to']]),
                 'revenue' => $d['revenue'], 'vehicle' => $vehicle, 'opex' => $opex,
                 'result' => $result, 'margin' => $d['revenue'] ? round($result / $d['revenue'] * 100, 1) : null,
+                'range' => $p['from'] . ' → ' . $p['to'],
             ];
         })->values();
 
@@ -471,11 +472,12 @@ class FinanceReportController extends BaseReportController
 
         return $this->render($request, 'revenue_vs_expense', [
             ['key' => 'period', 'label' => 'Period', 'link' => 'url'],
-            ['key' => 'revenue', 'label' => 'Recognised Revenue', 'type' => 'money', 'total' => true],
+            ['key' => 'revenue', 'label' => 'Recognized Revenue', 'type' => 'money', 'total' => true],
             ['key' => 'vehicle', 'label' => 'Vehicle Costs', 'type' => 'money', 'total' => true],
             ['key' => 'opex', 'label' => 'Operating Expenses', 'type' => 'money', 'total' => true],
             ['key' => 'result', 'label' => 'Result', 'type' => 'money', 'total' => true],
-            ['key' => 'margin', 'label' => 'Margin %', 'type' => 'pct'],
+            ['key' => 'margin', 'label' => 'Margin', 'type' => 'pct'],
+            ['key' => 'range', 'label' => 'Relevant Event Date', 'class' => 'small text-muted'],
         ], $rows, $this->filters(
             $this->fDateRange('Date range', 'from', 'to', $from, $to),
             $this->fGranularity(),

@@ -258,17 +258,10 @@
               <li class="{{ request()->routeIs('reports.index') ? 'active' : '' }}">
                 <a class="nav-link" href="{{ route('reports.index') }}">All Reports</a>
               </li>
-              @foreach($reportMenu as $cat)
-                @php $catActive = collect($cat['reports'])->contains(fn ($r) => request()->routeIs($r['route'])); @endphp
-                <li class="nav-parent {{ $catActive ? 'nav-expanded nav-active' : '' }}">
-                  <a class="nav-link" href="#">{{ $cat['label'] }}</a>
-                  <ul class="nav nav-children">
-                    @foreach($cat['reports'] as $r)
-                      <li class="{{ request()->routeIs($r['route']) ? 'active' : '' }}">
-                        <a class="nav-link" href="{{ route($r['route']) }}">{{ $r['label'] }}</a>
-                      </li>
-                    @endforeach
-                  </ul>
+              @foreach($reportMenu as $catKey => $cat)
+                @php $catActive = request()->is('reports/category/' . $catKey) || collect($cat['reports'])->contains(fn ($r) => request()->routeIs($r['route'])); @endphp
+                <li class="{{ $catActive ? 'active' : '' }}">
+                  <a class="nav-link" href="{{ route('reports.category', $catKey) }}">{{ $cat['label'] }}</a>
                 </li>
               @endforeach
             </ul>

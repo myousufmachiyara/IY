@@ -317,6 +317,11 @@ abstract class BaseReportController extends Controller
         return $granularity === 'quarter' ? $d->year . '-Q' . $d->quarter : $d->format('Y-m');
     }
 
+    protected function periodText(?string $from, ?string $to): string
+    {
+        return $from || $to ? ($from ?: '…') . ' → ' . ($to ?: '…') : 'All dates';
+    }
+
     protected function periodLabel($date, string $granularity = 'month'): string
     {
         $d = $date instanceof Carbon ? $date : Carbon::parse($date);

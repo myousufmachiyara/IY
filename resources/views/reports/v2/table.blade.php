@@ -14,7 +14,7 @@
                 @if(!empty($cards))
                 <div class="row g-2 mb-3">
                     @foreach($cards as $card)
-                    <div class="col-6 col-md">
+                    <div class="col" style="min-width:150px">
                         <div class="report-stat {{ !empty($card['variant']) ? 'report-stat-' . $card['variant'] : '' }}">
                             <div class="report-stat-label">{{ $card['label'] }}</div>
                             <div class="report-stat-value">

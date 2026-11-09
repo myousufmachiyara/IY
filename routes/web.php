@@ -171,6 +171,7 @@ Route::middleware(['auth'])->group(function () {
     // Reports V2 — every report key / permission / label lives in App\Support\ReportCatalog.
     Route::prefix('reports')->name('reports.')->group(function () {
         Route::get('/', [ReportHubController::class, 'index'])->name('index');
+        Route::get('category/{category}', [ReportHubController::class, 'category'])->name('category');
 
         $r = fn (string $uri, array $action, string $key) => Route::get($uri, $action)->middleware("permission:reports.$key")->name($key);
 

@@ -118,7 +118,7 @@ class ShippingReportController extends BaseReportController
             ['key' => 'customer', 'label' => 'Customer', 'link' => 'customer_url'],
             ['key' => 'port', 'label' => 'Port'],
             ['key' => 'invoice', 'label' => 'Invoice', 'link' => 'invoice_url'],
-            ['key' => 'invoice_date', 'label' => 'Invoice Date', 'type' => 'date'],
+            ['key' => 'invoice_date', 'label' => 'Relevant Event Date (invoice)', 'type' => 'date'],
             ['key' => 'pct', 'label' => 'Paid %', 'type' => 'pct'],
             ['key' => 'eligible', 'label' => 'Eligible', 'type' => 'bool'],
             ['key' => 'override', 'label' => 'Override', 'type' => 'badge'],
@@ -238,16 +238,16 @@ class ShippingReportController extends BaseReportController
 
         return $this->render($request, 'shipping_cost', [
             ['key' => 'shipment', 'label' => 'Shipment', 'link' => 'url'],
-            ['key' => 'date', 'label' => 'Ship Date', 'type' => 'date'],
+            ['key' => 'date', 'label' => 'Relevant Event Date (ship)', 'type' => 'date'],
             ['key' => 'customer', 'label' => 'Customer'],
             ['key' => 'route', 'label' => 'Destination'],
             ['key' => 'method', 'label' => 'Method'],
-            ['key' => 'vehicles', 'label' => 'Vehicles', 'type' => 'int', 'total' => true],
+            ['key' => 'vehicles', 'label' => 'Vehicle Count', 'type' => 'int', 'total' => true],
             ['key' => 'freight', 'label' => 'Total Freight', 'type' => 'money', 'total' => true],
             ['key' => 'per_vehicle', 'label' => 'Freight / Vehicle', 'type' => 'money'],
             ['key' => 'allocated', 'label' => 'Allocated to Costings', 'type' => 'money', 'total' => true],
             ['key' => 'allocation', 'label' => 'Allocation Check', 'type' => 'badge'],
-            ['key' => 'trend', 'label' => 'vs Method Avg %', 'type' => 'pct'],
+            ['key' => 'trend', 'label' => 'Cost Trend (vs method avg)', 'type' => 'pct'],
         ], $rows, $this->filters(
             $this->fDateRange('Ship date'),
             $this->fSelect('method', 'Method', array_combine(Shipment::METHODS, Shipment::METHODS)),

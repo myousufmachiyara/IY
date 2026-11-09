@@ -7,7 +7,7 @@
 @endphp
 @if($category)
 <div class="tabs pb-0 pt-2 report-tabs">
-    <div class="px-3 small text-muted mb-1"><i class="fas {{ $category['icon'] }} me-1"></i>{{ $category['label'] }}</div>
+    @if(empty($hideCategory))<div class="px-3 small text-muted mb-1"><i class="fas {{ $category['icon'] }} me-1"></i>{{ $category['label'] }}</div>@endif
     <ul class="nav nav-tabs flex-nowrap overflow-auto">
         @foreach($category['reports'] as $key => $r)
             <li class="nav-item"><a class="nav-link text-nowrap {{ $active === $key ? 'active' : '' }}" href="{{ route($r['route']) }}">{{ $r['label'] }}</a></li>

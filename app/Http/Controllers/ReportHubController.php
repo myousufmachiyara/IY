@@ -15,4 +15,13 @@ class ReportHubController extends Controller
 
         return view('reports.index', compact('categories'));
     }
+
+    /** Sidebar category link: opens the category's first report, whose tabs list the rest. */
+    public function category(Request $request, string $category)
+    {
+        $first = ReportCatalog::firstFor($request->user(), $category);
+        abort_unless($first, 403, 'You do not have access to any report in this category.');
+
+        return redirect()->route($first['route'], $request->query());
+    }
 }

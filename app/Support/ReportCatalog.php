@@ -25,11 +25,11 @@ class ReportCatalog
             'label' => 'Executive & Management',
             'icon'  => 'fa-briefcase',
             'reports' => [
-                'executive_summary' => ['label' => 'Executive Summary', 'route' => 'reports.executive_summary', 'priority' => 'P1',
+                'executive_summary' => ['label' => 'Executive Business Summary', 'route' => 'reports.executive_summary', 'priority' => 'P1',
                     'description' => 'Purchases, invoiced sales, approved collections, gross/company profit, receivables, payables and cash.'],
-                'business_trends' => ['label' => 'Business Trends', 'route' => 'reports.business_trends', 'priority' => 'P3',
+                'business_trends' => ['label' => 'Business Performance Trends', 'route' => 'reports.business_trends', 'priority' => 'P3',
                     'description' => 'Monthly / quarterly growth across sales, purchases, collections and profit.'],
-                'business_exposure' => ['label' => 'Business Exposure', 'route' => 'reports.business_exposure', 'priority' => 'P3',
+                'business_exposure' => ['label' => 'Business Exposure Report', 'route' => 'reports.business_exposure', 'priority' => 'P3',
                     'description' => 'Cash position against receivables, vendor payables, deposits held and unposted vehicle costs.'],
             ],
         ],
@@ -61,23 +61,19 @@ class ReportCatalog
                     'description' => 'Stage-by-stage progress of every vehicle with days in stage.'],
                 'vehicle_profitability' => ['label' => 'Vehicle Profitability', 'route' => 'reports.vehicle_profitability', 'priority' => 'P1',
                     'description' => 'Unit economics per vehicle: every cost line, sale, profit and margin.'],
-                'bid_wise' => ['label' => 'Bid Activity by Date', 'route' => 'reports.bid_wise', 'priority' => null,
-                    'description' => 'Bids placed and won per auction date.'],
-                'auction_house_performance' => ['label' => 'Auction House Performance', 'route' => 'reports.auction_house_performance', 'priority' => null,
-                    'description' => 'Won vehicles, average price and profit by auction house / vendor.'],
             ],
         ],
         'finance' => [
             'label' => 'Finance & Payments',
             'icon'  => 'fa-coins',
             'reports' => [
-                'receivables_aging' => ['label' => 'Receivables & Aging', 'route' => 'reports.receivables_aging', 'priority' => 'P1',
+                'receivables_aging' => ['label' => 'Customer Receivables & Aging', 'route' => 'reports.receivables_aging', 'priority' => 'P1',
                     'description' => 'Outstanding invoice balances bucketed by days overdue.'],
-                'payment_collections' => ['label' => 'Payment Collections', 'route' => 'reports.payment_collections', 'priority' => 'P1',
+                'payment_collections' => ['label' => 'Customer Payment Collections', 'route' => 'reports.payment_collections', 'priority' => 'P1',
                     'description' => 'Customer payment register — approved, pending and rejected.'],
                 'payment_stages' => ['label' => 'Payment Stage Report', 'route' => 'reports.payment_stages', 'priority' => 'P2',
                     'description' => 'Deposit, 50% shipping and 100% release gates per vehicle.'],
-                'security_deposits' => ['label' => 'Security Deposits', 'route' => 'reports.security_deposits', 'priority' => 'P2',
+                'security_deposits' => ['label' => 'Security Deposit Report', 'route' => 'reports.security_deposits', 'priority' => 'P2',
                     'description' => 'Deposits invoiced, collected, applied and still held.'],
                 'vendor_payables' => ['label' => 'Vendor Payables', 'route' => 'reports.vendor_payables', 'priority' => 'P1',
                     'description' => 'Costed vendor payable less vendor payments, per vehicle.'],
@@ -85,16 +81,8 @@ class ReportCatalog
                     'description' => 'Register of every vendor remittance, with reversal status.'],
                 'expense_analysis' => ['label' => 'Expense Analysis', 'route' => 'reports.expense_analysis', 'priority' => 'P2',
                     'description' => 'Operating expenses by category and period.'],
-                'revenue_vs_expense' => ['label' => 'Revenue vs Expense', 'route' => 'reports.revenue_vs_expense', 'priority' => 'P3',
+                'revenue_vs_expense' => ['label' => 'Revenue vs Expense Analysis', 'route' => 'reports.revenue_vs_expense', 'priority' => 'P3',
                     'description' => 'Recognised revenue against vehicle costs and operating expenses per period.'],
-                'vendor_wise' => ['label' => 'Vendor Summary', 'route' => 'reports.vendor_wise', 'priority' => null,
-                    'description' => 'Vehicles, payable and paid totals per vendor.'],
-                'receivables' => ['label' => 'Receivables Ledger', 'route' => 'accounting.receivables', 'priority' => null,
-                    'description' => 'Customer balances straight from the ledger (Accounting).'],
-                'payables' => ['label' => 'Payables Ledger', 'route' => 'accounting.payables', 'priority' => null,
-                    'description' => 'Vendor balances straight from the ledger (Accounting).'],
-                'financial_reports' => ['label' => 'Financial Statements', 'route' => 'accounting.profit_loss', 'priority' => null,
-                    'description' => 'Trial balance, balance sheet, profit & loss, cash flow (Accounting).'],
             ],
         ],
         'shipping' => [
@@ -127,6 +115,30 @@ class ReportCatalog
                     'description' => 'Customer base, active customers, sales and receivables per agent.'],
                 'agent_leaderboard' => ['label' => 'Agent Leaderboard', 'route' => 'reports.agent_leaderboard', 'priority' => 'P3',
                     'description' => 'Company-wide ranking by wins, sales, collections or commission.'],
+            ],
+        ],
+        'other' => [
+            'label' => 'Other Reports',
+            'icon'  => 'fa-folder-open',
+            'reports' => [
+                'bid_wise' => ['label' => 'Bid Activity by Date', 'route' => 'reports.bid_wise', 'priority' => null,
+                    'description' => 'Bids placed and won per auction date.'],
+
+                'auction_house_performance' => ['label' => 'Auction House Performance', 'route' => 'reports.auction_house_performance', 'priority' => null,
+                    'description' => 'Won vehicles, average price and profit by auction house / vendor.'],
+
+                'vendor_wise' => ['label' => 'Vendor Summary', 'route' => 'reports.vendor_wise', 'priority' => null,
+                    'description' => 'Vehicles, payable and paid totals per vendor.'],
+
+                'receivables' => ['label' => 'Receivables Ledger', 'route' => 'accounting.receivables', 'priority' => null,
+                    'description' => 'Customer balances straight from the ledger (Accounting).'],
+
+                'payables' => ['label' => 'Payables Ledger', 'route' => 'accounting.payables', 'priority' => null,
+                    'description' => 'Vendor balances straight from the ledger (Accounting).'],
+
+                'financial_reports' => ['label' => 'Financial Statements', 'route' => 'accounting.profit_loss', 'priority' => null,
+                    'description' => 'Trial balance, balance sheet, profit & loss, cash flow (Accounting).'],
+
                 'agent_profitability' => ['label' => 'Agent Profitability', 'route' => 'reports.agent_profitability', 'priority' => null,
                     'description' => 'Gross profit, agent earning and company profit per agent.'],
             ],
@@ -143,6 +155,13 @@ class ReportCatalog
             }
         }
         return $out;
+    }
+
+    /** First report of a category this user may open (category landing page). */
+    public static function firstFor(?User $user, string $category): ?array
+    {
+        $cat = self::visibleTo($user)[$category] ?? null;
+        return $cat ? reset($cat['reports']) : null;
     }
 
     public static function find(string $key): ?array
