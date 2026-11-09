@@ -195,6 +195,39 @@ class ReportCatalog
         return $out;
     }
 
+    /**
+     * Creates any missing reports.* / confidential-field permission rows and gives the
+     * newly created ones to Super Admin. Safe to call repeatedly (cheap when nothing is
+     * missing). Runs from the migration, `php artisan reports:sync-permissions`, and
+     * automatically when the Roles screen or Reports hub is opened — so a deploy where
+     * `migrate` was skipped still shows every report.
+     */
+    public static function syncPermissions(): int
+    {
+        $wanted = array_merge(self::permissionNames(), [self::SENSITIVE_PERMISSION]);
+        $existing = \Spatie\Permission\Models\Permission::whereIn('name', $wanted)->where('guard_name', 'web')->pluck('name')->all();
+        $missing = array_values(array_diff($wanted, $existing));
+        if (! $missing) {
+            return 0;
+        }
+
+        foreach ($missing as $name) {
+            \Spatie\Permission\Models\Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
+        }
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        if ($super = \Spatie\Permission\Models\Role::where('name', 'super_admin')->first()) {
+            $super->givePermissionTo($missing);
+        }
+        if (in_array(self::SENSITIVE_PERMISSION, $missing, true)) {
+            \Spatie\Permission\Models\Role::permission('data.view_all')->get()
+                ->each(fn ($role) => $role->givePermissionTo(self::SENSITIVE_PERMISSION));
+        }
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return count($missing);
+    }
+
     public static function userCanAny(?User $user): bool
     {
         return (bool) self::visibleTo($user);

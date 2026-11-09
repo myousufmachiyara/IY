@@ -10,6 +10,7 @@ class ReportHubController extends Controller
     /** Landing page listing every report the user may open, grouped by category. */
     public function index(Request $request)
     {
+        ReportCatalog::syncPermissions();
         $categories = ReportCatalog::visibleTo($request->user());
         abort_if(empty($categories), 403, 'You do not have access to any reports.');
 

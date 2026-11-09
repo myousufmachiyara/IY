@@ -19,6 +19,8 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Also creates anything the catalog has gained since (see ReportCatalog::syncPermissions).
+        ReportCatalog::syncPermissions();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         $names = array_merge(ReportCatalog::permissionNames(), [ReportCatalog::SENSITIVE_PERMISSION]);

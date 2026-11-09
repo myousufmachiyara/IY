@@ -104,12 +104,14 @@ class RoleController extends Controller
 
     public function index()
     {
+        \App\Support\ReportCatalog::syncPermissions();
         $roles = Role::withCount('permissions', 'users')->orderBy('name')->get();
         return view('roles.index', compact('roles'));
     }
 
     public function create()
     {
+        \App\Support\ReportCatalog::syncPermissions();
         return view('roles.create', [
             'role'               => new Role,
             'assigned'           => [],
@@ -137,6 +139,7 @@ class RoleController extends Controller
 
     public function edit(Role $role)
     {
+        \App\Support\ReportCatalog::syncPermissions();
         return view('roles.edit', [
             'role'               => $role,
             'assigned'           => $role->permissions->pluck('id')->toArray(),
